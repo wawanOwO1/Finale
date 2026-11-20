@@ -1,0 +1,141 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #f3d9b1;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  color: #3b2414;
+  user-select: none;
+}
+
+/* Canvas always fills the window; with the pixel filter on, the browser upscales
+   a low-res canvas with nearest-neighbor. */
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: block;
+}
+#scene.pixelated { image-rendering: pixelated; }
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  /* UI scales with window height so it reads the same from 640p to 1440p. */
+  font-size: clamp(11px, 1.6vh, 22px);
+}
+#ui button, #ui .card { pointer-events: auto; }
+
+/* ---------- top bar ---------- */
+.top-bar {
+  position: absolute;
+  top: 1.2em; left: 1.5em; right: 1.5em;
+  display: flex; align-items: center; gap: 1em;
+}
+.title {
+  font-weight: 900; font-size: 1.8em; letter-spacing: 0.15em;
+  color: #d8342c; text-shadow: 0.08em 0.08em 0 #3b2414;
+}
+.district { font-weight: 700; opacity: 0.8; flex: 1; }
+
+/* ---------- buttons ---------- */
+.btn {
+  font: inherit; font-weight: 900; font-size: 1.1em;
+  padding: 0.6em 1.4em;
+  border: 0.22em solid #3b2414; border-radius: 0.6em;
+  background: #faf0dc; color: #3b2414;
+  box-shadow: 0 0.25em 0 #3b2414;
+  cursor: pointer;
+}
+.btn:hover { transform: translateY(-0.1em); }
+.btn:active { transform: translateY(0.15em); box-shadow: 0 0.1em 0 #3b2414; }
+.btn.small { font-size: 0.85em; padding: 0.4em 0.9em; }
+.btn.serve { background: #d8342c; color: #fff; font-size: 1.5em; }
+.btn small { font-size: 0.6em; opacity: 0.9; }
+
+/* ---------- rival intent (follows the rival in 3D) ---------- */
+.intent {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3em;
+  will-change: transform;
+}
+.intent-name { font-weight: 900; font-size: 1.1em; }
+.intent-bubble {
+  background: #fff; border: 0.18em solid #3b2414; border-radius: 1em;
+  padding: 0.3em 0.8em; font-weight: 800;
+}
+.bar {
+  position: relative; width: 9em; height: 1.2em;
+  background: #3b2414; border-radius: 0.6em; overflow: hidden;
+}
+.bar-fill { position: absolute; inset: 0; background: #d8342c; }
+.bar span {
+  position: relative; display: block; text-align: center;
+  font-size: 0.7em; line-height: 1.7em; color: #fff; font-weight: 800;
+}
+
+/* ---------- Confidence badge bottom-left (GDD §7.2) ---------- */
+.badge-area {
+  position: absolute; left: 1.5em; bottom: 1.5em;
+  display: flex; align-items: flex-end; gap: 0.6em;
+}
+.badge {
+  width: 7.5em; height: 7.5em; border-radius: 50%;
+  background: #d8342c; color: #fff;
+  border: 0.3em solid #3b2414;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: 0 0.3em 0 #3b2414;
+}
+.badge-value { font-size: 2.2em; font-weight: 900; line-height: 1; }
+.badge-value small { font-size: 0.45em; }
+.badge-label { font-size: 0.75em; font-weight: 800; letter-spacing: 0.05em; }
+.chip {
+  background: #faf0dc; border: 0.18em solid #3b2414; border-radius: 0.5em;
+  padding: 0.3em 0.7em; font-weight: 900;
+}
+
+/* ---------- hand of cards ---------- */
+.hand {
+  position: absolute; left: 50%; bottom: -2.5em;
+  transform: translateX(-50%);
+  display: flex; gap: 0.6em;
+}
+.card {
+  position: relative;
+  width: 8.5em; height: 12em;
+  background: #faf0dc;
+  border: 0.3em solid #3b2414; border-radius: 0.8em;
+  box-shadow: 0 0.3em 0 #3b2414;
+  padding: 0.5em;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3em;
+  transition: transform 0.12s ease-out;
+  cursor: pointer;
+}
+.card:hover { transform: translateY(-2.2em) scale(1.08); z-index: 2; }
+.card.ingredient { background: #fbe3c0; }
+.card.technique { background: #e9e4f5; }
+.card-cost {
+  position: absolute; top: -0.7em; left: -0.7em;
+  width: 2em; height: 2em; border-radius: 50%;
+  background: #d9822b; color: #fff; border: 0.18em solid #3b2414;
+  display: flex; align-items: center; justify-content: center; font-weight: 900;
+}
+.card-name { font-weight: 900; font-size: 1em; text-align: center; }
+.card-art {
+  width: 100%; height: 4.5em; border-radius: 0.4em;
+  background: repeating-linear-gradient(45deg, #0000 0 0.5em, #3b241414 0.5em 1em);
+  border: 0.12em solid #3b241455;
+}
+.card-type { font-size: 0.7em; font-weight: 800; opacity: 0.7; letter-spacing: 0.08em; }
+.card-text { font-size: 0.85em; font-weight: 700; text-align: center; }
+
+/* ---------- action buttons ---------- */
+.actions {
+  position: absolute; right: 1.5em; bottom: 1.5em;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.6em;
+}
