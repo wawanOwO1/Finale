@@ -139,3 +139,71 @@ html, body {
   position: absolute; right: 1.5em; bottom: 1.5em;
   display: flex; flex-direction: column; align-items: flex-end; gap: 0.6em;
 }
+
+/* ---------- duel state ---------- */
+.hidden { display: none !important; }
+.muted { opacity: 0.6; font-weight: 700; }
+#ui .recipe, #ui .btn:disabled { pointer-events: auto; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.hype { display: flex; align-items: center; gap: 0.5em; font-weight: 900; }
+.hype-bar {
+  width: 12em; height: 1em; background: #3b2414; border-radius: 0.5em; overflow: hidden;
+  border: 0.15em solid #3b2414;
+}
+.hype-fill { height: 100%; width: 0; background: #f2b632; transition: width 0.3s; }
+
+.log {
+  position: absolute; top: 4.5em; left: 1.5em;
+  display: flex; flex-direction: column; gap: 0.2em;
+  font-weight: 700; font-size: 0.9em;
+}
+.log div:last-child { font-weight: 900; color: #d8342c; }
+
+.chip.composure { background: #dce9f2; }
+.chips { display: flex; flex-direction: column; gap: 0.4em; align-items: flex-start; }
+
+.piles {
+  position: absolute; right: 1.5em; bottom: 9.5em;
+  font-weight: 800; font-size: 0.85em; opacity: 0.75;
+}
+
+/* Plate panel floats above the player's plate. */
+.plate-panel {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4em;
+  width: 22em; will-change: transform;
+}
+.plate-items {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3em;
+  background: #fffaf0; border: 0.18em solid #3b2414; border-radius: 0.8em;
+  padding: 0.35em 0.7em;
+}
+.plate-item {
+  background: #fbe3c0; border-radius: 0.4em; padding: 0.1em 0.45em; font-weight: 800; font-size: 0.9em;
+}
+.plate-item b { color: #d9822b; font-size: 0.8em; }
+.recipes { display: flex; flex-direction: column; gap: 0.3em; align-items: center; }
+.recipe {
+  font: inherit; font-weight: 900; font-size: 0.95em;
+  border: 0.18em solid #3b2414; border-radius: 0.6em; padding: 0.25em 0.8em;
+}
+.recipe small { font-weight: 700; opacity: 0.8; }
+.recipe.ready { background: #8bd17c; cursor: pointer; box-shadow: 0 0.2em 0 #3b2414; }
+.recipe.ready:hover { transform: translateY(-0.1em); }
+.recipe.ready:disabled { opacity: 0.55; cursor: not-allowed; }
+.recipe.almost { background: #faf0dc; border-style: dashed; opacity: 0.85; }
+
+.card.disabled { filter: grayscale(0.7) brightness(0.85); cursor: not-allowed; }
+
+.overlay {
+  position: absolute; inset: 0; pointer-events: auto;
+  background: #3b2414aa; display: flex; align-items: center; justify-content: center;
+}
+.overlay-box {
+  background: #faf0dc; border: 0.3em solid #3b2414; border-radius: 1em;
+  padding: 2em 3em; text-align: center; display: flex; flex-direction: column; gap: 1em;
+  box-shadow: 0 0.4em 0 #3b2414;
+}
+.overlay-title { font-size: 3em; font-weight: 900; color: #d8342c; text-shadow: 0.06em 0.06em 0 #3b2414; }
+.overlay-text { font-weight: 700; }

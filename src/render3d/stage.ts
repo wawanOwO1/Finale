@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE } from './palette';
+import { PALETTE, TAG_COLORS } from './palette';
 
 /** Flat-shaded material: one solid color per face, no textures (GDD §7.1). */
 const flat = (color: number) => new THREE.MeshLambertMaterial({ color, flatShading: true });
@@ -46,6 +46,12 @@ export interface Stage {
   plate: THREE.Mesh;
   /** Point above the rival's head, used to place the intent label. */
   rivalIntentAnchor: THREE.Object3D;
+  /** Point above the plate, used to place the Plate panel. */
+  plateAnchor: THREE.Object3D;
+  /** Show one block per ingredient on the Plate (colored by its first tag). */
+  setPlate(tags: string[]): void;
+  /** Flinch a chef when it takes Pressure. */
+  hit(who: 'player' | 'rival'): void;
   update(time: number): void;
 }
 
@@ -125,6 +131,33 @@ export function createStage(camera: THREE.PerspectiveCamera): Stage {
     }
   }
 
+  const plateAnchor = new THREE.Object3D();
+  plateAnchor.position.set(0, 1.4, 0);
+  plate.add(plateAnchor);
+
+  const plateItems = new THREE.Group();
+  plate.add(plateItems);
+  const itemGeo = new THREE.DodecahedronGeometry(0.16, 0);
+  function setPlate(tags: string[]): void {
+    plateItems.clear();
+    tags.forEach((tag, i) => {
+      const m = new THREE.Mesh(itemGeo, flat(TAG_COLORS[tag] ?? PALETTE.accent));
+      const a = (i / Math.max(1, tags.length)) * Math.PI * 2;
+      const r = tags.length > 1 ? 0.3 : 0;
+      m.position.set(Math.cos(a) * r, 0.17, Math.sin(a) * r);
+      m.castShadow = true;
+      plateItems.add(m);
+    });
+  }
+
+  // Flinch: short sideways shake that decays over ~0.4 s.
+  const hitAt = { player: -10, rival: -10 };
+  let now = 0;
+  const shake = (who: 'player' | 'rival') => {
+    const dt = now - hitAt[who];
+    return dt < 0.4 ? Math.sin(dt * 60) * 0.18 * (1 - dt / 0.4) : 0;
+  };
+
   const rivalIntentAnchor = new THREE.Object3D();
   rivalIntentAnchor.position.set(0, 3.3, 0);
   rival.add(rivalIntentAnchor);
@@ -139,10 +172,18 @@ export function createStage(camera: THREE.PerspectiveCamera): Stage {
     rival,
     plate,
     rivalIntentAnchor,
+    plateAnchor,
+    setPlate,
+    hit(who) {
+      hitAt[who] = now;
+    },
     update(time: number) {
+      now = time;
       // Idle bob so the graybox feels alive.
       player.position.y = stageTop + Math.abs(Math.sin(time * 2.2)) * 0.06;
       rival.position.y = stageTop + Math.abs(Math.sin(time * 2.0 + 1)) * 0.06;
+      player.position.x = -3 + shake('player');
+      rival.position.x = 3 + shake('rival');
       for (const m of crowd) {
         m.position.y = m.userData.baseY + Math.max(0, Math.sin(time * 3 + m.userData.phase)) * 0.12;
       }

@@ -14,3 +14,14 @@ export const PALETTE = {
   skin: 0xf2c7a0,
   plate: 0xffffff,
 } as const;
+
+/** Placeholder ingredient colors on the Plate, by tag. */
+export const TAG_COLORS: Record<string, number> = {
+  PROTEIN: 0xf6d36b,
+  CARB: 0xd9a35b,
+  VEGGIE: 0xd8342c,
+  FAT: 0xfff1a8,
+  DAIRY: 0xfafafa,
+  SPICE: 0xb8261f,
+  SAUCE: 0x8a3b1e,
+};

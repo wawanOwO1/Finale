@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import './style.css';
+import { Duel } from './core/duel';
+import { CARDS, STARTER_DECK } from './data/cards';
+import { ENEMIES } from './data/enemies';
+import { BOOKS, RECIPES } from './data/recipes';
 import { GameRenderer } from './render3d/renderer';
 import { createStage } from './render3d/stage';
 import { createHud } from './ui/hud';
@@ -15,6 +19,26 @@ hud.onTogglePixel(() => {
   gfx.setPixelated(!gfx.isPixelated);
   hud.setPixelLabel(gfx.isPixelated);
 });
+
+/** Graybox milestone: one duel against Tony with the starter deck + Basics Cookbook. */
+function startDuel(): Duel {
+  const duel = new Duel({
+    deck: STARTER_DECK.map((id) => CARDS[id]),
+    enemy: ENEMIES.tony,
+    recipes: BOOKS.basics.recipes.map((id) => RECIPES[id]),
+  });
+  // Visuals listen to the event bus; the duel never knows about them (GDD §9).
+  duel.bus.on('changed', () => stage.setPlate(duel.plate.map((c) => c.def.tags?.[0] ?? '')));
+  duel.bus.on('pressure_dealt', (e) => {
+    if (e.amount > e.blocked) stage.hit(e.target === 'enemy' ? 'rival' : 'player');
+  });
+  stage.setPlate([]);
+  hud.bind(duel);
+  return duel;
+}
+
+startDuel();
+hud.onRestart(() => startDuel());
 
 // Project a 3D point to screen pixels (for labels that follow 3D objects).
 const tmp = new THREE.Vector3();
@@ -32,6 +56,8 @@ function frame(): void {
   stage.update(t);
   const p = toScreen(stage.rivalIntentAnchor);
   hud.setIntentPosition(p.x, p.y);
+  const q = toScreen(stage.plateAnchor);
+  hud.setPlatePosition(q.x, q.y);
   gfx.render(stage.scene);
   requestAnimationFrame(frame);
 }
