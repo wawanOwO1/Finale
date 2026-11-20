@@ -1,4 +1,4 @@
-import type { CardInstance, Intent, RecipeDef } from './types.ts';
+import type { CardInstance, Intent, RecipeDef, StatusId } from './types.ts';
 
 /** Events the duel emits; visuals and audio listen, logic never depends on them (GDD §9). */
 export interface DuelEvents {
@@ -6,8 +6,13 @@ export interface DuelEvents {
   card_played: { card: CardInstance };
   dish_served: { recipe: RecipeDef | null; pressure: number; quality: number; count: number };
   pressure_dealt: { target: 'player' | 'enemy'; amount: number; blocked: number };
-  composure_gained: { target: 'player' | 'enemy'; amount: number };
+  confidence_lost: { target: 'player' | 'enemy'; amount: number; source: 'pressure' | 'spicy' };
+  composure_gained:{ target: 'player' | 'enemy'; amount: number };
   enemy_acted: { intent: Intent };
+  status_applied: { target: 'player' | 'enemy'; status: StatusId; amount: number };
+  signature_ready: Record<string, never>;
+  signature_served: { dish: string };
+  dish_revealed: { recipe: RecipeDef | null; perfect: boolean; signature: boolean; burnt: boolean };
   duel_ended: { winner: 'player' | 'enemy' };
   changed: Record<string, never>;
 }

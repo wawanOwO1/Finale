@@ -46,8 +46,10 @@ export interface Stage {
   plate: THREE.Mesh;
   /** Point above the rival's head, used to place the intent label. */
   rivalIntentAnchor: THREE.Object3D;
-  /** Point above the plate, used to place the Plate panel. */
-  plateAnchor: THREE.Object3D;
+  /** Point above the prep table beside Apis, where the Prep Board UI sits. */
+  boardAnchor: THREE.Object3D;
+  /** Point above Apis's head, for floating numbers. */
+  playerAnchor: THREE.Object3D;
   /** Show one block per ingredient on the Plate (colored by its first tag). */
   setPlate(tags: string[]): void;
   /** Flinch a chef when it takes Pressure. */
@@ -131,9 +133,19 @@ export function createStage(camera: THREE.PerspectiveCamera): Stage {
     }
   }
 
-  const plateAnchor = new THREE.Object3D();
-  plateAnchor.position.set(0, 1.4, 0);
-  plate.add(plateAnchor);
+  // Prep table on Apis's left: the Prep Board UI floats over it.
+  const prepTable = box(2.2, 0.9, 1.3, PALETTE.counter);
+  prepTable.position.set(-6.4, stageTop + 0.45, 1.4);
+  const prepTop = box(2.4, 0.1, 1.45, PALETTE.counterTop);
+  prepTop.position.set(-6.4, stageTop + 0.95, 1.4);
+  scene.add(prepTable, prepTop);
+  const boardAnchor = new THREE.Object3D();
+  boardAnchor.position.set(-6.4, stageTop + 1.2, 1.4);
+  scene.add(boardAnchor);
+
+  const playerAnchor = new THREE.Object3D();
+  playerAnchor.position.set(0, 3.1, 0);
+  player.add(playerAnchor);
 
   const plateItems = new THREE.Group();
   plate.add(plateItems);
@@ -172,7 +184,8 @@ export function createStage(camera: THREE.PerspectiveCamera): Stage {
     rival,
     plate,
     rivalIntentAnchor,
-    plateAnchor,
+    boardAnchor,
+    playerAnchor,
     setPlate,
     hit(who) {
       hitAt[who] = now;

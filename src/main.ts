@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { Duel } from './core/duel';
-import { CARDS, STARTER_DECK } from './data/cards';
+import { CARDS, DEV_DECK, STARTER_DECK } from './data/cards';
 import { ENEMIES } from './data/enemies';
 import { BOOKS, RECIPES } from './data/recipes';
 import { GameRenderer } from './render3d/renderer';
@@ -20,27 +20,38 @@ hud.onTogglePixel(() => {
   hud.setPixelLabel(gfx.isPixelated);
 });
 
-/** Graybox milestone: one duel against Tony with the starter deck + Basics Cookbook. */
-function startDuel(): Duel {
+/**
+ * Graybox: one duel, Tony + starter deck + Basics Cookbook by default.
+ * Dev URL params until the Course Path exists:
+ *   ?enemy=rosa   pick the rival
+ *   ?deck=dev     starter + status cards, all four Recipe Books
+ *   ?hype=100     start with Hype (100 = Signature Dish in hand)
+ */
+const params = new URLSearchParams(location.search);
+const dev = params.get('deck') === 'dev';
+const enemy = ENEMIES[params.get('enemy') ?? ''] ?? ENEMIES.tony;
+const recipes = (dev ? Object.keys(BOOKS) : ['basics']).flatMap((b) => BOOKS[b].recipes.map((id) => RECIPES[id]));
+
+async function startDuel(): Promise<void> {
+  stage.setPlate([]);
+  // The Recipe Book is only readable before the duel: memorize the orders.
+  await hud.showCookbook(recipes);
   const duel = new Duel({
-    deck: STARTER_DECK.map((id) => CARDS[id]),
-    enemy: ENEMIES.tony,
-    recipes: BOOKS.basics.recipes.map((id) => RECIPES[id]),
+    deck: (dev ? DEV_DECK : STARTER_DECK).map((id) => CARDS[id]),
+    enemy,
+    recipes,
+    hype: Number(params.get('hype')) || 0,
   });
   // Visuals listen to the event bus; the duel never knows about them (GDD §9).
   duel.bus.on('changed', () => stage.setPlate(duel.plate.map((c) => c.def.tags?.[0] ?? '')));
-  duel.bus.on('pressure_dealt', (e) => {
-    if (e.amount > e.blocked) stage.hit(e.target === 'enemy' ? 'rival' : 'player');
-  });
-  stage.setPlate([]);
-  hud.bind(duel);
-  return duel;
+  duel.bus.on('confidence_lost', (e) => stage.hit(e.target === 'enemy' ? 'rival' : 'player'));
+  hud.bind(duel, enemy.name);
 }
 
 startDuel();
 hud.onRestart(() => startDuel());
 
-// Project a 3D point to screen pixels (for labels that follow 3D objects).
+// Project a 3D point to screen pixels (for UI that follows 3D objects).
 const tmp = new THREE.Vector3();
 function toScreen(obj: THREE.Object3D): { x: number; y: number } {
   obj.getWorldPosition(tmp).project(gfx.camera);
@@ -54,10 +65,11 @@ const clock = new THREE.Clock();
 function frame(): void {
   const t = clock.getElapsedTime();
   stage.update(t);
-  const p = toScreen(stage.rivalIntentAnchor);
-  hud.setIntentPosition(p.x, p.y);
-  const q = toScreen(stage.plateAnchor);
-  hud.setPlatePosition(q.x, q.y);
+  hud.setAnchors({
+    rival: toScreen(stage.rivalIntentAnchor),
+    player: toScreen(stage.playerAnchor),
+    board: toScreen(stage.boardAnchor),
+  });
   gfx.render(stage.scene);
   requestAnimationFrame(frame);
 }

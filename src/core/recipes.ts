@@ -56,7 +56,38 @@ export function plateQuality(plate: CardInstance[]): number {
   return plate.reduce((sum, c) => sum + (c.def.quality ?? 0), 0);
 }
 
-/** Human-readable requirement, e.g. "VEGGIE" or "Beef". */
-export function requirementLabel(req: Requirement): string {
-  return 'card' in req ? req.card : req.tag;
+/**
+ * Perfect Order: the recipe's ingredients sit on the Prep Board in the same order the
+ * Recipe Book lists them (other ingredients may sit in between). Greedy subsequence
+ * matching is optimal here: taking the earliest fitting ingredient never hurts later slots.
+ */
+export function inOrder(recipe: RecipeDef, plate: CardInstance[]): boolean {
+  let r = 0;
+  for (const c of plate) {
+    if (r < recipe.requires.length && fits(recipe.requires[r], c)) r++;
+  }
+  return r === recipe.requires.length;
+}
+
+export interface Dish {
+  recipe: RecipeDef;
+  inOrder: boolean;
+}
+
+/**
+ * The dish the board cooks into. The Recipe Book is closed during a duel, so the game
+ * picks for the player: a Perfect Order match first, then the recipe with more slots.
+ */
+export function bestDish(known: RecipeDef[], plate: CardInstance[]): Dish | null {
+  const dishes = known
+    .filter((r) => missingCount(r, plate) === 0)
+    .map((recipe) => ({ recipe, inOrder: inOrder(recipe, plate) }));
+  const power = (r: RecipeDef) => r.effects.reduce((s, e) => s + e.amount, 0);
+  dishes.sort(
+    (a, b) =>
+      Number(b.inOrder) - Number(a.inOrder) ||
+      b.recipe.requires.length - a.recipe.requires.length ||
+      power(b.recipe) - power(a.recipe),
+  );
+  return dishes[0] ?? null;
 }
