@@ -18,7 +18,13 @@ Setup duel (pengganti URL param lama) ada di Inspector node **Main**:
 | `?deck=dev` | `Dev Deck` |
 | `?hype=100` | `Start Hype` |
 
-Shortcut in-game: **E** = End Turn, **S** = Serve.
+**Cara main (sama seperti versi web):** kartu di-**drag**. Bahan → seret ke Prep Board. Teknik → seret ke atas
+keluar dari tangan lalu lepas. Klik biasa pada kartu hanya memunculkan hint "Drag a card to play it".
+
+Shortcut in-game: **E** = End Turn, **S** = Serve, **P** = filter pixel.
+
+> Kalau menjalankan dari editor dan tidak bisa klik apa pun: di tab **Game** editor, pastikan mode
+> input aktif (bukan mode *Select* 2D/3D), atau matikan *Embed Game* supaya game jalan di window sendiri.
 
 ## Struktur
 
@@ -28,18 +34,21 @@ godot/
   export_presets.cfg      Preset "Web" → build/web/index.html
   data/                   SEMUA konten, 1 file .tres per item (edit di Inspector)
     cards/ recipes/ enemies/ books/ decks/
+  assets/icons/           Ikon SVG putih (dari src/ui/icons.ts), diwarnai lewat self_modulate
+  assets/ui_theme.tres    Theme project: font + warna teks default
   scripts/
     data/                 Class Resource: CardDef, RecipeDef, EffectDef, EnemyDef, IntentDef, BookDef, DeckDef, StatusDefs
     core/                 Logika murni, tanpa node: Duel, RecipeMatch, SeededRng, CardInstance
     game_db.gd            GameDB: load semua .tres di data/ lalu cari by id
     stage/                Stage (3D diorama), Chef
-    ui/                   DuelUI (HUD), CardView
+    ui/                   DuelUI (HUD + drag), CardView, Ui (builder panel/ikon), Pal (palet warna), Keywords
     main.gd               Entry point: cookbook → duel
   scenes/
     main.tscn             Stage + DuelUI
     stage/                stage.tscn, chef.tscn, counter.tscn  ← atur posisi/kamera/lampu di editor 3D
     ui/                   duel_ui.tscn, card_view.tscn        ← atur layout HUD di editor 2D
-  tests/sim.gd            Test headless (port dari scripts/sim.ts)
+  tests/sim.gd            Test headless logika (port dari scripts/sim.ts)
+  tests/ui_drive.gd       Test UI dengan input mouse simulasi + screenshot
 ```
 
 ### Peta TS → Godot
@@ -99,13 +108,26 @@ Catatan syarat jam (GDD §9):
 - Sinyal `og:ready`: panggil lewat `JavaScriptBridge.eval(...)` setelah duel pertama tampil
   (API SDK OpenGame belum diintegrasikan, sama seperti versi web).
 
-## Belum di-port (masih graybox sederhana)
+## Status port UI
 
-Versi Godot sudah bisa dimainkan penuh (cookbook → duel → menang/kalah → rematch), tapi HUD-nya
-lebih polos dari versi web. Yang belum:
+Sudah setara versi web: top bar + meter Hype, panel rival yang mengikuti kepala rival (intent pill,
+bar Confidence, Composure, status), Prep Board yang mengikuti meja prep, badge hati/Heat/Composure,
+pile draw/discard, kartu bergaya (badge biaya, ikon tag, keyword berwarna, tooltip keyword saat hover),
+drag & drop dengan ghost miring, zona "Release to play", angka melayang, banner dish, cut-in Signature
+Dish, Recipe Book, layar Victory/Defeat, tooltip di semua elemen, filter pixel (tombol kanan atas / P).
 
-- Drag & drop kartu ke Prep Board (sekarang: klik kartu)
-- Ikon status/tag dan highlight keyword + tooltip kaya di teks kartu
-- Intent pill yang menempel di atas kepala rival (`Stage.screen_pos(rival_intent_anchor)` sudah siap)
-- Angka damage melayang, cut-in Signature Dish
-- Toggle filter pixel (bisa pakai `SubViewport` resolusi rendah + `TEXTURE_FILTER_NEAREST`)
+Perbedaan kecil yang tersisa:
+- Font: pakai SystemFont "Trebuchet MS" (Windows). Di build **Web**, SystemFont tidak tersedia dan jatuh
+  ke font bawaan Godot. Untuk jam, tambahkan file font OFL (mis. Nunito Black) ke `assets/` dan pasang di
+  `assets/ui_theme.tres`.
+- Gradien halus CSS (kartu, zona play) diganti warna rata.
+- Intent pill tidak "bob" naik-turun.
+- Pencahayaan 3D dikalibrasi manual: di renderer Compatibility, matahari ber-bayangan dirender sebagai
+  pass terpisah yang dijumlahkan setelah konversi sRGB, jadi energinya sengaja kecil (sun 0.35, ambient 0.15).
+
+Test UI (butuh window, bukan headless):
+
+```powershell
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
+```
+Invalid project path specified: "godot", aborting.

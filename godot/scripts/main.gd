@@ -7,16 +7,30 @@ extends Node
 @export var dev_deck := false
 ## 100 = Signature Dish in hand from turn 1.
 @export_range(0, 100) var start_hype := 0
+## Vertical resolution of the 3D view when the pixel filter is on.
+@export var pixel_height := 360
 
-@onready var stage: Stage = $Stage
+@onready var view: SubViewportContainer = $StageView
+@onready var stage: Stage = $StageView/StageViewport/Stage
 @onready var ui: DuelUI = $DuelUI
 
 var duel: Duel
+var pixelated := false
 
 
 func _ready() -> void:
 	ui.restart_requested.connect(_start_duel)
+	ui.pixel_toggled.connect(_toggle_pixel)
 	_start_duel()
+
+
+func _process(_delta: float) -> void:
+	# HUD blocks that follow the 3D stage (rival HUD, Prep Board, floating numbers).
+	ui.anchors = {
+		rival = _screen(stage.rival_intent_anchor),
+		player = _screen(stage.player_anchor),
+		board = _screen(stage.board_anchor),
+	}
 
 
 func _start_duel() -> void:
@@ -39,3 +53,15 @@ func _sync_plate() -> void:
 	for c in duel.plate:
 		tags.append(c.def.first_tag())
 	stage.set_plate(tags)
+
+
+## 3D anchor → HUD (canvas) coordinates, through the SubViewport's shrink factor.
+func _screen(anchor: Node3D) -> Vector2:
+	return view.position + stage.screen_pos(anchor) * view.stretch_shrink
+
+
+## Pixel filter: render the 3D view at ~360p and upscale it with nearest filtering.
+func _toggle_pixel() -> void:
+	pixelated = not pixelated
+	view.stretch_shrink = maxi(1, roundi(view.size.y / pixel_height)) if pixelated else 1
+	ui.set_pixel_on(pixelated)
