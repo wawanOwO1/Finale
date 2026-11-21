@@ -24,6 +24,15 @@ func _ready() -> void:
 	_start_duel()
 
 
+## F11 = real fullscreen. Do not drag the window bigger than the screen instead: Windows then
+## moves it, and the mouse no longer lines up with what is drawn.
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and not key.echo and key.keycode == KEY_F11:
+		var w := get_window()
+		w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+
+
 func _process(_delta: float) -> void:
 	# HUD blocks that follow the 3D stage (rival HUD, Prep Board, floating numbers).
 	ui.anchors = {

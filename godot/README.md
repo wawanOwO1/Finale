@@ -21,10 +21,18 @@ Setup duel (pengganti URL param lama) ada di Inspector node **Main**:
 **Cara main (sama seperti versi web):** kartu di-**drag**. Bahan → seret ke Prep Board. Teknik → seret ke atas
 keluar dari tangan lalu lepas. Klik biasa pada kartu hanya memunculkan hint "Drag a card to play it".
 
-Shortcut in-game: **E** = End Turn, **S** = Serve, **P** = filter pixel.
+Shortcut in-game: **E** = End Turn, **S** = Serve, **P** = filter pixel, **F11** = fullscreen.
+
+Resolusi desain 1920x1080 (stretch `canvas_items` + `expand`), tapi window dibuka **1600x900**
+(`window_*_override`) supaya window + title bar muat di layar 1080p. UI mengikuti ukuran window
+apa pun; `tests/hit_probe.gd` memastikan tiap tombol bisa diklik penuh setelah resize.
 
 > Kalau menjalankan dari editor dan tidak bisa klik apa pun: di tab **Game** editor, pastikan mode
 > input aktif (bukan mode *Select* 2D/3D), atau matikan *Embed Game* supaya game jalan di window sendiri.
+>
+> Kalau klik **meleset** (harus klik sedikit di bawah tombol): window Game floating lebih besar dari
+> layar, lalu Windows menggesernya sementara game yang di-embed tidak ikut. Kecilkan window Game itu
+> supaya muat di layar, atau pakai **F11** untuk fullscreen. Jangan menarik window melebihi layar.
 
 ## Struktur
 
@@ -49,6 +57,7 @@ godot/
     ui/                   duel_ui.tscn, card_view.tscn        ← atur layout HUD di editor 2D
   tests/sim.gd            Test headless logika (port dari scripts/sim.ts)
   tests/ui_drive.gd       Test UI dengan input mouse simulasi + screenshot
+  tests/hit_probe.gd      Cek area klik semua tombol di beberapa ukuran window
 ```
 
 ### Peta TS → Godot
@@ -129,5 +138,5 @@ Test UI (butuh window, bukan headless):
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1366x768 --script res://tests/hit_probe.gd
 ```
-Invalid project path specified: "godot", aborting.
