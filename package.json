@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "sim": "node scripts/sim.ts"
+    "sim": "node scripts/sim.ts",
+    "godot:data": "node scripts/export-godot-data.ts"
   },
   "dependencies": {
     "three": "^0.187.0"

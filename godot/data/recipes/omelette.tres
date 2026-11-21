@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="RecipeDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/recipe_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 0
+amount = 10
+
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+kind = 1
+amount = 5
+
+[resource]
+script = ExtResource("2")
+id = "omelette"
+name = "Omelette"
+book = "basics"
+requires = PackedStringArray("FAT", "PROTEIN", "VEGGIE")
+effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2")])
+hype = 25
+text = "10 Pressure, 5 Composure"

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/card_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 3
+amount = 1
+
+[resource]
+script = ExtResource("2")
+id = "rice"
+name = "Rice"
+type = 0
+cost = 0
+tags = Array[String](["CARB"])
+quality = 1
+effects = Array[ExtResource("1")]([SubResource("sub_1")])
+text = "Quality 1. Draw 1"

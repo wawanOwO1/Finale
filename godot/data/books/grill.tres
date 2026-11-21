@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BookDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/recipe_def.gd" id="1"]
+[ext_resource type="Resource" path="res://data/recipes/classicSteak.tres" id="2"]
+[ext_resource type="Resource" path="res://data/recipes/skewers.tres" id="3"]
+[ext_resource type="Resource" path="res://data/recipes/mixedGrill.tres" id="4"]
+[ext_resource type="Script" path="res://scripts/data/book_def.gd" id="5"]
+
+[resource]
+script = ExtResource("5")
+id = "grill"
+name = "Grill Master's Notes"
+recipes = Array[ExtResource("1")]([ExtResource("2"), ExtResource("3"), ExtResource("4")])

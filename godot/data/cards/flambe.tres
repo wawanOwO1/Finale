@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/card_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 0
+amount = 12
+
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+kind = 4
+amount = 10
+
+[resource]
+script = ExtResource("2")
+id = "flambe"
+name = "Flambé"
+type = 1
+cost = 2
+effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2")])
+text = "12 Pressure, Hype +10"

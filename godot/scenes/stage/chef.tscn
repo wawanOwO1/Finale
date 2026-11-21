@@ -1,0 +1,45 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/stage/chef.gd" id="1"]
+
+[sub_resource type="CapsuleMesh" id="body_mesh"]
+radius = 0.45
+height = 1.6
+radial_segments = 8
+rings = 2
+
+[sub_resource type="StandardMaterial3D" id="skin"]
+albedo_color = Color(0.949, 0.78, 0.627, 1)
+
+[sub_resource type="SphereMesh" id="head_mesh"]
+material = SubResource("skin")
+radius = 0.5
+height = 1.0
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="white"]
+albedo_color = Color(1, 1, 1, 1)
+
+[sub_resource type="CylinderMesh" id="hat_mesh"]
+material = SubResource("white")
+top_radius = 0.38
+bottom_radius = 0.32
+height = 0.55
+radial_segments = 7
+rings = 1
+
+[node name="Chef" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("body_mesh")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+mesh = SubResource("head_mesh")
+
+[node name="Hat" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.45, 0)
+mesh = SubResource("hat_mesh")

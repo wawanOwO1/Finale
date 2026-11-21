@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/intent_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+label = "Taunt"
+attack = 4
+status = "flustered"
+status_amount = 2
+status_target = 0
+
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+label = "Prepping"
+attack = 9
+
+[sub_resource type="Resource" id="sub_3"]
+script = ExtResource("1")
+label = "Salsa Shield"
+block = 7
+
+[sub_resource type="Resource" id="sub_4"]
+script = ExtResource("1")
+label = "Taunt"
+status = "rattled"
+status_amount = 2
+status_target = 0
+
+[sub_resource type="Resource" id="sub_5"]
+script = ExtResource("1")
+label = "Prepping"
+attack = 11
+
+[resource]
+script = ExtResource("2")
+id = "rosa"
+name = "Rosa"
+title = "Taco Truck Queen"
+confidence = 38
+pattern = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2"), SubResource("sub_3"), SubResource("sub_4"), SubResource("sub_5")])

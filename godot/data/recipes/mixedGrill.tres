@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RecipeDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/recipe_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 0
+amount = 16
+
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+kind = 5
+amount = 1
+status = "rattled"
+target = 0
+
+[resource]
+script = ExtResource("2")
+id = "mixedGrill"
+name = "Mixed Grill"
+book = "grill"
+requires = PackedStringArray("FAT", "PROTEIN", "PROTEIN")
+effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2")])
+hype = 30
+text = "16 Pressure, Rival Rattled 1"

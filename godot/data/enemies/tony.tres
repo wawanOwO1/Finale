@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/intent_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+label = "Prepping"
+attack = 6
+
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+label = "Prepping"
+attack = 8
+
+[sub_resource type="Resource" id="sub_3"]
+script = ExtResource("1")
+label = "Stir-fry"
+attack = 5
+block = 5
+
+[sub_resource type="Resource" id="sub_4"]
+script = ExtResource("1")
+label = "Composed"
+block = 8
+
+[resource]
+script = ExtResource("2")
+id = "tony"
+name = "Tony"
+title = "Street Noodle Cook"
+confidence = 30
+pattern = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2"), SubResource("sub_3"), SubResource("sub_4")])
