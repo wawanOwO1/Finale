@@ -48,6 +48,7 @@ script = ExtResource("2")
 id = "rosa"
 name = "Rosa"
 title = "Taco Truck Queen"
+gimmick = "Trickster: her deck is full of Onions and Stare Downs that leave you Flustered. Cooks from Basics and the Spice book."
 confidence = 38
 deck = ExtResource("4")
 books = PackedStringArray("basics", "spice")

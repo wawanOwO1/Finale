@@ -15,6 +15,8 @@ extends Node
 @onready var ui: DuelUI = $DuelUI
 ## Turn pacing (GRAND_DESIGN §1); timings are in its Inspector.
 @onready var director: TurnDirector = $TurnDirector
+## Discovery + save (GRAND_DESIGN §6); the window is the Almanac node in duel_ui.tscn.
+@onready var almanac_keeper: AlmanacKeeper = $AlmanacKeeper
 
 var duel: Duel
 var pixelated := false
@@ -27,6 +29,7 @@ func _ready() -> void:
 	ui.pixel_toggled.connect(_toggle_pixel)
 	director.ui = ui
 	ui.director = director
+	ui.almanac_keeper = almanac_keeper
 	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))
 	_start_duel()
 
@@ -53,18 +56,21 @@ func _process(_delta: float) -> void:
 func _start_duel() -> void:
 	var books: PackedStringArray = GameDB.ALL_BOOKS if dev_deck else PackedStringArray(["basics"])
 	var recipes := GameDB.book_recipes(books)
+	var deck := GameDB.deck("dev" if dev_deck else "starter")
+	almanac_keeper.prepare(deck, recipes)
 	stage.set_plate([])
 	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
 	if duel and duel.phase == "won":
 		round_number += 1
 	ui.round_number = round_number
-	duel = Duel.new(GameDB.deck("dev" if dev_deck else "starter"), GameDB.enemy(enemy_id), recipes,
+	duel = Duel.new(deck, GameDB.enemy(enemy_id), recipes,
 			{hype = start_hype})
 	# Visuals listen to the duel's signals; the duel never knows about them (GDD §9).
 	duel.changed.connect(_sync_plate)
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:
 		stage.hit("rival" if target == "enemy" else "player"))
+	almanac_keeper.watch(duel)
 	ui.bind(duel)
 	Audio.bind(duel)
 	_sync_plate()

@@ -11,6 +11,7 @@ var failures := 0
 func _initialize() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	main.dev_deck = true
+	main.get_node("AlmanacKeeper").persist = false
 	root.add_child(main)
 	await _wait(1.5)
 	var ui = main.get_node("DuelUI")

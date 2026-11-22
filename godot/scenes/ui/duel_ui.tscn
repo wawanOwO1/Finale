@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" path="res://assets/icons/draw.svg" id="6"]
 [ext_resource type="Texture2D" path="res://assets/icons/discard.svg" id="7"]
 [ext_resource type="Texture2D" path="res://assets/icons/book.svg" id="8"]
+[ext_resource type="Script" path="res://scripts/ui/almanac_view.gd" id="9"]
 
 [sub_resource type="StyleBoxFlat" id="pill"]
 content_margin_left = 15.0
@@ -310,6 +311,48 @@ mouse_filter = 2
 texture = ExtResource("3")
 expand_mode = 1
 stretch_mode = 5
+
+[node name="AlmanacButton" type="Button" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -113.0
+offset_top = 14.0
+offset_right = -73.0
+offset_bottom = 54.0
+grow_horizontal = 0
+
+[node name="AlmanacIcon" type="TextureRect" parent="Root/AlmanacButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 9.0
+offset_top = 8.0
+offset_right = -9.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("8")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AlmanacDot" type="ColorRect" parent="Root/AlmanacButton"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -9.0
+offset_top = -4.0
+offset_right = 3.0
+offset_bottom = 8.0
+grow_horizontal = 0
+mouse_filter = 2
+color = Color(0.847, 0.204, 0.173, 1)
 
 [node name="Rival" type="VBoxContainer" parent="Root"]
 unique_name_in_owner = true
@@ -1063,10 +1106,19 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 6
 
-[node name="StartButton" type="Button" parent="Root/Cookbook/Center/BookBox/VBox"]
-unique_name_in_owner = true
+[node name="Buttons" type="HBoxContainer" parent="Root/Cookbook/Center/BookBox/VBox"]
 layout_mode = 2
 size_flags_horizontal = 4
+theme_override_constants/separation = 17
+
+[node name="BookAlmanac" type="Button" parent="Root/Cookbook/Center/BookBox/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Almanac (Tab)"
+
+[node name="StartButton" type="Button" parent="Root/Cookbook/Center/BookBox/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
 text = "Close the book and duel"
 
 [node name="Overlay" type="Control" parent="Root"]
@@ -1190,6 +1242,157 @@ layout_mode = 2
 size_flags_horizontal = 4
 theme_override_constants/separation = 24
 alignment = 1
+
+[node name="Almanac" type="Control" parent="Root"]
+process_mode = 3
+z_index = 160
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("9")
+
+[node name="Dim" type="ColorRect" parent="Root/Almanac"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.165, 0.102, 0.047, 0.85)
+
+[node name="Center" type="CenterContainer" parent="Root/Almanac"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AlmanacBox" type="PanelContainer" parent="Root/Almanac/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1280, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("modal_box")
+
+[node name="VBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Head" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 13
+
+[node name="BookIcon" type="TextureRect" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+self_modulate = Color(0.847, 0.204, 0.173, 1)
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("8")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Titles" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="AlmanacTitle" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Almanac"
+
+[node name="AlmanacSub" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+text = "Everything you have found so far. The duel is paused. Tab or Esc closes it."
+
+[node name="AlmanacProgress" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+text = "Found 0 / 0"
+
+[node name="AlmanacClose" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+text = "Close"
+
+[node name="AlmanacTabs" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Ingredients" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Ingredients"
+
+[node name="Techniques" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Techniques"
+
+[node name="Recipes" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Recipes"
+
+[node name="Rivals" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Rivals"
+
+[node name="Keywords" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Keywords"
+
+[node name="AlmanacFinder" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FinderHint" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+theme_override_font_sizes/font_size = 15
+text = "Pick up to 3 tags or ingredients to find the recipes that use them."
+
+[node name="FinderChips" type="HFlowContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="Body" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Scroll" type="ScrollContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
+custom_minimum_size = Vector2(0, 520)
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0
+
+[node name="AlmanacList" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="AlmanacDetail" type="PanelContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("book_rule")
+
+[node name="DetailBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/AlmanacDetail"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
 
 [node name="Tooltip" type="Control" parent="Root"]
 z_index = 200

@@ -39,6 +39,7 @@ script = ExtResource("2")
 id = "tony"
 name = "Tony"
 title = "Street Noodle Cook"
+gimmick = "Greedy: serves the moment any recipe fits and rarely blocks. Cooks from Basics with 2 Heat and 4 cards a turn."
 confidence = 30
 deck = ExtResource("4")
 books = PackedStringArray("basics")

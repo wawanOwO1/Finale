@@ -34,6 +34,10 @@ var duel: Duel
 ## Paces the turn loop and the rival's steps (GRAND_DESIGN §1). The TurnDirector node in main.tscn;
 ## main.gd hands it over.
 var director: TurnDirector
+## Set by main.gd: the discoveries the Almanac window shows (GRAND_DESIGN §6).
+var almanac_keeper: AlmanacKeeper
+## Tab was pressed on the rival turn: open the Almanac as soon as it is the player's turn.
+var _almanac_queued := false
 ## Screen positions of the 3D anchors, pushed every frame by main.gd.
 var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400),
 		rival_stations = Vector2(1300, 420)}
@@ -81,6 +85,9 @@ func _ready() -> void:
 	%EndTurn.pressed.connect(_end_turn)
 	%RestartButton.pressed.connect(func() -> void: restart_requested.emit())
 	%PixelButton.pressed.connect(func() -> void: pixel_toggled.emit())
+	%AlmanacButton.pressed.connect(toggle_almanac)
+	%BookAlmanac.pressed.connect(toggle_almanac)
+	%Almanac.closed.connect(_refresh_almanac_dot)
 	_build_static()
 	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip, %FlowPick]:
 		n.hide()
@@ -108,6 +115,7 @@ func show_cookbook(recipes: Array[RecipeDef]) -> void:
 		%BookList.add_child(_book_row(r))
 	%Cookbook.show()
 	_pop_in(%BookBox)
+	_refresh_almanac_dot()
 	await %StartButton.pressed
 	%Cookbook.hide()
 
@@ -285,6 +293,11 @@ func _build_static() -> void:
 	# Top bar
 	_tip(%HypeMeter, "Hype", Keywords.BASE.Hype.text, "hype")
 	_tip(%PixelButton, "Pixel filter", "Toggle the low-res pixel look. Shortcut: P.", "pixel")
+	Ui.style_button(%AlmanacButton, Pal.CREAM, Pal.INK, 1.0, 0.3, 0.3)
+	_square_button(%AlmanacButton, Pal.CREAM)
+	%AlmanacButton.get_node("AlmanacIcon").self_modulate = Pal.INK
+	_tip(%AlmanacButton, "Almanac", "Everything you have discovered: ingredients, techniques, recipes and rivals. Pauses the duel. Shortcut: Tab.", "book")
+	Ui.style_button(%BookAlmanac, Pal.PAPER, Pal.INK, 1.1, 1.6, 0.6)
 	set_pixel_on(false)
 	# Badges with icons
 	%HpBadge.add_child(_badge_bg("confidence", Pal.RED, 6.5, 0.2))
@@ -420,6 +433,7 @@ func _badge_bg(icon_name: String, color: Color, size_em: float, shadow_em: float
 func _refresh() -> void:
 	if duel == null:
 		return
+	_refresh_almanac_dot()
 	var d := duel
 	# live = the player can act. During the rival turn the intent stays up (it is being played).
 	var live := d.phase == "player"
@@ -870,7 +884,7 @@ func _best_station() -> int:
 
 ## Input is ignored while the announcer or a drag animation runs.
 func _locked() -> bool:
-	return duel == null or _busy or %Cookbook.visible or _announcer.visible or %FlowPick.visible
+	return duel == null or _busy or %Cookbook.visible or _announcer.visible or %FlowPick.visible or %Almanac.visible
 
 
 func _pulse(node: CanvasItem, on: bool, current: Tween) -> Tween:
@@ -938,12 +952,14 @@ func _process(_delta: float) -> void:
 	%Board.position = Vector2(anchors.board.x - %Board.size.x / 2.0, anchors.board.y - Pal.em(STATION_TOP_EM))
 	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
 	_update_hover()
+	if _almanac_queued and not _almanac_blocked():
+		open_almanac()
 
 
 ## Hover is polled (not mouse_entered) so a lifted card does not flicker at its bottom edge.
 func _update_hover() -> void:
 	var target: CardView = null
-	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible and not %FlowPick.visible:
+	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible and not %FlowPick.visible and not %Almanac.visible:
 		var m: Vector2 = _mouse
 		var w := Pal.em(8.4)
 		var h := Pal.em(11.8)
@@ -997,6 +1013,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and not key.echo and key.keycode == KEY_TAB:
+		get_viewport().set_input_as_handled()
+		toggle_almanac()
+		return
 	if event is InputEventMouse:
 		_mouse = (%Root as Control).make_input_local(event).position
 	if _station_drag_input(event):
@@ -1522,3 +1543,47 @@ func _on_modifier_gained(side: String, m: ModifierDef, stacks: int) -> void:
 	var label := m.name + (" x%d" % stacks if stacks > 1 else "")
 	var at: Vector2 = anchors.rival if side == "enemy" else anchors.player
 	_float(at + Vector2(0, -Pal.em(1.0)), label, Pal.GOLD, 1.3, m.icon, 0.1 if side == "player" else 0.9)
+
+
+# ================================================================ Almanac (GRAND_DESIGN §6)
+
+## Almanac button / Tab: open (pauses the game) or close. On the rival's turn it waits for
+## the player's turn instead of stopping the rival halfway through.
+func toggle_almanac() -> void:
+	if %Almanac.visible:
+		%Almanac.close()
+		return
+	if almanac_keeper == null:
+		return
+	if _almanac_blocked():
+		_almanac_queued = not _almanac_queued
+		if _almanac_queued:
+			_toast("The Almanac opens on your turn.")
+		return
+	open_almanac()
+
+
+func open_almanac() -> void:
+	_almanac_queued = false
+	_hide_tip()
+	if _hover:
+		_hover.set_hovered(false)
+		_hover = null
+	%Almanac.open(almanac_keeper.almanac)
+
+
+## Only on a calm moment: the Recipe Book, the result screen, or the player's own turn with
+## nothing animating or being dragged.
+func _almanac_blocked() -> bool:
+	if %Cookbook.visible or duel == null:
+		return false
+	if _announcer.visible or (director and director.running):
+		return true
+	if duel.over():
+		return false
+	return duel.phase != "player" or _busy or not _drag.is_empty() or not _sdrag.is_empty()
+
+
+## Red dot on the Almanac button while something new is waiting in it.
+func _refresh_almanac_dot() -> void:
+	%AlmanacDot.visible = almanac_keeper != null and not almanac_keeper.almanac.unseen.is_empty()

@@ -5,6 +5,8 @@ extends Resource
 @export var id := ""
 @export var name := ""
 @export var title := ""
+## Shown in the Almanac once a duel with this rival ended (GRAND_DESIGN §6).
+@export_multiline var gimmick := ""
 @export var confidence := 30
 ## Grand final / boss duel: Boss appearance sting, and no Battle_Theme (boss theme comes later).
 @export var boss := false

@@ -333,7 +333,7 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
 
 ---
 
-## 6. Almanac
+## 6. Almanac — ✅ selesai 23 Nov (fase F), lihat §6.5
 
 ### 6.1 Isi
 
@@ -364,6 +364,15 @@ Di tab Recipes: klik 1–3 ikon tag/bahan → daftar resep yang memakainya, deng
 - Tombol buku (ikon `book.svg`) di HUD + tombol **Tab**.
 - Di duel: membuka Almanac **mem-pause** game. Tidak bisa dibuka di tengah animasi giliran rival (antre sampai giliran pemain).
 - Di Course Path / Shop: selalu bisa dibuka.
+
+### 6.5 Status implementasi (fase F, 23 Nov)
+- ✅ Logika: `Almanac` (`scripts/core/almanac.gd`, murni) menyimpan kartu, resep (sumber `mastered` atau id rival), rival (bertemu / gimmick terbuka) dan hidangan yang disajikan rival. `prepare(deck, buku)` sebelum Recipe Book, `watch(duel)` selama duel: rival tercatat saat duel dimulai, resep rival saat Serve-nya ("Seen from Tony"), gimmick saat duel selesai. Buku yang dikuasai selalu menang atas "Seen from".
+- ✅ Persistensi: node `AlmanacKeeper` di `main.tscn` (Inspector: `save_path` = `user://almanac.save`, `persist`, `reveal_all` untuk dev). Disimpan setiap ada discovery baru dan saat duel selesai (JSON).
+- ✅ UI: node `Almanac` di `duel_ui.tscn` (skrip `almanac_view.gd`). Tab Ingredients / Techniques / Recipes / Rivals / Keywords, panel detail di kanan, siluet "???" + petunjuk untuk yang belum terbuka, badge NEW (dan titik merah di tombol HUD) sampai entri dilihat.
+- ✅ Combination finder di tab Recipes: pilih sampai 3 tag atau bahan kunci yang sudah ditemukan. Hanya resep yang sudah terbuka; langkah yang diisi pilihanmu berbingkai hijau, yang masih kurang berbingkai oranye.
+- ✅ Akses: tombol buku di HUD (sebelah tombol pixel), tombol **Tab**, dan tombol "Almanac (Tab)" di Recipe Book sebelum duel. Membuka Almanac mem-pause game (`get_tree().paused`). Di giliran rival, Tab hanya mengantre: Almanac terbuka begitu giliran pemain dimulai. Tab / Esc / Close menutupnya.
+- ✅ Data: `EnemyDef.gimmick` (teks gimmick di tab Rivals), diisi untuk Tony dan Rosa.
+- Penyesuaian: Course Path dan Shop belum ada, jadi discovery "ditawarkan sebagai reward/shop" dan "buku dilihat di Shop" belum terpakai. Tab Rivals hanya berisi rival yang ada di data (Tony, Rosa). Keyword tambahan (Perfect Order, Cooked, Garnish, Improvised Dish, Chef's Flow) ditulis di `AlmanacView.EXTRA_KEYWORDS`.
 
 ---
 

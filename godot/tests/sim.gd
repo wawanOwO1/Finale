@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_rival_ai()
 	_rng()
 	_chefs_flow()
+	_almanac()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -796,3 +797,63 @@ func _chefs_flow() -> void:
 	check("the rival picks a modifier on its own", gained.has("enemy") and rk.offer.is_empty() and not rk.modifiers.is_empty())
 	check("the rival's Serve step names the modifier", reported != "" and reported == gained.get("enemy", ""), reported)
 	check("Flow is per duel", Duel.new(GameDB.deck("starter"), tony, basics, {seed = 6}).kitchen("enemy").modifiers.is_empty())
+
+
+# ---------------------------------------------------------------- Almanac (GRAND_DESIGN §6)
+
+func _almanac() -> void:
+	print("\n-- Almanac")
+	var a := Almanac.new()
+	var fresh: Array[String] = []
+	a.discovered.connect(func(kind: String, id: String) -> void: fresh.append("%s:%s" % [kind, id]))
+	a.prepare(GameDB.deck("starter"), basics)
+	check("your deck's cards are discovered", a.knows_card("bread") and a.knows_card("quickChop"))
+	check("cards you never had stay hidden", not a.knows_card("chili"))
+	check("mastered books' recipes are discovered", a.knows_recipe("toast") and a.recipe_source("toast") == Almanac.MASTERED)
+	check("other books' recipes stay hidden", not a.knows_recipe("hotWings"))
+	check("each discovery is announced once", fresh.count("card:bread") == 1 and fresh.has("recipe:toast"))
+	check("new entries carry the NEW badge", a.is_new("recipe", "toast"))
+	a.mark_seen("recipe", "toast")
+	check("looking at an entry clears NEW", not a.is_new("recipe", "toast"))
+
+	# A duel: the rival is met at once, its dishes are "Seen from", its gimmick after the end.
+	var d := Duel.new(GameDB.deck("starter"), GameDB.enemy("tony"), basics, {seed = 77})
+	a.watch(d)
+	check("rival is met when the duel starts", a.knows_rival("tony") and not a.rival_finished("tony"))
+	d.dish_served.emit("enemy", GameDB.recipe("hotWings"), 8, 2, 3)
+	check("a dish the rival serves is seen from them", a.recipe_source("hotWings") == "tony")
+	check("the rival's served list records it", a.served_by("tony") == PackedStringArray(["hotWings"]))
+	d.dish_served.emit("enemy", GameDB.recipe("toast"), 5, 1, 2)
+	check("a mastered recipe stays mastered when the rival serves it", a.recipe_source("toast") == Almanac.MASTERED)
+	d.dish_served.emit("player", GameDB.recipe("omelette"), 5, 1, 2)
+	check("your own Serves do not log the rival", a.served_by("tony").size() == 2)
+	a.discover_recipe("hotWings", Almanac.MASTERED)
+	check("mastering a seen recipe upgrades it", a.recipe_source("hotWings") == Almanac.MASTERED)
+	d._lose_confidence("enemy", 999, "pressure")
+	check("gimmick opens once the duel ended", a.rival_finished("tony"))
+
+	# Save / load round trip.
+	var path := "user://almanac_sim_test.save"
+	check("almanac saves", a.save(path))
+	var b := Almanac.load_from(path)
+	check("load keeps cards, recipes and sources", b.cards == a.cards and b.recipes == a.recipes)
+	check("load keeps rivals and their dishes", b.rival_finished("tony") and b.served_by("tony") == a.served_by("tony"))
+	check("load keeps NEW badges", b.unseen.keys().size() == a.unseen.keys().size())
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	check("a missing save gives an empty almanac", Almanac.load_from(path).count() == 0)
+
+	# Combination finder (§6.3).
+	var toast := GameDB.recipe("toast")
+	var burger := GameDB.recipe("burger")
+	check("a tag pick fits its slot", Almanac.cover(toast, ["FAT"]) == ([false, true] as Array[bool]))
+	check("an ingredient pick fills a slot of its tag", Almanac.pick_fits("card:butter", "FAT"))
+	check("a tag pick fills a key ingredient of that tag", Almanac.pick_fits("PROTEIN", "card:beef"))
+	check("two picks need two slots", Almanac.cover(toast, ["FAT", "FAT"]).is_empty())
+	var two_breads := Almanac.cover(burger, ["card:bread", "card:bread"])
+	check("two breads cover both bun slots", two_breads == ([true, false, false, false, true] as Array[bool]))
+	var hits := Almanac.find(all_recipes, ["SPICE"])
+	var names := hits.map(func(h: Dictionary) -> String: return h.recipe.id)
+	check("finder lists recipes using a tag", names.has("hotWings") and not names.has("toast"), str(names))
+	check("finder rejects recipes missing a pick", Almanac.find([toast], ["DAIRY"]).is_empty())
+	var uses := Almanac.uses_of(GameDB.card("butter"), all_recipes).map(func(r: RecipeDef) -> String: return r.id)
+	check("Used in lists the recipes an ingredient fits", uses.has("toast"), str(uses))
