@@ -123,7 +123,7 @@ func _initialize() -> void:
 	_crop("7a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
 	_crop("7b_rival", Rect2(0.5, 0.0, 0.3, 0.25))
 	# Signature Dish cut-in
-	ui._play_cutin("Omelette")
+	ui._play_cutin("player", "Omelette")
 	await _wait(0.5)
 	_shot("8_cutin")
 	await _wait(1.4)

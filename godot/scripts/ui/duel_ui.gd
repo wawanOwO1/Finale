@@ -120,7 +120,7 @@ func bind(d: Duel) -> void:
 	_sdrag = {}
 	_emote.clear()
 	d.confidence_lost.connect(_emote_on_hit)
-	d.signature_served.connect(func(_dish: String) -> void: _emote.pop("shocked"))
+	d.signature_served.connect(func(side: String, _dish: String) -> void: if side == "player": _emote.pop("shocked"))
 	d.turn_started.connect(func(_turn: int) -> void: _emote_on_intent())
 	d.duel_ended.connect(_on_duel_ended)
 	%VenueSub.text = "vs %s" % d.enemy_def.name
@@ -1206,7 +1206,11 @@ func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name :
 	tw.tween_callback(row.queue_free)
 
 
-func _show_dish(recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) -> void:
+## Dish reveal over the served station. Apis only for now; the rival's reveal over its own
+## counter comes with the drafting AI (GRAND_DESIGN §1.3).
+func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) -> void:
+	if side != "player":
+		return
 	%DishKicker.text = "DISH SERVED" if recipe else "NO RECIPE MATCHED"
 	%DishName.text = recipe.name if recipe else "Improvised Dish"
 	for c in %DishTags.get_children():
@@ -1253,7 +1257,10 @@ func _dish_tag(icon_name: String, text: String, bg: Color, fg: Color) -> Control
 
 
 ## Signature Dish cut-in (GDD §4.5): spinning rays, slammed ink banner, fade out.
-func _play_cutin(dish: String) -> void:
+## Apis only: the Signature Dish is the MC's move (GDD §4.5).
+func _play_cutin(side: String, dish: String) -> void:
+	if side != "player":
+		return
 	%CutInDish.text = dish
 	var c: Control = %CutIn
 	c.show()

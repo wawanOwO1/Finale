@@ -123,7 +123,8 @@ func bind(d: Duel) -> void:
 		play_music("battle")
 
 
-func _on_card_played(card: CardInstance) -> void:
+## Both chefs are heard: the rival chops and sizzles on its own turn too.
+func _on_card_played(_side: String, card: CardInstance) -> void:
 	if card.def.special == "signature":
 		sfx("signature")
 	elif card.def.is_ingredient():
@@ -145,6 +146,6 @@ func _on_duel_ended(winner: String) -> void:
 
 
 ## Plate goes into the pot, then the bell rings with the dish reveal.
-func _on_dish(_recipe: RecipeDef, _perfect: bool, _signature: bool, _burnt: bool) -> void:
+func _on_dish(_side: String, _recipe: RecipeDef, _perfect: bool, _signature: bool, _burnt: bool) -> void:
 	sfx("pot")
 	get_tree().create_timer(0.18).timeout.connect(sfx.bind("bell"))

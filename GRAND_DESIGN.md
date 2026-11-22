@@ -22,7 +22,7 @@
 
 ---
 
-## 1. Turn Sequence
+## 1. Turn Sequence — ✅ selesai 22 Nov (fase A)
 
 ### 1.1 Urutan
 
@@ -109,7 +109,7 @@ func _rival_turn() -> void:
 
 ---
 
-## 2. Kitchen simetris (refactor inti)
+## 2. Kitchen simetris (refactor inti) — ✅ selesai 22 Nov (fase B)
 
 Sekarang `Duel` menyimpan tangan, draw pile, station, Hype, dan Heat **hanya untuk pemain**. Rival yang drafting butuh semua itu juga. Refactor:
 

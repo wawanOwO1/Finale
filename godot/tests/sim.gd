@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_signature()
 	_stations()
 	_rival_turn_steps()
+	_symmetric_kitchen()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -132,14 +133,14 @@ func _perfect_order() -> void:
 	d.stations[0] = inst(["bread", "butter"])
 	var before := d.enemy.confidence
 	var seen := {perfect = false}
-	d.dish_revealed.connect(func(_r, perfect, _s, _b): seen.perfect = perfect)
+	d.dish_revealed.connect(func(_side, _r, perfect, _s, _b): seen.perfect = perfect)
 	d.serve()
 	check("Perfect Order Toast: (6 + 2) x1.5 = 12", lost(d, before) == 12 and seen.perfect)
 
 	d = new_duel(21, dummy)
 	d.stations[0] = inst(["egg", "egg"])
 	var dish := {name = ""}
-	d.dish_revealed.connect(func(r: RecipeDef, _p, _s, _b): dish.name = r.name if r else "Improvised")
+	d.dish_revealed.connect(func(_side, r: RecipeDef, _p, _s, _b): dish.name = r.name if r else "Improvised")
 	d.serve()
 	check("auto Serve with no recipe is Improvised", dish.name == "Improvised")
 
@@ -227,7 +228,7 @@ func _signature() -> void:
 	check("Signature Dish is retained over End Turn", has_signature(d.hand))
 
 	var cut_in := {dish = ""}
-	d.signature_served.connect(func(dish: String): cut_in.dish = dish)
+	d.signature_served.connect(func(_side, dish: String): cut_in.dish = dish)
 	for c in d.hand:
 		if c.def.special == "signature":
 			d.play(c.uid)
@@ -330,6 +331,62 @@ func _rival_turn_steps() -> void:
 	check("rival pattern advanced once", d.intent().label != "Taunt" or d.enemy_def.pattern.size() == 1)
 
 
+## The rival's Kitchen plays by the player's rules (GRAND_DESIGN §2).
+func _symmetric_kitchen() -> void:
+	var opts := {seed = 7, enemy_deck = GameDB.deck("starter"), enemy_recipes = basics}
+	var d := Duel.new(GameDB.deck("starter"), dummy, basics, opts)
+	var k := d.kitchen("enemy")
+	check("rival deck is shuffled in, nothing drawn on Apis's turn", k.draw_pile.size() == 10 and k.hand.is_empty())
+	k.hand = inst(["butter"])
+	check("rival cannot act on Apis's turn", d.play(k.hand[0].uid, 0, "enemy").reason == "Wait for your turn.")
+	k.hand.clear()
+
+	d.end_turn()
+	d.begin_enemy_turn()
+	check("rival turn start: draws 5, Heat 3", k.hand.size() == Duel.HAND_SIZE and d.enemy.heat == Duel.MAX_HEAT)
+	check("Apis cannot act on the rival turn", d.can_serve(0).reason == "Wait for your turn.")
+	k.discard.append_array(k.hand)
+	k.hand = inst(["butter", "egg", "tomato", "quickChop"])
+	var player_stacks := d.ingredient_count("player")
+	for i in 3:
+		d.play(k.hand[0].uid, 0, "enemy")
+	check("rival stacks on its own station", d.stack(0, "enemy").size() == 3 and d.ingredient_count("player") == player_stacks)
+	check("rival ticket reads its own recipes", d.ticket(0, "enemy").get("recipe") != null)
+	var conf := d.player.confidence
+	d.play(k.hand[0].uid, -1, "enemy")
+	check("rival technique hits Apis (Quick Chop 6)", conf - d.player.confidence == 6 and d.enemy.heat == 2)
+
+	var seen := {}
+	d.dish_served.connect(func(side, _r, pressure, _q, _n): seen.side = side; seen.pressure = pressure)
+	conf = d.player.confidence
+	var player_hype := d.hype
+	check("rival serves", d.serve(0, "enemy").ok)
+	check("rival Perfect Omelette hits Apis: (10 + 3) x1.5 = 19", conf - d.player.confidence == 19)
+	check("dish_served says who cooked", seen.get("side") == "enemy" and seen.get("pressure") == 19)
+	check("rival Omelette Composure goes to the rival", d.enemy.composure == 7)
+	check("Hype goes to the rival's crowd only", k.hype == 25 and d.hype == player_hype)
+	check("rival serves once per turn", d.serve(1, "enemy").reason == "Already served this turn.")
+	d.run_enemy_turn()
+	check("rival hand discarded at end of its turn", k.hand.is_empty() and d.phase == "player")
+	check("rival cards conserved", k.card_total() == 10 + 4, str(k.card_total()))
+
+	# Separate shuffle streams: the rival's shuffles never change Apis's draws.
+	var a := Duel.new(GameDB.deck("starter"), dummy, basics, {seed = 11, enemy_deck = GameDB.deck("starter")})
+	var b := Duel.new(GameDB.deck("starter"), dummy, basics, {seed = 11})
+	for _t in 3:
+		for x: Duel in [a, b]:
+			x.end_turn()
+			x.run_enemy_turn()
+	check("Apis draws the same with or without a rival deck", _ids(a.hand) == _ids(b.hand), "%s vs %s" % [_ids(a.hand), _ids(b.hand)])
+
+
+func _ids(cards: Array[CardInstance]) -> Array[String]:
+	var out: Array[String] = []
+	for c in cards:
+		out.append(c.def.id)
+	return out
+
+
 func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Array[RecipeDef]) -> void:
 	var deck := GameDB.deck(deck_id)
 	var n := 500
@@ -339,7 +396,7 @@ func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Arr
 	var signatures := {count = 0}
 	for s in range(1, n + 1):
 		var d := Duel.new(deck, enemy, recipes, {seed = s})
-		d.signature_served.connect(func(_dish): signatures.count += 1)
+		d.signature_served.connect(func(_side, _dish): signatures.count += 1)
 		var pick_rng := SeededRng.new(s * 7919)
 		var safety := 0
 		while d.phase == "player" and safety < 100:
