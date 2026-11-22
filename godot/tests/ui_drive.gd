@@ -127,6 +127,28 @@ func _initialize() -> void:
 	_shot("7_turn2")
 	_crop("7a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
 	_crop("7b_rival", Rect2(0.5, 0.0, 0.3, 0.25))
+	# Chef's Flow (GRAND_DESIGN §5): one Perfect Serve short, then a Perfect Toast opens the pick.
+	var pk := duel.kitchen("player")
+	pk.flow = pk.flow_threshold() - 1
+	duel.stations[0] = _inst(duel, ["bread", "butter"])
+	duel.changed.emit()
+	await _wait(0.3)
+	await _click(_serve_button(ui, 0).get_global_rect().get_center())
+	await _wait(1.0)
+	_check("the pick waits for the dish reveal", not ui.get_node("%FlowPick").visible)
+	await _wait(0.9)
+	var pick: Control = ui.get_node("%FlowPick")
+	var cards := ui.get_node("%FlowChoices").get_children()
+	_check("Chef's Flow opens a pick of 3", pick.visible and cards.size() == 3)
+	_check("input is locked while picking", ui._locked() and not duel.end_turn().ok)
+	_shot("7e_flow_pick")
+	var chosen: String = pk.offer[1].id
+	await _click((cards[1] as Control).get_global_rect().get_center())
+	await _wait(0.3)
+	_check("clicking a card takes that modifier", pk.mod(chosen) == 1 and not pick.visible and not ui._locked())
+	_check("the HUD shows the modifier", ui.get_node("%PlayerFlow").get_child_count() >= 2)
+	await _wait(1.2)
+	_crop("7f_player_flow", Rect2(0, 0.62, 0.4, 0.38))
 	# Signature Dish cut-in
 	ui._play_cutin("player", "Omelette")
 	await _wait(0.5)

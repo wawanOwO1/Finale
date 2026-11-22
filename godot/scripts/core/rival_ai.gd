@@ -69,16 +69,23 @@ static func serve_preview(d: Duel, stack: Array[CardInstance], side := "enemy", 
 	var k := d.kitchen(side)
 	var recipe := RecipeMatch.best_dish(k.recipes, stack)
 	var perfect := recipe != null and RecipeMatch.in_order(recipe, stack)
-	var mult := Duel.PERFECT_ORDER_MULT if perfect else 1.0
+	var mult := d.perfect_mult(side) if perfect else 1.0
 	if k.signature_armed:
 		mult *= 2.0
 	if d.fighter(side).stacks("burnt") > 0:
 		mult *= 0.5
 	var out: Dictionary
 	if recipe:
-		out = _effects_value(d, recipe.effects, RecipeMatch.plate_quality(stack), mult, side, p)
+		out = _effects_value(d, recipe.effects, d.dish_quality(recipe, stack, side), mult, side, p)
 	else:
 		out = _effects_value(d, [EffectDef.make(EffectDef.Kind.PRESSURE, 2 * stack.size())], 0, mult, side, p)
+	# Hot Pan: flat Pressure on top of every Serve.
+	if d.serve_bonus(side) > 0:
+		var extra := d.pressure_from(side, d.serve_bonus(side))
+		var foe := d.fighter(Duel._other(side))
+		out.pressure += extra
+		out.value += extra * p.w_attack
+		out.lethal = out.pressure - foe.composure >= foe.confidence
 	out.recipe = recipe
 	out.perfect = perfect
 	return out
@@ -248,3 +255,45 @@ static func _consider(pick: Dictionary, b: Dictionary) -> void:
 		pick.ties += 1
 		if pick.rng.index(pick.ties) == 0:
 			pick.best = b
+
+
+## Chef's Flow pick (GRAND_DESIGN §5.1): the offered modifier that suits this chef's profile
+## best. Also picks for a bot Apis in tests/sim.gd.
+static func pick_modifier(d: Duel, choices: Array[ModifierDef], side := "enemy", prof: AiProfile = null) -> ModifierDef:
+	var p := prof if prof else profile(d)
+	var best: ModifierDef = null
+	var best_v := -INF
+	for m in choices:
+		var v := modifier_value(d, m, side, p)
+		if v > best_v:
+			best_v = v
+			best = m
+	return best
+
+
+## Rough worth of one more stack of `m` for `side`, per turn.
+static func modifier_value(d: Duel, m: ModifierDef, side: String, p: AiProfile) -> float:
+	var k := d.kitchen(side)
+	match m.id:
+		"hot_pan":
+			return m.amount * p.w_attack
+		"steady_hands":
+			return m.amount * 2.5 * p.w_defend * 2.0
+		"encore":
+			return m.amount * 10.0 * p.w_attack
+		"extra_burner":
+			return 2.0
+		"prep_cook":
+			return 2.5
+		"crowd_favorite":
+			return 1.5 if side == "player" else 0.3
+		"spice_whisperer":
+			return m.amount * 2.0 * p.w_debuff
+		"free_move":
+			# The rival AI does not move cards yet.
+			return 1.0 if side == "player" else 0.1
+		"mise_master":
+			return 1.5
+		"plating_pro":
+			return 1.5 + k.hand_size * 0.1
+	return 0.0

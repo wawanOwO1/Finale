@@ -420,6 +420,13 @@ mouse_filter = 2
 theme_override_constants/separation = 4
 alignment = 1
 
+[node name="EnemyFlow" type="HBoxContainer" parent="Root/Rival"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+alignment = 1
+
 [node name="RivalKitchen" type="PanelContainer" parent="Root"]
 visible = false
 unique_name_in_owner = true
@@ -568,6 +575,12 @@ grow_vertical = 0
 mouse_filter = 2
 theme_override_constants/separation = 7
 alignment = 2
+
+[node name="PlayerFlow" type="HBoxContainer" parent="Root/PlayerHud"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
 
 [node name="PlayerStatuses" type="HBoxContainer" parent="Root/PlayerHud"]
 unique_name_in_owner = true
@@ -1114,6 +1127,69 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 text = "Duel again"
+
+[node name="FlowPick" type="Control" parent="Root"]
+z_index = 140
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Root/FlowPick"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.165, 0.102, 0.047, 0.8)
+
+[node name="Center" type="CenterContainer" parent="Root/FlowPick"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FlowBox" type="VBoxContainer" parent="Root/FlowPick/Center"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="FlowKicker" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.714, 0.196, 1)
+theme_override_font_sizes/font_size = 22
+text = "CHEF'S FLOW!"
+horizontal_alignment = 1
+
+[node name="FlowTitle" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_font_sizes/font_size = 40
+text = "Pick a modifier"
+horizontal_alignment = 1
+
+[node name="FlowSub" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 0.8)
+theme_override_font_sizes/font_size = 15
+text = "It lasts the rest of this duel. Picking one you have adds a stack."
+horizontal_alignment = 1
+
+[node name="FlowChoices" type="HBoxContainer" parent="Root/FlowPick/Center/FlowBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 24
+alignment = 1
 
 [node name="Tooltip" type="Control" parent="Root"]
 z_index = 200

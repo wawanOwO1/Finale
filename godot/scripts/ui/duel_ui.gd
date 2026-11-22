@@ -82,7 +82,7 @@ func _ready() -> void:
 	%RestartButton.pressed.connect(func() -> void: restart_requested.emit())
 	%PixelButton.pressed.connect(func() -> void: pixel_toggled.emit())
 	_build_static()
-	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip]:
+	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip, %FlowPick]:
 		n.hide()
 	# Rival emote follows the head; announcer covers everything but the tooltip.
 	_emote_holder = Control.new()
@@ -129,6 +129,9 @@ func bind(d: Duel) -> void:
 	d.signature_served.connect(_play_cutin)
 	d.dish_revealed.connect(_show_dish)
 	d.mise_en_place.connect(func(side: String, _drawn: CardInstance, _given: CardInstance) -> void: show_mise(side))
+	d.flow_offer.connect(_on_flow_offer)
+	d.modifier_gained.connect(_on_modifier_gained)
+	%FlowPick.hide()
 	d.confidence_lost.connect(func(target: String, amount: int, source: String) -> void:
 		_float(_anchor(target), "-%d" % amount, Pal.ORANGE if source == "spicy" else Pal.RED, 2.3))
 	d.pressure_dealt.connect(func(target: String, _amount: int, blocked: int) -> void:
@@ -439,6 +442,8 @@ func _refresh() -> void:
 	(_round_chip.find_child("Value", true, false) as Label).text = str(round_number)
 	_block_badge(%EnemyBlock, d.enemy.composure)
 	_fill_statuses(%EnemyStatuses, d.enemy)
+	%EnemyFlow.visible = d.drafting()
+	_fill_flow(%EnemyFlow, "enemy")
 	%Rival.reset_size()
 
 	# Player
@@ -454,6 +459,7 @@ func _refresh() -> void:
 		_heat_pips[i].self_modulate = Pal.ORANGE if i < d.player.heat else Pal.INK_SOFT
 	_heat_text.text = "HEAT %d/%d" % [d.player.heat, Duel.MAX_HEAT]
 	_fill_statuses(%PlayerStatuses, d.player)
+	_fill_flow(%PlayerFlow, "player")
 	%HeatValue.text = str(d.player.heat)
 	%HeatMax.text = "/%d" % Duel.MAX_HEAT
 	var heat_icon: TextureRect = %HeatOrb.get_child(0).get_node("Icon")
@@ -864,7 +870,7 @@ func _best_station() -> int:
 
 ## Input is ignored while the announcer or a drag animation runs.
 func _locked() -> bool:
-	return duel == null or _busy or %Cookbook.visible or _announcer.visible
+	return duel == null or _busy or %Cookbook.visible or _announcer.visible or %FlowPick.visible
 
 
 func _pulse(node: CanvasItem, on: bool, current: Tween) -> Tween:
@@ -937,7 +943,7 @@ func _process(_delta: float) -> void:
 ## Hover is polled (not mouse_entered) so a lifted card does not flicker at its bottom edge.
 func _update_hover() -> void:
 	var target: CardView = null
-	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible:
+	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible and not %FlowPick.visible:
 		var m: Vector2 = _mouse
 		var w := Pal.em(8.4)
 		var h := Pal.em(11.8)
@@ -1393,3 +1399,126 @@ func _book_row(r: RecipeDef) -> Control:
 	row.add_child(eff)
 	var s := Ui.pad(Ui.box(Color(1, 1, 1, 0.53), Color.TRANSPARENT, 0.0, 0.55, 0.0), 0.6, 0.45)
 	return Ui.panel(s, row)
+
+
+# ================================================================ Chef's Flow (GRAND_DESIGN §5)
+
+## Seconds after a Serve before the pick overlay opens (the dish reveal plays first).
+const FLOW_PICK_DELAY := 1.2
+const FLOW_CARD_W_EM := 12.5
+const FLOW_CARD_H_EM := 15.0
+
+
+## "FLOW ●●○" toward the next modifier, then one chip per modifier owned (tooltip = what it does).
+func _fill_flow(box: HBoxContainer, side: String) -> void:
+	for c in box.get_children():
+		c.queue_free()
+	var k := duel.kitchen(side)
+	var meter := Ui.hbox(0.2)
+	meter.add_child(Ui.label("FLOW", 0.7, Pal.INK_SOFT))
+	for i in k.flow_threshold():
+		var pip := Panel.new()
+		pip.custom_minimum_size = Vector2.ONE * Pal.em(0.7)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.add_theme_stylebox_override("panel", Ui.box(Pal.GOLD if i < k.flow else Pal.PAPER, Pal.INK, 0.1, 1.0, 0.0))
+		meter.add_child(pip)
+	_tip(meter, "Chef's Flow %d/%d" % [k.flow, k.flow_threshold()],
+			"Each Perfect Order Serve fills 1. Full: pick 1 of 3 modifiers for the rest of the duel.", "check")
+	box.add_child(meter)
+	for id: String in k.modifiers:
+		var m := GameDB.modifier(id)
+		var n: int = k.modifiers[id]
+		var row := Ui.hbox(0.1)
+		row.add_child(Ui.icon(m.icon, Pal.GOLD if m.is_rare() else Pal.ORANGE, 1.1))
+		if n > 1:
+			row.add_child(Ui.label(str(n), 0.8))
+		var chip := Ui.panel(Ui.pad(Ui.box(Pal.CREAM, Pal.INK, 0.13, 0.45, 0.0), 0.3, 0.1), row)
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		_tip(chip, m.name + (" x%d" % n if n > 1 else ""), m.describe(n), m.icon)
+		box.add_child(chip)
+
+
+func _on_flow_offer(side: String, choices: Array[ModifierDef]) -> void:
+	if side != "player":
+		return
+	var d := duel
+	await get_tree().create_timer(FLOW_PICK_DELAY).timeout
+	# Still this duel's open offer (not restarted, not already picked).
+	if d != duel or d.kitchen("player").offer != choices:
+		return
+	show_flow_pick(choices)
+
+
+## The pick-1-of-3 overlay (FlowPick in duel_ui.tscn). Input is locked until a card is picked.
+func show_flow_pick(choices: Array[ModifierDef]) -> void:
+	_hide_tip()
+	for c in %FlowChoices.get_children():
+		c.queue_free()
+	var k := duel.kitchen("player")
+	%FlowTitle.text = "Pick a modifier"
+	for m in choices:
+		%FlowChoices.add_child(_flow_card(m, k.mod(m.id)))
+	%FlowPick.show()
+	_pop_in(%FlowBox)
+	var i := 0
+	for card: Control in %FlowChoices.get_children():
+		card.pivot_offset = Vector2(Pal.em(FLOW_CARD_W_EM), Pal.em(FLOW_CARD_H_EM)) / 2.0
+		card.scale = Vector2.ONE * 0.7
+		card.modulate.a = 0.0
+		var tw := create_tween().set_parallel()
+		tw.tween_property(card, "scale", Vector2.ONE, 0.25).set_delay(0.08 * i).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(card, "modulate:a", 1.0, 0.15).set_delay(0.08 * i)
+		i += 1
+
+
+func _flow_card(m: ModifierDef, owned: int) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(Pal.em(FLOW_CARD_W_EM), Pal.em(FLOW_CARD_H_EM))
+	Ui.style_button(b, Pal.CREAM, Pal.INK, 1.0, 0.8, 0.8)
+	if m.is_rare():
+		for st in ["normal", "hover", "pressed", "hover_pressed"]:
+			var sb := b.get_theme_stylebox(st).duplicate() as StyleBoxFlat
+			sb.border_color = Pal.GOLD
+			b.add_theme_stylebox_override(st, sb)
+	b.name = "Pick_" + m.id
+	var col := Ui.vbox(0.45)
+	Ui.fill(col)
+	col.offset_left = Pal.em(0.8)
+	col.offset_right = -Pal.em(0.8)
+	col.offset_top = Pal.em(0.8)
+	col.offset_bottom = -Pal.em(0.8)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(Ui.label("RARE" if m.is_rare() else "COMMON", 0.7, Pal.GOLD.darkened(0.25) if m.is_rare() else Pal.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	var ic := Ui.icon(m.icon, Pal.GOLD if m.is_rare() else Pal.ORANGE, 3.2)
+	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(ic)
+	col.add_child(Ui.label(m.name, 1.25, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	var text := Ui.label(m.describe(owned + 1), 0.85, Pal.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(text)
+	if owned > 0:
+		col.add_child(Ui.label("Stack %d → %d" % [owned, owned + 1], 0.8, Pal.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+	for n in col.find_children("*", "Control", true, false):
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(col)
+	b.pressed.connect(_pick_flow.bind(m.id))
+	return b
+
+
+func _pick_flow(id: String) -> void:
+	if duel == null or not %FlowPick.visible:
+		return
+	if not duel.pick_modifier(id).ok:
+		return
+	%FlowPick.hide()
+	_refresh()
+
+
+## A modifier was taken: Apis's floats up from the HUD; the rival's is announced by the
+## Turn Director (TONY GOT / HOT PAN!) and floats over the rival.
+func _on_modifier_gained(side: String, m: ModifierDef, stacks: int) -> void:
+	var label := m.name + (" x%d" % stacks if stacks > 1 else "")
+	var at: Vector2 = anchors.rival if side == "enemy" else anchors.player
+	_float(at + Vector2(0, -Pal.em(1.0)), label, Pal.GOLD, 1.3, m.icon, 0.1 if side == "player" else 0.9)

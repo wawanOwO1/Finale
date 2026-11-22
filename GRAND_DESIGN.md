@@ -275,7 +275,7 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
 
 ---
 
-## 5. Chef's Flow & Modifier
+## 5. Chef's Flow & Modifier — ✅ inti selesai 22 Nov (fase E), lihat §5.5
 
 ### 5.1 Aturan
 - Setiap Serve **Perfect Order** = +1 Flow. Serve Cooked/Improvised = +0.
@@ -317,6 +317,19 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
 | Tony, Rosa | 3 → 4 → 5 |
 | Marco | 2 → 4 → 5 |
 | Élodie, Bruno | 2 → 3 → 4 (sama dengan pemain) |
+
+### 5.5 Status implementasi (fase E)
+- ✅ Data: `ModifierDef` (Resource) + 10 file di `data/modifiers/`. Angka (`amount`), rarity, ikon, teks, `stackable`, dan `tag` build bisa diatur di Inspector; efeknya dikodekan per `id` di `Duel`.
+- ✅ Logika (`Duel` + `Kitchen`): Flow +1 hanya dari Serve Perfect Order (setelah sinyal `dish_served`), threshold pemain `Duel.PLAYER_FLOW` 2→3→4, rival `EnemyDef.flow_thresholds` (Tony/Rosa default 3→4→5). Semua per duel (Kitchen baru tiap duel).
+- ✅ Penawaran (`Duel._make_offer`, stream `offers`/`offers_enemy`): 2 Common + 1 slot (Rare 25%), pity 3 penawaran tanpa Rare → slot 3 Rare, tanpa duplikat, tanpa non-stackable yang sudah dimiliki. **Build** = tag dengan ≥3 bahan di deck: modifier ber-tag hanya muncul kalau deck memakai tag itu, dan kalau ada, selalu mengisi 1 slot.
+- ✅ Pemain: sinyal `flow_offer`, overlay `FlowPick` di `duel_ui.tscn` muncul 1.2 s setelah Serve (sesudah dish reveal). Selama terbuka, semua aksi ditolak ("Pick a modifier first.") dan input HUD terkunci. `pick_modifier(id)`.
+- ✅ Rival: `RivalAI.pick_modifier` memilih sesuai profil; langkah Serve-nya membawa `modifier`, lalu Turn Director menampilkan banner **"TONY GOT / HOT PAN!"**.
+- ✅ HUD: baris `PlayerFlow` / `EnemyFlow` (FLOW ●●○ + chip modifier dengan angka stack dan tooltip).
+- Penyesuaian terhadap tabel §5.3:
+  - **Hot Pan** berlaku di setiap Serve, karena Serve memang hanya sekali per giliran.
+  - **Plating Pro**: belum ada batas Garnish di aturan, jadi efeknya "Quality Garnish ×2".
+  - **Free Move**: AI belum memakai pindah kartu, jadi nilainya rendah untuk rival.
+- ⚠️ Balancing (untuk fase G): di `sim.gd` bot pintar Apis rata-rata mendapat 0.06 (vs Tony) / 0.22 (vs Rosa) modifier per duel. Duel hanya ±3 giliran dengan 1 Serve per giliran, jadi 2 Serve Perfect jarang tercapai. Pertimbangkan threshold 1→2→3, atau Flow +1 juga dari Serve Cooked.
 
 ---
 

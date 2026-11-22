@@ -81,6 +81,10 @@ func rival_turn() -> void:
 		rival_acted.emit(a)
 		ui.rival_act(a)
 		await _wait(_hold(a.kind))
+		# Chef's Flow: the rival picked a modifier with this Serve (GRAND_DESIGN §5.1).
+		if a.has("modifier") and _live(d):
+			await ui.announcer().turn_banner("%s!" % a.modifier.name.to_upper(), Pal.GOLD,
+					"%s GOT" % d.enemy_def.name.to_upper(), false)
 	if _live(d):
 		await _wait(end_pause)
 		ui.speed_hint().hide()

@@ -20,6 +20,8 @@ extends Resource
 ## Cards drawn per turn.
 @export_range(1, 8) var hand_size := 5
 @export var ai: AiProfile
+## Chef's Flow: Perfect Serves needed for each modifier (GRAND_DESIGN §5.4); the last repeats.
+@export var flow_thresholds: PackedInt32Array = [3, 4, 5]
 
 @export_group("Intent pattern (old)")
 ## Intents cycle in order. Used only when the rival has no deck/AI (tests, fallback).

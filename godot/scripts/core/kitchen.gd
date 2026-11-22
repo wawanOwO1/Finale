@@ -42,6 +42,36 @@ var ai_rng: SeededRng
 ## Mise en Place already helped this turn (max once per turn, GRAND_DESIGN §4.2).
 var mise_used := false
 
+# ---- Chef's Flow (GRAND_DESIGN §5). All per duel.
+## Perfect Serves needed for each modifier; the last one repeats.
+var flow_thresholds: PackedInt32Array = [2, 3, 4]
+## Perfect Serves toward the next modifier.
+var flow := 0
+## Modifiers earned so far (picks the threshold).
+var flow_level := 0
+## modifier id -> stacks
+var modifiers := {}
+## The 1-of-3 offer waiting for a pick (the player's blocks its actions until then).
+var offer: Array[ModifierDef] = []
+## Offers in a row without a Rare (pity: the 4th holds one).
+var offers_without_rare := 0
+## Rolls the offers. Its own stream (GRAND_DESIGN §4.3).
+var offer_rng: SeededRng
+## Extra Burner: +Heat at the start of the next turn.
+var burner_next := false
+## Free Move: moves used this turn beyond the first.
+var extra_moves := 0
+## Last modifier taken, for the rival's step report (Duel._apply_ai clears it).
+var gained: ModifierDef
+
+
+func flow_threshold() -> int:
+	return flow_thresholds[mini(flow_level, flow_thresholds.size() - 1)]
+
+
+func mod(id: String) -> int:
+	return modifiers.get(id, 0)
+
 
 func _init(side_: String, fighter_: Duel.Fighter, rng_: SeededRng) -> void:
 	side = side_

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "extra_burner"
+name = "Extra Burner"
+rarity = 0
+icon = "heat"
+text = "After a Perfect Order Serve, +X Heat next turn."
+stackable = false
+amount = 1.0
+tag = ""

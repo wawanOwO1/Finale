@@ -30,6 +30,10 @@ signal duel_ended(winner: String)
 ## Mise en Place (GRAND_DESIGN §4.2): a hand with nothing to place traded `given_back` (a
 ## Technique, back into the draw pile) for `drawn` (the top ingredient of the draw pile).
 signal mise_en_place(side: String, drawn: CardInstance, given_back: CardInstance)
+## Chef's Flow (GRAND_DESIGN §5): a Perfect Serve filled the meter. The player picks with
+## pick_modifier(); the rival picks on its own (then modifier_gained follows at once).
+signal flow_offer(side: String, choices: Array[ModifierDef])
+signal modifier_gained(side: String, modifier: ModifierDef, stacks: int)
 signal changed
 
 const MAX_HEAT := 3
@@ -48,6 +52,12 @@ const ENEMY_RNG_SALT := 0x5bd1e995
 const CLUMP_TECHNIQUES := 4
 const CLUMP_WINDOW := 5
 const CLUMP_RETRIES := 3
+## Chef's Flow thresholds for Apis (rivals set theirs in EnemyDef.flow_thresholds).
+const PLAYER_FLOW: PackedInt32Array = [2, 3, 4]
+## Offer slot 3 is Rare this often (GRAND_DESIGN §5.2); 3 offers without one guarantee it.
+const RARE_CHANCE := 0.25
+const RARE_PITY := 3
+const PICK_FIRST := "Pick a modifier first."
 
 ## Signature Dish (GDD §4.5): appears in hand when Hype is full, once per duel.
 static var SIGNATURE_CARD: CardDef = _make_signature_card()
@@ -141,6 +151,11 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	kitchens.enemy = Kitchen.new("enemy", enemy, SeededRng.new(rng_seed ^ ENEMY_RNG_SALT))
 	kitchens.player.ai_rng = SeededRng.stream(rng_seed, "ai_player")
 	kitchens.enemy.ai_rng = SeededRng.stream(rng_seed, "ai_enemy")
+	kitchens.player.offer_rng = SeededRng.stream(rng_seed, "offers")
+	kitchens.enemy.offer_rng = SeededRng.stream(rng_seed, "offers_enemy")
+	kitchens.player.flow_thresholds = PLAYER_FLOW
+	if not enemy_def.flow_thresholds.is_empty():
+		kitchens.enemy.flow_thresholds = enemy_def.flow_thresholds
 	kitchens.player.recipes = recipes_
 	var enemy_recipes: Array[RecipeDef] = []
 	var enemy_deck: Array[CardDef] = []
@@ -266,6 +281,8 @@ func enemy_actions_left() -> int:
 func can_play(uid: int, station := -1, side := "player") -> Dictionary:
 	if phase != side:
 		return _not_your_turn()
+	if not kitchen(side).offer.is_empty():
+		return _fail(PICK_FIRST)
 	var k := kitchen(side)
 	var i := k.hand_index(uid)
 	if i < 0:
@@ -283,6 +300,8 @@ func can_play(uid: int, station := -1, side := "player") -> Dictionary:
 func can_serve(station := 0, side := "player") -> Dictionary:
 	if phase != side:
 		return _not_your_turn()
+	if not kitchen(side).offer.is_empty():
+		return _fail(PICK_FIRST)
 	var k := kitchen(side)
 	if k.served_this_turn:
 		return _fail("Already served this turn.")
@@ -297,8 +316,10 @@ func can_serve(station := 0, side := "player") -> Dictionary:
 func can_move(from: int, to: int, side := "player") -> Dictionary:
 	if phase != side:
 		return _not_your_turn()
+	if not kitchen(side).offer.is_empty():
+		return _fail(PICK_FIRST)
 	var k := kitchen(side)
-	if k.moved_this_turn:
+	if not _move_left(k):
 		return _fail("Already moved a card this turn.")
 	if from == to or from < 0 or to < 0 or from >= STATIONS or to >= STATIONS:
 		return _fail("Pick another station.")
@@ -318,7 +339,7 @@ func move_top(from: int, to: int, side := "player") -> Dictionary:
 	var k := kitchen(side)
 	var card: CardInstance = k.stack(from).pop_back()
 	k.stack(to).append(card)
-	k.moved_this_turn = true
+	_use_move(k)
 	_say("%s moves to station %d." % [card.def.name, to + 1])
 	changed.emit()
 	return _ok()
@@ -328,14 +349,16 @@ func move_top(from: int, to: int, side := "player") -> Dictionary:
 func clear_station(station: int, side := "player") -> Dictionary:
 	if phase != side:
 		return _not_your_turn()
+	if not kitchen(side).offer.is_empty():
+		return _fail(PICK_FIRST)
 	var k := kitchen(side)
-	if k.moved_this_turn:
+	if not _move_left(k):
 		return _fail("Already moved a card this turn.")
 	if station < 0 or station >= STATIONS or k.stack(station).is_empty():
 		return _fail("That station is empty.")
 	k.discard.append_array(k.stack(station))
 	k.stack(station).clear()
-	k.moved_this_turn = true
+	_use_move(k)
 	_say("Station %d cleared." % (station + 1))
 	changed.emit()
 	return _ok()
@@ -361,6 +384,11 @@ func play(uid: int, station := -1, side := "player") -> Dictionary:
 		_say("Signature Dish ready! Next Serve ×2.")
 	card_played.emit(side, card)
 	_apply_effects(card.def.effects, 0, 1.0, side)
+	if card.def.is_ingredient() and not over():
+		if mods(side, "steady_hands") > 0:
+			_gain_composure(side, int(GameDB.modifier("steady_hands").amount) * mods(side, "steady_hands"))
+		if mods(side, "spice_whisperer") > 0 and card.def.tags.has("SPICE"):
+			_add_status(_other(side), "spicy", int(GameDB.modifier("spice_whisperer").amount) * mods(side, "spice_whisperer"))
 	changed.emit()
 	return _ok()
 
@@ -398,6 +426,8 @@ func serve_as(recipe_id: String, station := 0, side := "player") -> Dictionary:
 func end_turn() -> Dictionary:
 	if phase != "player":
 		return _not_your_turn()
+	if not kitchens.player.offer.is_empty():
+		return _fail(PICK_FIRST)
 	_end_turn_cleanup("player")
 	phase = "enemy"
 	_enemy_started = false
@@ -506,11 +536,11 @@ func _do_serve(recipe: RecipeDef, station: int, side: String) -> Dictionary:
 	k.served_this_turn = true
 	k.last_served_station = station
 	k.stack(station).clear()
-	var quality := RecipeMatch.plate_quality(served)
+	var quality := dish_quality(recipe, served, side)
 	var target_before := target.confidence + target.composure
 
 	# Effect multiplier: Perfect Order ×1.5, Signature Dish ×2, Burnt ×0.5 (all stack).
-	var mult := PERFECT_ORDER_MULT if perfect else 1.0
+	var mult := perfect_mult(side) if perfect else 1.0
 	var signature := k.signature_armed
 	if signature:
 		mult *= 2.0
@@ -539,10 +569,20 @@ func _do_serve(recipe: RecipeDef, station: int, side: String) -> Dictionary:
 		k.hype = 0
 	elif recipe:
 		_add_hype(recipe.hype, side)
+	# Modifiers (GRAND_DESIGN §5.3): Hot Pan hits harder, Crowd Favorite builds Hype.
+	if serve_bonus(side) > 0 and not over():
+		_deal_pressure(_other(side), pressure_from(side, serve_bonus(side)))
+	if mods(side, "crowd_favorite") > 0:
+		_add_hype(int(GameDB.modifier("crowd_favorite").amount) * mods(side, "crowd_favorite"), side)
+	if perfect and mods(side, "extra_burner") > 0:
+		k.burner_next = true
 
 	k.discard.append_array(served)
 	var dealt := target_before - (target.confidence + target.composure)
 	dish_served.emit(side, recipe, dealt, quality, served.size())
+	# Chef's Flow: a Perfect Order Serve fills the meter (after the dish, so its reveal comes first).
+	if perfect and not over():
+		_gain_flow(side)
 	changed.emit()
 	return _ok()
 
@@ -557,14 +597,18 @@ func _start_turn(side: String) -> void:
 	k.fighter.composure = 0
 	k.served_this_turn = false
 	k.moved_this_turn = false
+	k.extra_moves = 0
 	_tick_spicy(side)
 	if over():
 		return
 	k.fighter.heat = k.max_heat
+	if k.burner_next:
+		k.burner_next = false
+		k.fighter.heat += int(GameDB.modifier("extra_burner").amount)
 	var inspired := k.fighter.stacks("inspired")
 	if inspired > 0:
 		_add_status(side, "inspired", -inspired)
-	_draw(k.hand_size + inspired, side)
+	_draw(k.hand_size + inspired + mods(side, "prep_cook"), side)
 	k.mise_used = false
 	_mise_en_place(side)
 	if side == "player":
@@ -724,10 +768,15 @@ func _mise_en_place(side: String) -> void:
 	var k := kitchen(side)
 	if k.mise_used:
 		return
+	# Mise Master: also when the hand holds just 1 placeable ingredient.
+	var allowed := 1 if mods(side, "mise_master") > 0 else 0
+	var placeable := 0
 	var technique: CardInstance = null
 	for c in k.hand:
 		if c.def.is_ingredient() and _placeable(c, k):
-			return
+			placeable += 1
+			if placeable > allowed:
+				return
 		if technique == null and not c.def.is_ingredient() and c.def.special != "signature":
 			technique = c
 	if technique == null:
@@ -779,9 +828,15 @@ func _apply_ai(a: Dictionary) -> Dictionary:
 		"serve":
 			var recipe := RecipeMatch.best_dish(k.recipes, k.stack(a.station))
 			var perfect := recipe != null and RecipeMatch.in_order(recipe, k.stack(a.station))
+			k.gained = null
 			if not serve(a.station, "enemy").ok:
 				return {}
-			return {kind = "serve", station = a.station, recipe = recipe, perfect = perfect}
+			var step := {kind = "serve", station = a.station, recipe = recipe, perfect = perfect}
+			# Chef's Flow modifier the rival took with this Serve (the Turn Director announces it).
+			if k.gained:
+				step.modifier = k.gained
+				k.gained = null
+			return step
 	return {}
 
 
@@ -831,3 +886,142 @@ static func _make_signature_card() -> CardDef:
 	c.exhaust = true
 	c.special = "signature"
 	return c
+
+
+# ---------------------------------------------------------------- Chef's Flow (GRAND_DESIGN §5)
+
+## Stacks of a modifier on `side` (0 = not owned).
+func mods(side: String, id: String) -> int:
+	return kitchen(side).mod(id)
+
+
+## The Perfect Order multiplier for `side` (Encore raises it).
+func perfect_mult(side: String) -> float:
+	var enc := GameDB.modifier("encore")
+	return PERFECT_ORDER_MULT + enc.amount * mods(side, "encore")
+
+
+## Quality a dish gets from `plate` (Plating Pro multiplies the Garnish part).
+func dish_quality(recipe: RecipeDef, plate: Array[CardInstance], side: String) -> int:
+	var q := RecipeMatch.plate_quality(plate)
+	if recipe and mods(side, "plating_pro") > 0:
+		var extra := int(GameDB.modifier("plating_pro").amount) - 1
+		for i in range(recipe.requires.size(), plate.size()):
+			q += plate[i].def.quality * extra
+	return q
+
+
+## Flat Pressure a Serve adds on top of the dish (Hot Pan).
+func serve_bonus(side: String) -> int:
+	return int(GameDB.modifier("hot_pan").amount) * mods(side, "hot_pan")
+
+
+## The player picks one of the offered modifiers (the pick-1-of-3 overlay).
+func pick_modifier(id: String, side := "player") -> Dictionary:
+	var k := kitchen(side)
+	for m in k.offer:
+		if m.id == id:
+			_take_modifier(side, m)
+			changed.emit()
+			return _ok()
+	return _fail("That modifier is not on offer.")
+
+
+func _gain_flow(side: String) -> void:
+	var k := kitchen(side)
+	k.flow += 1
+	if k.flow < k.flow_threshold():
+		return
+	k.flow = 0
+	k.flow_level += 1
+	var choices := _make_offer(side)
+	if choices.is_empty():
+		return
+	_say("Chef's Flow! %s is on a roll." % chef_name(side))
+	if side == "player":
+		k.offer = choices
+		flow_offer.emit(side, choices)
+	else:
+		flow_offer.emit(side, choices)
+		_take_modifier(side, RivalAI.pick_modifier(self, choices, side))
+
+
+func _take_modifier(side: String, m: ModifierDef) -> void:
+	var k := kitchen(side)
+	k.offer = []
+	k.modifiers[m.id] = k.mod(m.id) + 1
+	k.gained = m
+	_say("%s takes %s." % [chef_name(side), m.name])
+	modifier_gained.emit(side, m, k.mod(m.id))
+
+
+## 2 Commons + 1 slot (Rare 25%, or for sure after RARE_PITY offers without one), never a
+## non-stackable modifier already owned, and one that fits the deck's build when there is one.
+func _make_offer(side: String) -> Array[ModifierDef]:
+	var k := kitchen(side)
+	var build := build_tags(side)
+	var commons: Array[ModifierDef] = []
+	var rares: Array[ModifierDef] = []
+	for m in GameDB.modifiers():
+		if not m.stackable and k.mod(m.id) > 0:
+			continue
+		# Never offer a modifier made for a tag this deck does not use.
+		if m.tag != "" and not build.has(m.tag):
+			continue
+		(rares if m.is_rare() else commons).append(m)
+	var out: Array[ModifierDef] = []
+	for _i in 2:
+		_take_random(commons, out, k.offer_rng)
+	var rare := k.offers_without_rare >= RARE_PITY or k.offer_rng.next() < RARE_CHANCE
+	if rare and not rares.is_empty():
+		_take_random(rares, out, k.offer_rng)
+	else:
+		_take_random(commons, out, k.offer_rng)
+	# Pool running dry: fill from whatever is left.
+	while out.size() < 3 and not (commons.is_empty() and rares.is_empty()):
+		_take_random(commons if not commons.is_empty() else rares, out, k.offer_rng)
+	# Build match: a modifier made for a tag the deck leans on takes the first Common slot.
+	if not out.any(func(m: ModifierDef) -> bool: return m.tag != ""):
+		var pool := commons.filter(func(m: ModifierDef) -> bool: return m.tag != "")
+		if not pool.is_empty() and not out.is_empty():
+			out[0] = pool[k.offer_rng.index(pool.size())]
+	var has_rare := out.any(func(m: ModifierDef) -> bool: return m.is_rare())
+	k.offers_without_rare = 0 if has_rare else k.offers_without_rare + 1
+	return out
+
+
+static func _take_random(from: Array[ModifierDef], into: Array[ModifierDef], rng: SeededRng) -> void:
+	if from.is_empty():
+		return
+	into.append(from.pop_at(rng.index(from.size())))
+
+
+## Ingredient tags with 3+ cards in this side's deck (its "build").
+func build_tags(side: String) -> Dictionary:
+	var k := kitchen(side)
+	var count := {}
+	var piles: Array = [k.draw_pile, k.hand, k.discard, k.exhausted]
+	piles.append_array(k.stations)
+	for pile: Array in piles:
+		for c: CardInstance in pile:
+			if c.def.is_ingredient():
+				for t in c.def.tags:
+					count[t] = count.get(t, 0) + 1
+	var out := {}
+	for t in count:
+		if count[t] >= 3:
+			out[t] = true
+	return out
+
+
+func _move_left(k: Kitchen) -> bool:
+	if not k.moved_this_turn:
+		return true
+	var fm := k.mod("free_move")
+	return fm > 0 and 1 + k.extra_moves < int(GameDB.modifier("free_move").amount)
+
+
+func _use_move(k: Kitchen) -> void:
+	if k.moved_this_turn:
+		k.extra_moves += 1
+	k.moved_this_turn = true

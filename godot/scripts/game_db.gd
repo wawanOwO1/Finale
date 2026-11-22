@@ -8,6 +8,7 @@ const DATA_DIRS := {
 	enemies = "res://data/enemies",
 	books = "res://data/books",
 	decks = "res://data/decks",
+	modifiers = "res://data/modifiers",
 }
 ## Book order used for "all books" (dev deck).
 const ALL_BOOKS: PackedStringArray = ["basics", "grill", "spice", "comfort"]
@@ -76,3 +77,15 @@ static func _ensure_loaded() -> void:
 			else:
 				push_warning("GameDB: %s has no id, skipped" % dir.path_join(file))
 		_tables[table] = into
+
+
+static func modifier(id: String) -> ModifierDef:
+	return _lookup("modifiers", id)
+
+
+## Every Chef's Flow modifier, sorted by id so offers are reproducible from a seed.
+static func modifiers() -> Array[ModifierDef]:
+	var out: Array[ModifierDef] = []
+	out.assign(all("modifiers"))
+	out.sort_custom(func(a: ModifierDef, b: ModifierDef) -> bool: return a.id < b.id)
+	return out

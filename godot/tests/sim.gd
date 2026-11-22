@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_symmetric_kitchen()
 	_rival_ai()
 	_rng()
+	_chefs_flow()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -494,6 +495,9 @@ func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Arr
 			for st in Duel.STATIONS:
 				if d.can_serve(st).ok and (not d.recipe_check(st).ready.is_empty() or d.stack(st).size() >= 4):
 					d.serve(st)
+					var offer := d.kitchen("player").offer
+					if not offer.is_empty():
+						d.pick_modifier(offer[pick_rng.index(offer.size())].id)
 					break
 			var total := d.draw_pile.size() + d.hand.size() + d.discard.size() + d.ingredient_count() + d.exhausted.size()
 			if total != deck.size() + (1 if d.signature_given else 0):
@@ -520,6 +524,7 @@ func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
 	var turns_total := 0
 	var conf_left := 0
 	var ended := true
+	var mods_taken := [0, 0]
 	for s in range(1, n + 1):
 		var d := Duel.new(GameDB.deck("starter"), enemy, basics, {seed = s})
 		var safety := 0
@@ -534,11 +539,16 @@ func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
 						d.play(a.uid)
 					"serve":
 						d.serve(a.station)
+						var offer := d.kitchen("player").offer
+						if not offer.is_empty():
+							d.pick_modifier(RivalAI.pick_modifier(d, offer, "player", me).id)
+							mods_taken[0] += 1
 				if a.kind == "end" or d.over():
 					break
 			if not d.over():
 				d.end_turn()
 				d.run_enemy_turn()
+		mods_taken[1] += d.kitchen("enemy").modifiers.values().reduce(func(acc, v): return acc + v, 0)
 		if not d.over():
 			ended = false
 		if d.phase == "won":
@@ -548,6 +558,7 @@ func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
 	check("smart Apis vs %s: every duel ends" % label.trim_prefix("starter vs "), ended)
 	print("      smart bot %s: %d/%d wins, avg %.1f turns, avg Confidence left on a win %.0f/60" % [
 			label, wins, n, float(turns_total) / n, float(conf_left) / maxi(1, wins)])
+	print("      Chef's Flow modifiers per duel: Apis %.2f, rival %.2f" % [float(mods_taken[0]) / n, float(mods_taken[1]) / n])
 
 
 ## Phase D (GRAND_DESIGN §4): independent streams, anti-clump shuffle, Mise en Place, AI ties.
@@ -644,3 +655,144 @@ func _rng() -> void:
 		if step.kind == "place":
 			stations[step.station] = true
 	check("tied placements vary between stations", stations.size() > 1, str(stations.keys()))
+
+
+## A Perfect Order Toast on station 1, served; then the turn passes (dummy rival).
+func _perfect_serve(d: Duel, next_turn := true) -> void:
+	d.stations[0] = inst(["bread", "butter"])
+	d.serve(0)
+	if next_turn and d.kitchen("player").offer.is_empty():
+		d.end_turn()
+		d.run_enemy_turn()
+
+
+## Phase E (GRAND_DESIGN §5): Chef's Flow meter, the 1-of-3 offer, and every modifier.
+func _chefs_flow() -> void:
+	var d := new_duel(30, dummy)
+	var k := d.kitchen("player")
+	var offers := [0]
+	d.flow_offer.connect(func(_side: String, _c: Array[ModifierDef]) -> void: offers[0] += 1)
+	_perfect_serve(d)
+	check("a Perfect Serve fills 1 Flow", k.flow == 1 and k.offer.is_empty())
+	d.stations[0] = inst(["butter", "bread"])
+	d.serve(0)
+	check("a Cooked Serve adds no Flow", k.flow == 1)
+	d.end_turn()
+	d.run_enemy_turn()
+	_perfect_serve(d)
+	check("2 Perfect Serves offer 3 modifiers", k.offer.size() == 3 and offers[0] == 1, str(k.offer.size()))
+	check("the meter resets and the next threshold is 3", k.flow == 0 and k.flow_threshold() == 3)
+	check("no action until a pick", not d.end_turn().ok and d.end_turn().reason == Duel.PICK_FIRST)
+	check("only an offered modifier can be picked", not d.pick_modifier("nope").ok)
+	var first: ModifierDef = k.offer[0]
+	check("picking takes it", d.pick_modifier(first.id).ok and k.mod(first.id) == 1 and k.offer.is_empty())
+	check("play goes on after the pick", d.end_turn().ok)
+
+	# Offer rules over many offers.
+	var dupes := false
+	var owned_again := false
+	var longest_dry := 0
+	var dry := 0
+	var spice_offered := false
+	for s in 40:
+		var x := new_duel(100 + s, dummy)
+		var xk := x.kitchen("player")
+		for _i in 6:
+			var o := x._make_offer("player")
+			var ids := {}
+			for m in o:
+				dupes = dupes or ids.has(m.id)
+				ids[m.id] = true
+				owned_again = owned_again or (not m.stackable and xk.mod(m.id) > 0)
+				spice_offered = spice_offered or m.id == "spice_whisperer"
+			dry = 0 if o.any(func(m: ModifierDef) -> bool: return m.is_rare()) else dry + 1
+			longest_dry = maxi(longest_dry, dry)
+			xk.modifiers[o[0].id] = xk.mod(o[0].id) + 1
+		dry = 0
+	check("an offer never repeats a modifier", not dupes)
+	check("a non-stackable modifier is never offered twice", not owned_again)
+	check("rarity pity: never 4 offers in a row without a Rare", longest_dry <= Duel.RARE_PITY, str(longest_dry))
+	check("Spice Whisperer stays out of a deck without SPICE", not spice_offered)
+	var spicy_deck: Array[CardDef] = []
+	for id in ["chili", "chili", "chili", "bread", "butter", "egg", "tomato"]:
+		spicy_deck.append(GameDB.card(id))
+	var always := true
+	for s in 30:
+		var x := Duel.new(spicy_deck, dummy, basics, {seed = s})
+		always = always and x._make_offer("player").any(func(m: ModifierDef) -> bool: return m.id == "spice_whisperer")
+	check("a SPICE deck is always offered its build modifier", always)
+
+	# Each modifier, applied directly.
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {hot_pan = 1}
+	var before := d.enemy.confidence
+	_perfect_serve(d, false)
+	check("Hot Pan: Perfect Toast 12 + 3", lost(d, before) == 15, str(lost(d, before)))
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {encore = 1}
+	before = d.enemy.confidence
+	_perfect_serve(d, false)
+	check("Encore: (6 + 2) x1.75 = 14", lost(d, before) == 14, str(lost(d, before)))
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {plating_pro = 1}
+	d.stations[0] = inst(["bread", "butter", "tomato"])
+	before = d.enemy.confidence
+	d.serve(0)
+	check("Plating Pro: garnish counts twice, (6 + 4) x1.5 = 15", lost(d, before) == 15, str(lost(d, before)))
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {crowd_favorite = 1}
+	var hype_before := d.hype
+	_perfect_serve(d, false)
+	check("Crowd Favorite: +10 Hype on top", d.hype == hype_before + GameDB.recipe("toast").hype + 10)
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {extra_burner = 1, prep_cook = 1}
+	_perfect_serve(d)
+	check("Extra Burner: +1 Heat after a Perfect Serve", d.player.heat == Duel.MAX_HEAT + 1, str(d.player.heat))
+	check("Prep Cook: draws 1 more", d.hand.size() == Duel.HAND_SIZE + 1, str(d.hand.size()))
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {steady_hands = 1, spice_whisperer = 1}
+	var chili := give_hand(d, ["chili"])[0]
+	d.play(chili.uid, 1)
+	check("Steady Hands: +1 Composure per ingredient", d.player.composure >= 1)
+	check("Spice Whisperer: SPICE gives the rival Spicy", d.enemy.stacks("spicy") >= 1)
+	d = new_duel(31, dummy)
+	d.kitchen("player").modifiers = {free_move = 1}
+	d.stations[0] = inst(["bread", "butter", "egg"])
+	check("Free Move: 2 moves a turn", d.move_top(0, 1).ok and d.move_top(0, 2).ok and not d.move_top(0, 1).ok)
+	var mm := 0
+	var plain := 0
+	var two_tech: Array[CardDef] = []
+	for id in ["quickChop", "quickChop", "quickChop", "stareDown", "egg", "bread", "butter", "tomato"]:
+		two_tech.append(GameDB.card(id))
+	for s in 60:
+		var x := Duel.new(two_tech, dummy, basics, {seed = s})
+		x.kitchen("player").modifiers = {mise_master = 1}
+		x.end_turn()
+		x.run_enemy_turn()
+		var ing := x.hand.filter(func(c: CardInstance) -> bool: return c.def.is_ingredient()).size()
+		if x.kitchen("player").mise_used and ing >= 2:
+			mm += 1
+		if ing < 2:
+			plain += 1
+	check("Mise Master: steps in on a 1-ingredient hand", mm > 0 and plain == 0, "%d helped, %d left short" % [mm, plain])
+
+	# The rival takes its own pick, and its step reports it.
+	var tony := GameDB.enemy("tony")
+	var r := Duel.new(GameDB.deck("starter"), tony, basics, {seed = 6})
+	var rk := r.kitchen("enemy")
+	check("rival thresholds come from its EnemyDef", rk.flow_threshold() == tony.flow_thresholds[0])
+	rk.flow = rk.flow_threshold() - 1
+	rk.stations[0] = inst(["bread", "butter"])
+	var gained := {}
+	r.modifier_gained.connect(func(side: String, m: ModifierDef, _n: int) -> void: gained[side] = m.id)
+	r.end_turn()
+	var reported := ""
+	while r.phase == "enemy":
+		var a := r.enemy_step()
+		if a.has("modifier"):
+			reported = a.modifier.id
+		if a.kind == "end" or a.kind == "none":
+			break
+	check("the rival picks a modifier on its own", gained.has("enemy") and rk.offer.is_empty() and not rk.modifiers.is_empty())
+	check("the rival's Serve step names the modifier", reported != "" and reported == gained.get("enemy", ""), reported)
+	check("Flow is per duel", Duel.new(GameDB.deck("starter"), tony, basics, {seed = 6}).kitchen("enemy").modifiers.is_empty())
