@@ -36,6 +36,8 @@ const STATUS_SFX := {
 	spicy = "poison",
 }
 
+## Tracks that repeat (set here too, so a stale import cache cannot break it).
+const LOOPING: PackedStringArray = ["menu", "deck", "battle"]
 const VOICES := 8
 const FADE := 0.6
 
@@ -49,6 +51,8 @@ var _fade_tw: Tween
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	for k in LOOPING:
+		MUSIC[k].loop = true
 	for i in 2:
 		var p := AudioStreamPlayer.new()
 		p.bus = &"Music"
