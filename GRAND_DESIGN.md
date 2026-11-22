@@ -75,11 +75,13 @@ Target giliran rival: **4–7 detik** dengan 3–6 aksi. Lebih dari itu terasa l
 **`Duel` (logika)** mendapat fase `"enemy"` dan API langkah demi langkah:
 
 ```gdscript
-duel.end_turn()               # P4: buang tangan, phase = "enemy", jalankan E2. Tidak lagi memanggil giliran rival.
+duel.end_turn()               # P4: buang tangan, phase = "enemy". Tidak lagi memanggil giliran rival.
+duel.begin_enemy_turn()       # E2: Composure rival → 0, Spicy tick, antre aksi giliran ini.
 duel.enemy_step() -> Dictionary
-    # Rival memutuskan & menerapkan SATU aksi, memancarkan sinyal, lalu mengembalikan
-    # { kind: "place"|"technique"|"move"|"clear"|"serve"|"end", station, ... }.
-duel.finish_enemy_turn()      # E4 + mulai giliran pemain (P2).
+    # Menerapkan SATU aksi, memancarkan sinyal, lalu mengembalikan { kind, … }.
+    # Fase A (pola Intent): "attack" | "block" | "status" | "end". Fase C (AI): "place" | "technique" | "move" | "clear" | "serve" | "end".
+    # "end" = E4 (decay akhir giliran rival). enemy_actions_left() = sisa aksi.
+duel.start_player_turn()      # P2: phase = "player", Composure, Spicy, draw.
 duel.run_enemy_turn()         # loop sinkron untuk tests/sim.gd (tanpa animasi).
 ```
 

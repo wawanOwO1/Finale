@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_statuses()
 	_signature()
 	_stations()
+	_rival_turn_steps()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -109,7 +110,7 @@ func _core_loop() -> void:
 	d.stations[0] = inst(["egg"])
 	d.player.composure = 4
 	var conf := d.player.confidence
-	d.end_turn() # Tony: Prepping 6
+	d.end_turn(); d.run_enemy_turn() # Tony: Prepping 6
 	check("stations kept across turns", d.stack(0).size() == 1)
 	check("composure absorbs 4 of 6", conf - d.player.confidence == 2)
 	check("composure reset on new turn", d.player.composure == 0 and d.turn == 2)
@@ -153,21 +154,21 @@ func _statuses() -> void:
 	var before := d.enemy.confidence
 	d.play(h[1].uid)
 	check("Rattled: 6 Pressure becomes 9", lost(d, before) == 9)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("Rattled counts down at the end of the rival turn", d.enemy.stacks("rattled") == 1)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("Rattled expires after 2 rival turns", not d.enemy.statuses.has("rattled"))
 
 	d = new_duel(6, GameDB.enemy("rosa"))
 	var conf := d.player.confidence
 	check("intent preview matches Rosa taunt (4)", d.pressure_from("enemy", d.intent().attack) == 4)
-	d.end_turn() # Rosa: Taunt (4 Pressure, Flustered 2)
+	d.end_turn(); d.run_enemy_turn() # Rosa: Taunt (4 Pressure, Flustered 2)
 	check("Rosa taunt: 4 Pressure + Flustered 2", conf - d.player.confidence == 4 and d.player.stacks("flustered") == 2)
 	h = give_hand(d, ["quickChop"])
 	before = d.enemy.confidence
 	d.play(h[0].uid)
 	check("Flustered: 6 Pressure becomes 4", lost(d, before) == 4)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("player Flustered counts down at end of own turn", d.player.stacks("flustered") == 1)
 
 	d = new_duel(7, dummy)
@@ -176,7 +177,7 @@ func _statuses() -> void:
 	check("Chili: rival Spicy 2", d.enemy.stacks("spicy") == 2)
 	before = d.enemy.confidence
 	d.enemy.composure = 50 # Spicy ignores Composure
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("Spicy ticks 2 at rival turn start, ignores Composure", lost(d, before) == 2)
 	check("Spicy then drops to 1", d.enemy.stacks("spicy") == 1)
 
@@ -201,7 +202,7 @@ func _statuses() -> void:
 	d.stations[0] = inst(["rice", "mushroom", "cheese"])
 	d.serve_as("mushroomRisotto")
 	check("Risotto gives Inspired 1", d.player.stacks("inspired") == 1)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("Inspired: draw 6 next turn, then gone", d.hand.size() == 6 and not d.player.statuses.has("inspired"))
 
 	d = new_duel(11, dummy)
@@ -222,7 +223,7 @@ func _signature() -> void:
 	d.hype = 75
 	d.serve_as("toast")
 	check("Hype 100 puts Signature Dish in hand", d.hype == 100 and has_signature(d.hand))
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	check("Signature Dish is retained over End Turn", has_signature(d.hand))
 
 	var cut_in := {dish = ""}
@@ -238,7 +239,7 @@ func _signature() -> void:
 	check("Signature Serve: (6+2) × 2 = 16", lost(d, before) == 16)
 	check("cut-in event fires with the dish name", cut_in.dish == "Toast")
 	check("Hype spent, not re-armed", d.hype == 0 and not d.signature_armed)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	d.stations[0] = inst(["bread", "butter"])
 	d.hype = 99
 	d.serve_as("toast")
@@ -275,7 +276,7 @@ func _stations() -> void:
 	check("move top card", d.move_top(1, 2).ok and d.stack(1).size() == 1 and d.stack(2).back().def.id == "egg")
 	check("only one move per turn", not d.move_top(2, 1).ok)
 	check("clear also uses the move", not d.clear_station(0).ok)
-	d.end_turn()
+	d.end_turn(); d.run_enemy_turn()
 	var discard_before := d.discard.size()
 	check("clear station after a new turn", d.clear_station(0).ok and d.stack(0).is_empty() and d.discard.size() == discard_before + 1)
 
@@ -302,6 +303,32 @@ func _stations() -> void:
 
 
 # ---------------------------------------------------------------- random playthroughs
+
+## Rival turn runs one paced step at a time (GRAND_DESIGN §1.5).
+func _rival_turn_steps() -> void:
+	var d := new_duel(6, GameDB.enemy("rosa"))
+	var conf := d.player.confidence
+	var hand_card := d.hand[0].uid
+	d.end_turn()
+	check("end turn hands over to the rival", d.phase == "enemy")
+	check("player cannot act on the rival turn", d.end_turn().reason == "Wait for your turn.")
+	check("hand is discarded on end turn", d.hand.is_empty() and d.can_play(hand_card).reason == "Wait for your turn.")
+	check("nothing hits before the first step", d.player.confidence == conf)
+	var kinds: Array[String] = []
+	while true:
+		var a := d.enemy_step()
+		kinds.append(a.kind)
+		if a.kind == "attack":
+			check("attack step lands alone (4, no Flustered yet)", conf - d.player.confidence == 4 and d.player.stacks("flustered") == 0)
+		if a.kind == "end" or kinds.size() > 10:
+			break
+	check("Rosa taunt plays as attack, status, end", kinds == ["attack", "status", "end"], str(kinds))
+	check("extra steps after end do nothing", d.enemy_step().kind == "end" and d.player.stacks("flustered") == 2)
+	var t := d.turn
+	d.start_player_turn()
+	check("player turn starts after the rival ends", d.phase == "player" and d.turn == t + 1 and d.hand.size() == Duel.HAND_SIZE)
+	check("rival pattern advanced once", d.intent().label != "Taunt" or d.enemy_def.pattern.size() == 1)
+
 
 func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Array[RecipeDef]) -> void:
 	var deck := GameDB.deck(deck_id)
@@ -333,7 +360,7 @@ func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Arr
 			if total != deck.size() + (1 if d.signature_given else 0):
 				conserved = false
 			if d.phase == "player":
-				d.end_turn()
+				d.end_turn(); d.run_enemy_turn()
 		if d.phase == "won":
 			wins += 1
 		turns_total += d.turn

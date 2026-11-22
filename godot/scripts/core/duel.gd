@@ -71,7 +71,7 @@ var exhausted: Array[CardInstance] = []
 
 var hype := 0
 var turn := 0
-## "player" | "won" | "lost"
+## "player" | "enemy" | "won" | "lost"
 var phase := "player"
 var served_this_turn := false
 ## Top card moved to another station (once per turn, free). Clearing a station also uses it.
@@ -84,6 +84,10 @@ var signature_armed := false
 var log_lines: PackedStringArray = []
 
 var _intent_index := 0
+## Rival turn: actions still to play this turn, and whether its start (Composure, Spicy) ran.
+var _enemy_queue: Array[Dictionary] = []
+var _enemy_started := false
+var _enemy_ended := false
 var _next_uid := 0
 var _rng: SeededRng
 
@@ -173,7 +177,7 @@ func pressure_from(attacker: String, base: int) -> int:
 ## station: target for an ingredient (-1 = auto_station). Ignored for techniques.
 func can_play(uid: int, station := -1) -> Dictionary:
 	if phase != "player":
-		return _fail("The duel is over.")
+		return _not_your_turn()
 	var i := _hand_index(uid)
 	if i < 0:
 		return _fail("Card is not in hand.")
@@ -189,7 +193,7 @@ func can_play(uid: int, station := -1) -> Dictionary:
 
 func can_serve(station := 0) -> Dictionary:
 	if phase != "player":
-		return _fail("The duel is over.")
+		return _not_your_turn()
 	if served_this_turn:
 		return _fail("Already served this turn.")
 	if station < 0 or station >= STATIONS or stack(station).is_empty():
@@ -204,7 +208,7 @@ func can_serve(station := 0) -> Dictionary:
 ## Move the top (newest) card of one station onto another. Once per turn, free.
 func can_move(from: int, to: int) -> Dictionary:
 	if phase != "player":
-		return _fail("The duel is over.")
+		return _not_your_turn()
 	if moved_this_turn:
 		return _fail("Already moved a card this turn.")
 	if from == to or from < 0 or to < 0 or from >= STATIONS or to >= STATIONS:
@@ -231,7 +235,7 @@ func move_top(from: int, to: int) -> Dictionary:
 ## Throw a whole station into the discard pile. Free, but uses the turn's move.
 func clear_station(station: int) -> Dictionary:
 	if phase != "player":
-		return _fail("The duel is over.")
+		return _not_your_turn()
 	if moved_this_turn:
 		return _fail("Already moved a card this turn.")
 	if station < 0 or station >= STATIONS or stack(station).is_empty():
@@ -291,20 +295,105 @@ func serve_as(recipe_id: String, station := 0) -> Dictionary:
 	return _do_serve(recipe, station)
 
 
+## Ends the player's turn and hands it to the rival (phase "enemy"). The rival then acts one
+## step at a time so the UI can pace it (GRAND_DESIGN §1):
+##   end_turn() → begin_enemy_turn() → enemy_step() until kind "end" → start_player_turn()
+## Tests and sims without animation call run_enemy_turn() for the whole rival turn.
 func end_turn() -> Dictionary:
 	if phase != "player":
-		return _fail("The duel is over.")
+		return _not_your_turn()
 	# Hand is discarded except Retain cards; stations stay (GDD §4.2 step 4).
 	var kept: Array[CardInstance] = []
 	for c in hand:
 		(kept if c.def.retain else discard).append(c)
 	hand = kept
 	_end_of_turn_decay("player")
-	_enemy_turn()
-	if phase == "player":
-		_start_player_turn()
+	phase = "enemy"
+	_enemy_started = false
+	_enemy_ended = false
 	changed.emit()
 	return _ok()
+
+
+## Start of the rival's turn: Composure fades, Spicy ticks, the turn's actions are queued.
+func begin_enemy_turn() -> void:
+	if phase != "enemy" or _enemy_started:
+		return
+	_enemy_started = true
+	# Composure fades at the start of its owner's turn (GDD §4.1).
+	enemy.composure = 0
+	_tick_spicy("enemy")
+	_enemy_queue.clear()
+	if over():
+		return
+	# Intent pattern for now; the drafting AI replaces this queue (GRAND_DESIGN §3).
+	var it := intent()
+	_say("%s: %s!" % [enemy_def.name, it.label])
+	if it.has_attack():
+		_enemy_queue.append({kind = "attack", base = it.attack})
+	if it.block > 0:
+		_enemy_queue.append({kind = "block", amount = it.block})
+	if it.has_status():
+		var side := "player" if it.status_target == IntentDef.StatusTarget.PLAYER else "enemy"
+		_enemy_queue.append({kind = "status", status = it.status, amount = it.status_amount, target = side})
+	changed.emit()
+
+
+## Applies the rival's next action and returns it: { kind: "attack"|"block"|"status"|"end", … }.
+## "end" also closes the rival's turn (end-of-turn decay). Returns kind "none" when it is not
+## the rival's turn (or the duel ended mid-turn).
+func enemy_step() -> Dictionary:
+	if phase != "enemy":
+		return {kind = "none"}
+	begin_enemy_turn()
+	if over():
+		return {kind = "none"}
+	if _enemy_ended:
+		return {kind = "end"}
+	if _enemy_queue.is_empty():
+		_enemy_ended = true
+		enemy_acted.emit(intent())
+		_intent_index += 1
+		_end_of_turn_decay("enemy")
+		changed.emit()
+		return {kind = "end"}
+	var a: Dictionary = _enemy_queue.pop_front()
+	match a.kind:
+		"attack":
+			a.amount = pressure_from("enemy", a.base)
+			_deal_pressure("player", a.amount)
+		"block":
+			_gain_composure("enemy", a.amount)
+		"status":
+			_add_status(a.target, a.status, a.amount)
+	changed.emit()
+	return a
+
+
+## Rival turn is over (enemy_step returned "end"): Apis's turn starts (Composure, Spicy, draw).
+func start_player_turn() -> void:
+	if phase != "enemy":
+		return
+	phase = "player"
+	_start_player_turn()
+	changed.emit()
+
+
+## The whole rival turn at once, for tests/sims (no pacing).
+func run_enemy_turn() -> void:
+	while phase == "enemy":
+		if enemy_step().kind == "end":
+			break
+	start_player_turn()
+
+
+## Rival steps still queued this turn (0 = the next enemy_step ends the turn).
+func enemy_actions_left() -> int:
+	return _enemy_queue.size() if phase == "enemy" and not _enemy_ended else 0
+
+
+func over() -> bool:
+	return phase == "won" or phase == "lost"
 
 
 # ---------------------------------------------------------------- serve
@@ -376,29 +465,6 @@ func _start_player_turn() -> void:
 	turn_started.emit(turn)
 
 
-func _enemy_turn() -> void:
-	# Composure fades at the start of its owner's turn (GDD §4.1).
-	enemy.composure = 0
-	_tick_spicy("enemy")
-	if phase != "player":
-		return
-
-	var it := intent()
-	_say("%s: %s!" % [enemy_def.name, it.label])
-	if it.has_attack():
-		_deal_pressure("player", pressure_from("enemy", it.attack))
-	if phase != "player":
-		return
-	if it.block > 0:
-		_gain_composure("enemy", it.block)
-	if it.has_status():
-		var side := "player" if it.status_target == IntentDef.StatusTarget.PLAYER else "enemy"
-		_add_status(side, it.status, it.status_amount)
-	enemy_acted.emit(it)
-	_intent_index += 1
-	_end_of_turn_decay("enemy")
-
-
 ## Spicy: lose X Confidence (ignores Composure), then X − 1.
 func _tick_spicy(side: String) -> void:
 	var x := fighter(side).stacks("spicy")
@@ -421,7 +487,7 @@ func _end_of_turn_decay(side: String) -> void:
 ## `bonus` is added to the first effect's amount (recipe Quality); `mult` scales it all.
 func _apply_effects(effects: Array[EffectDef], bonus: int, mult: float) -> void:
 	for i in effects.size():
-		if phase != "player":
+		if over():
 			return
 		var e := effects[i]
 		var scaled := floori((e.amount + (bonus if i == 0 else 0)) * mult)
@@ -457,7 +523,7 @@ func _lose_confidence(target: String, amount: int, source: String) -> void:
 	if amount > 0:
 		confidence_lost.emit(target, mini(amount, f.confidence), source)
 	f.confidence = maxi(0, f.confidence - amount)
-	if f.confidence == 0 and phase == "player":
+	if f.confidence == 0 and not over():
 		phase = "won" if target == "enemy" else "lost"
 		_say("%s gives up!" % enemy_def.name if target == "enemy" else "Apis loses heart...")
 		duel_ended.emit("player" if target == "enemy" else "enemy")
@@ -547,6 +613,10 @@ static func _ok() -> Dictionary:
 
 static func _fail(reason: String) -> Dictionary:
 	return {ok = false, reason = reason}
+
+
+func _not_your_turn() -> Dictionary:
+	return _fail("The duel is over." if over() else "Wait for your turn.")
 
 
 static func _make_signature_card() -> CardDef:

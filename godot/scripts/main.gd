@@ -13,6 +13,8 @@ extends Node
 @onready var view: SubViewportContainer = $StageView
 @onready var stage: Stage = $StageView/StageViewport/Stage
 @onready var ui: DuelUI = $DuelUI
+## Turn pacing (GRAND_DESIGN §1); timings are in its Inspector.
+@onready var director: TurnDirector = $TurnDirector
 
 var duel: Duel
 var pixelated := false
@@ -23,6 +25,9 @@ var round_number := 1
 func _ready() -> void:
 	ui.restart_requested.connect(_start_duel)
 	ui.pixel_toggled.connect(_toggle_pixel)
+	director.ui = ui
+	ui.director = director
+	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))
 	_start_duel()
 
 

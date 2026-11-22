@@ -31,6 +31,9 @@ void fragment() {
 """
 
 var duel: Duel
+## Paces the turn loop and the rival's steps (GRAND_DESIGN §1). The TurnDirector node in main.tscn;
+## main.gd hands it over.
+var director: TurnDirector
 ## Screen positions of the 3D anchors, pushed every frame by main.gd.
 var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400)}
 
@@ -74,7 +77,7 @@ var _mouse := Vector2(-1000, -1000)
 
 
 func _ready() -> void:
-	%EndTurn.pressed.connect(func() -> void: if duel: duel.end_turn())
+	%EndTurn.pressed.connect(_end_turn)
 	%RestartButton.pressed.connect(func() -> void: restart_requested.emit())
 	%PixelButton.pressed.connect(func() -> void: pixel_toggled.emit())
 	_build_static()
@@ -144,8 +147,54 @@ func _intro() -> void:
 	_busy = true
 	_hide_tip()
 	await _announcer.intro(round_number)
+	await director.first_turn()
 	_busy = false
 	_emote_on_intent()
+
+
+## End Turn (button or E): the Turn Director plays the rival's turn and hands it back.
+func _end_turn() -> void:
+	if _locked():
+		return
+	var r := duel.end_turn()
+	if not r.ok:
+		_reject(r.reason)
+		return
+	_hide_tip()
+	director.rival_turn()
+
+
+func announcer() -> Announcer:
+	return _announcer
+
+
+## "Hold click or Space to speed up" (SpeedHint in duel_ui.tscn), shown on the rival turn.
+func speed_hint() -> Label:
+	return %SpeedHint
+
+
+## Locks card/station input (rival turn, banners). The result sequence also sets it.
+func set_busy(on: bool) -> void:
+	_busy = on
+	if on:
+		_hide_tip()
+
+
+## E3: the rival "thinks" for a moment before each step.
+func rival_think(seconds: float) -> void:
+	_emote.pop("think")
+	await get_tree().create_timer(seconds).timeout
+
+
+## A rival step was applied: the intent badge pulses (numbers float from the duel's signals).
+func rival_act(_action: Dictionary) -> void:
+	if _emote.kind == "think":
+		_emote.clear()
+	var intent: Control = %Intent
+	intent.pivot_offset = intent.size / 2.0
+	var tw := create_tween()
+	tw.tween_property(intent, "scale", Vector2.ONE * 1.25, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(intent, "scale", Vector2.ONE, 0.15)
 
 
 func _on_duel_ended(winner: String) -> void:
@@ -166,7 +215,7 @@ func _on_duel_ended(winner: String) -> void:
 
 ## Rival emotes (ART_DIRECTION §5): smug when Apis is low, shocked by a big hit, angry when beaten down.
 func _emote_on_hit(target: String, amount: int, _source: String) -> void:
-	if duel == null or duel.phase != "player":
+	if duel == null or duel.over():
 		return
 	if target == "player":
 		var low := duel.player.confidence <= duel.player.max_confidence * 0.3
@@ -180,7 +229,7 @@ func _emote_on_hit(target: String, amount: int, _source: String) -> void:
 		_angry_shown = true
 		var wait := 1.7 if _emote.visible else 0.05
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
-			if duel and duel.phase == "player":
+			if duel and not duel.over():
 				_emote.pop("angry", true))
 
 
@@ -341,11 +390,12 @@ func _refresh() -> void:
 	if duel == null:
 		return
 	var d := duel
+	# live = the player can act. During the rival turn the intent stays up (it is being played).
 	var live := d.phase == "player"
 
 	# Rival
-	%Intent.visible = live
-	if live:
+	%Intent.visible = not d.over()
+	if not d.over():
 		_fill_intent(d.intent())
 	%RivalName.text = d.enemy_def.name
 	%RivalTitle.text = d.enemy_def.title
@@ -399,8 +449,8 @@ func _refresh() -> void:
 		_smug_armed = true
 
 	# End of duel (after the FINISHED announcer)
-	%Overlay.visible = not live and _result_done
-	if not live and _result_done:
+	%Overlay.visible = d.over() and _result_done
+	if d.over() and _result_done:
 		var won := d.phase == "won"
 		%ResultTitle.text = "Victory" if won else "Defeat"
 		%ResultTitle.add_theme_color_override("font_color", Pal.RED if won else Pal.INK_SOFT)
@@ -848,8 +898,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key and key.pressed and not key.echo:
 		match key.keycode:
 			KEY_E:
-				if not _locked():
-					duel.end_turn()
+				_end_turn()
 			KEY_S:
 				if not _locked():
 					var best := _best_station()

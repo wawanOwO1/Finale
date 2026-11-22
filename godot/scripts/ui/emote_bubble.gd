@@ -5,7 +5,7 @@ extends Control
 ## until the pixel assets exist. Call pop(kind); DuelUI decides when.
 
 ## Higher wins when two emotes want the bubble at once.
-const PRIORITY := {sad = 5, shocked = 4, angry = 3, smug = 2, confident = 1}
+const PRIORITY := {sad = 5, shocked = 4, angry = 3, smug = 2, confident = 1, think = 0}
 const HOLD := 1.5
 ## Face drawing grid (units), scaled into the bubble.
 const GRID := Vector2(40, 26)
@@ -138,6 +138,9 @@ func _face() -> void:
 			draw_arc(_p(10, 9), Pal.em(0.45), 0.0, TAU, 12, Pal.INK, Pal.em(0.3))
 			draw_arc(_p(30, 9), Pal.em(0.45), 0.0, TAU, 12, Pal.INK, Pal.em(0.3))
 			_box(16, 16, 8, 8)
+		"think":  # "…" while the rival plans its next step (GRAND_DESIGN §1.2 E3)
+			for x in [9.0, 18.0, 27.0]:
+				_box(x, 11, 4, 4)
 		"confident":
 			_line([Vector2(5, 5), Vector2(14, 10), Vector2(5, 15)])
 			_box(26, 5, 8, 9)

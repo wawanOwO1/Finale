@@ -31,6 +31,7 @@ const TAG_COLORS := {
 
 var _time := 0.0
 var _hit_at := {player = -10.0, rival = -10.0}
+var _act_at := {player = -10.0, rival = -10.0}
 var _base := {}
 var _crowd: Array[Node3D] = []
 
@@ -135,6 +136,11 @@ func hit(who: String) -> void:
 	_hit_at[who] = _time
 
 
+## Hop a chef when it takes an action on its turn (rival steps, GRAND_DESIGN §1.3).
+func act(who: String) -> void:
+	_act_at[who] = _time
+
+
 ## Screen position of a 3D anchor, for UI that follows the stage.
 func screen_pos(anchor: Node3D) -> Vector2:
 	return camera.unproject_position(anchor.global_position)
@@ -143,8 +149,8 @@ func screen_pos(anchor: Node3D) -> Vector2:
 func _process(delta: float) -> void:
 	_time += delta
 	# Idle bob + sideways flinch shake that decays over ~0.4 s.
-	player.position = _base[player] + Vector3(_shake("player"), absf(sin(_time * 2.2)) * 0.06, 0)
-	rival.position = _base[rival] + Vector3(_shake("rival"), absf(sin(_time * 2.0 + 1.0)) * 0.06, 0)
+	player.position = _base[player] + Vector3(_shake("player"), absf(sin(_time * 2.2)) * 0.06 + _hop("player"), 0)
+	rival.position = _base[rival] + Vector3(_shake("rival"), absf(sin(_time * 2.0 + 1.0)) * 0.06 + _hop("rival"), 0)
 	for m in _crowd:
 		var phase: float = m.get_meta("phase")
 		var base_y: float = m.get_meta("base_y")
@@ -154,6 +160,12 @@ func _process(delta: float) -> void:
 func _shake(who: String) -> float:
 	var dt: float = _time - _hit_at[who]
 	return sin(dt * 60.0) * 0.18 * (1.0 - dt / 0.4) if dt < 0.4 else 0.0
+
+
+## Quick 0.3 s hop up and back down.
+func _hop(who: String) -> float:
+	var dt: float = _time - _act_at[who]
+	return sin(dt / 0.3 * PI) * 0.22 if dt < 0.3 else 0.0
 
 
 func _spawn_crowd() -> void:

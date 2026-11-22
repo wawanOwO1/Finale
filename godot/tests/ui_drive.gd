@@ -24,7 +24,7 @@ func _initialize() -> void:
 	_shot("2_intro_countdown")
 	await _wait(1.3)
 	_shot("2_intro_fight")
-	await _wait(2.2)
+	await _wait(3.4)
 	_check("intro announcer finished", not ui._announcer.visible)
 	if main.duel == null:
 		return _end()
@@ -89,9 +89,36 @@ func _initialize() -> void:
 		_crop("6a_served", Rect2(0.0, 0.1, 0.75, 0.45))
 		_check("serve button serves", duel.served_this_turn)
 	await _wait(0.6)
+	# Turn sequence (GRAND_DESIGN §1): RIVAL'S TURN banner → paced steps → YOUR TURN banner.
 	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
-	await _wait(0.6)
+	await _wait(0.4)
+	_check("end turn hands over to the rival", duel.phase == "enemy" and duel.turn == 1)
+	_check("input is locked on the rival turn", ui._locked() and ui.get_node("%EndTurn").disabled)
+	_shot("7_rival_banner")
+	await _wait(1.3)
+	_shot("7b_rival_acting")
+	var t0 := Time.get_ticks_msec()
+	while duel.phase == "enemy" and Time.get_ticks_msec() - t0 < 12000:
+		await _wait(0.1)
+	_shot("7c_your_turn_banner")
+	var normal_ms := Time.get_ticks_msec() - t0 + 1700
+	_check("rival turn is paced (2-8 s): %d ms" % normal_ms, normal_ms > 2000 and normal_ms < 8000)
+	await _wait(1.6)
 	_check("end turn button advances the turn", duel.turn == 2)
+	_check("input unlocks on the player's turn", not ui._locked())
+	# Fast-forward: hold Space through a whole rival turn.
+	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
+	_space(true)
+	var t1 := Time.get_ticks_msec()
+	await _wait(0.3)
+	_check("holding Space speeds the rival up", Engine.time_scale > 1.0)
+	while duel.phase == "enemy" and Time.get_ticks_msec() - t1 < 12000:
+		await _wait(0.05)
+	_space(false)
+	var fast_ms := Time.get_ticks_msec() - t1
+	_check("fast-forward is quicker: %d vs %d ms" % [fast_ms, normal_ms], fast_ms < normal_ms * 0.7)
+	await _wait(1.6)
+	_check("time scale back to normal", Engine.time_scale == 1.0)
 	_shot("7_turn2")
 	_crop("7a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
 	_crop("7b_rival", Rect2(0.5, 0.0, 0.3, 0.25))
@@ -197,3 +224,11 @@ func _crop(name: String, f: Rect2) -> void:
 	var sz := Vector2(img.get_size())
 	var r := Rect2i(Vector2i(f.position * sz), Vector2i(f.size * sz))
 	img.get_region(r).save_png(out_dir.path_join(name + ".png"))
+
+
+func _space(down: bool) -> void:
+	var e := InputEventKey.new()
+	e.keycode = KEY_SPACE
+	e.physical_keycode = KEY_SPACE
+	e.pressed = down
+	Input.parse_input_event(e)
