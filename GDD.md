@@ -62,6 +62,8 @@ Tidak ada meta-progression di versi jam (lihat §11).
 > Plate yang bertahan antar giliran adalah keputusan inti: Serve sekarang dengan hasil kecil, atau tahan untuk resep besar sambil menanggung tekanan lawan? Tidak ada mekanik basi (sudah diputuskan). Tekanan datang dari intent dan gimmick lawan.
 
 ### 4.3 Pencocokan resep (berbasis tag)
+> Usulan pengganti: 3 Station bertumpuk dengan resep berurutan. Lihat [ART_DIRECTION.md §6](ART_DIRECTION.md#6-station-stack--resep-berurutan-usulan-grand-design).
+
 | Tag | Contoh bahan |
 |---|---|
 | `PROTEIN` | Egg, Chicken, Beef, Fish |
@@ -214,6 +216,8 @@ Pilih satu: **Rest** (pulihkan 30% Confidence), **Upgrade** satu kartu, atau **M
 Pilihan teks singkat dengan portrait. Contohnya: pedagang bahan misterius, kritikus makanan meminta cicip, dan bantu pedagang yang kewalahan.
 
 ## 7. Visual & presentasi
+
+> **Diperbarui 22 Nov 2026:** arah visual, HUD, emote, announcer, dan usulan **Station Stack** (resep berurutan, menggantikan Plate di §4.2–4.3) ada di [ART_DIRECTION.md](ART_DIRECTION.md). Bagian 7.1–7.3 di bawah ini adalah versi lama dan dipertahankan sebagai riwayat.
 
 ### 7.1 Gaya (acuan ref 01 / gambar 1)
 - **Low poly flat-shaded** dengan **palet terbatas**. Market Street memakai oranye hangat dan krem, aksen merah. Shading minim, siluet tegas, detail dari bentuk, bukan tekstur.
