@@ -46,6 +46,7 @@ func _start_duel() -> void:
 	var books: PackedStringArray = GameDB.ALL_BOOKS if dev_deck else PackedStringArray(["basics"])
 	var recipes := GameDB.book_recipes(books)
 	stage.set_plate([])
+	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
 	duel = Duel.new(GameDB.deck("dev" if dev_deck else "starter"), GameDB.enemy(enemy_id), recipes,
 			{hype = start_hype})
@@ -54,6 +55,7 @@ func _start_duel() -> void:
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:
 		stage.hit("rival" if target == "enemy" else "player"))
 	ui.bind(duel)
+	Audio.bind(duel)
 	_sync_plate()
 
 

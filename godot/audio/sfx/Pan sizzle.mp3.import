@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://uytlwsmpmuq8"
+path="res://.godot/imported/Pan sizzle.mp3-93e5052ba8ce1809f0188029bdc82eed.mp3str"
+
+[deps]
+
+source_file="res://audio/sfx/Pan sizzle.mp3"
+dest_files=["res://.godot/imported/Pan sizzle.mp3-93e5052ba8ce1809f0188029bdc82eed.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

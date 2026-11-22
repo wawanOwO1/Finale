@@ -8,3 +8,5 @@ extends Resource
 @export var confidence := 30
 ## Intents cycle in order (simple pattern AI; gimmicks come later).
 @export var pattern: Array[IntentDef] = []
+## Grand final / boss duel: Boss appearance sting, and no Battle_Theme (boss theme comes later).
+@export var boss := false
