@@ -140,3 +140,27 @@ Test UI (butuh window, bukan headless):
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1366x768 --script res://tests/hit_probe.gd
 ```
+
+## Audio
+
+Autoload **`Audio`** (`scripts/audio/audio.gd`) mendengarkan signal `Duel`; logika duel tidak tahu soal audio.
+Bus: `Music` (-6 dB) dan `SFX` di `default_bus_layout.tres`. Test: `tests/audio_check.gd` (headless).
+
+| Kondisi | File |
+|---|---|
+| Layar Recipe Book sebelum duel | `music/Building_Deck_Theme.mp3` (loop) |
+| Duel biasa (rival tanpa `boss`) | `music/Battle_Theme.mp3` (loop) + `sfx/Round start` |
+| Duel boss / grand final (`EnemyDef.boss = true`) | `sfx/Boss appearance sting`, Battle_Theme **tidak** diputar |
+| Menang | `sfx/Round won` + `music/Clear_Victory.mp3` |
+| Kalah | `music/Game_Over_Smile.mp3` |
+| Giliran baru | `sfx/Turn change` |
+| Bahan ditaruh di Prep Board | `sfx/Prep Board chopping` |
+| Kartu teknik dimainkan | `sfx/Pan sizzle` |
+| Kartu Signature Dish dimainkan | `sfx/Signature Dish activation` |
+| Serve | `sfx/Ingredient added to a pot` lalu `sfx/Cooking bell ding` |
+| Status Burnt / Spicy | `sfx/Burn status applied` / `sfx/Poison status applied` |
+| Status lain | `sfx/Debuff applied` / `sfx/Buff applied` |
+
+Belum terpakai karena fiturnya belum ada: `Main_Menu` (belum ada main menu), `Stun or freeze`
+(belum ada status stun), `Timer running out warning` (belum ada timer). Key-nya sudah terdaftar,
+tinggal panggil `Audio.play_music("menu")` / `Audio.sfx("stun")` / `Audio.sfx("timer")`.

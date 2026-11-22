@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dfr5bk3f01qf7"
+path="res://.godot/imported/Round won.mp3-9ba67f8cbe97425454d58f1404bc8485.mp3str"
+
+[deps]
+
+source_file="res://audio/sfx/Round won.mp3"
+dest_files=["res://.godot/imported/Round won.mp3-9ba67f8cbe97425454d58f1404bc8485.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

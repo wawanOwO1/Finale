@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://boa1f4kgdxuph"
+path="res://.godot/imported/Burn status applied.mp3-7ae3df0f33def031b981cbdd99e2c003.mp3str"
+
+[deps]
+
+source_file="res://audio/sfx/Burn status applied.mp3"
+dest_files=["res://.godot/imported/Burn status applied.mp3-7ae3df0f33def031b981cbdd99e2c003.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

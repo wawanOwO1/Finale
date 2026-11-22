@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://bksn8kjecf8ae"
+path="res://.godot/imported/Debuff applied.mp3-98cc3401a8a872c07aac4e6fa0d6209b.mp3str"
+
+[deps]
+
+source_file="res://audio/sfx/Debuff applied.mp3"
+dest_files=["res://.godot/imported/Debuff applied.mp3-98cc3401a8a872c07aac4e6fa0d6209b.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

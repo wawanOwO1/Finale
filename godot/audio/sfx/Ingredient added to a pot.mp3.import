@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dh2dwkdn0epha"
+path="res://.godot/imported/Ingredient added to a pot.mp3-92d0e8db62761e125fe073eebec1b7db.mp3str"
+
+[deps]
+
+source_file="res://audio/sfx/Ingredient added to a pot.mp3"
+dest_files=["res://.godot/imported/Ingredient added to a pot.mp3-92d0e8db62761e125fe073eebec1b7db.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
