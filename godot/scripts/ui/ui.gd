@@ -14,12 +14,13 @@ static func box(bg: Color, border := Pal.INK, border_em := 0.16, radius_em := 0.
 	s.bg_color = bg
 	s.border_color = border
 	s.set_border_width_all(roundi(Pal.em(border_em)))
-	s.set_corner_radius_all(roundi(Pal.em(radius_em)))
+	# Pixel look (ART_DIRECTION §1): corners stay nearly square whatever radius is asked for.
+	s.set_corner_radius_all(mini(roundi(Pal.em(radius_em)), 4))
 	if shadow_em > 0.0:
 		s.shadow_color = Pal.INK
 		s.shadow_size = 1
 		s.shadow_offset = Vector2(0, Pal.em(shadow_em) - 1.0)
-	s.anti_aliasing = true
+	s.anti_aliasing = false
 	return s
 
 

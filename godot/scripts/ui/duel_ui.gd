@@ -51,6 +51,16 @@ var _announcer: Announcer
 var _emote_holder: Control
 var _emote: EmoteBubble
 var _result_done := false
+# Pixel HUD pieces (HudKit), built over the .tscn nodes so their placement stays editable.
+var _round_chip: HBoxContainer
+var _hype_bar: HudKit.SegmentBar
+var _rival_bar: HudKit.SkewBar
+var _rival_portrait: HudKit.Diamond
+var _player_bar: HudKit.SkewBar
+var _player_block: PanelContainer
+var _heat_row: HBoxContainer
+var _heat_pips: Array[TextureRect] = []
+var _heat_text: Label
 var _smug_armed := true
 var _angry_shown := false
 var _hype_pulse: Tween
@@ -185,6 +195,7 @@ func _emote_on_intent() -> void:
 func set_pixel_on(on: bool) -> void:
 	var b: Button = %PixelButton
 	Ui.style_button(b, Pal.INK if on else Pal.CREAM, Pal.CREAM if on else Pal.INK, 1.0, 0.3, 0.3)
+	_square_button(b, Pal.INK if on else Pal.CREAM)
 	%PixelIcon.self_modulate = Pal.CREAM if on else Pal.INK
 
 
@@ -210,7 +221,9 @@ func _build_static() -> void:
 	_tip(%DrawPile, "Draw pile", "Cards you will draw. Shuffled from the discard pile when empty.", "draw")
 	_tip(%DiscardPile, "Discard pile", "Played and discarded cards. Shuffled back when the draw pile runs out.", "discard")
 	# Buttons
-	Ui.style_button(%EndTurn, Pal.CREAM, Pal.INK, 1.1, 1.3, 0.6)
+	Ui.style_button(%EndTurn, Pal.RED, Color.WHITE, 1.2, 1.3, 0.55)
+	_square_button(%EndTurn, Pal.RED)
+	%EndTurn.text = "END TURN"
 	Ui.style_button(%StartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
 	Ui.style_button(%RestartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
 	# Stations replace the old Prep Board row: hide its header, slots and single Serve button.
@@ -223,6 +236,7 @@ func _build_static() -> void:
 	_stations_box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_stations_box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	%Board.get_node("VBox").add_child(_stations_box)
+	_restyle_hud()
 	# Cut-in background
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -230,6 +244,89 @@ func _build_static() -> void:
 	mat.shader = sh
 	%CutInRays.material = mat
 	%CutInSfx.add_theme_font_override("font", Ui.italic_font())
+
+
+## HUD restyle to the canvas kit (ART_DIRECTION §4): square ink boxes with hard shadows,
+## ROUND chip, segmented Hype, skewed Confidence bars, diamond portraits and intent, Heat pips.
+func _restyle_hud() -> void:
+	# Top-left: ROUND chip above the venue name.
+	_round_chip = HudKit.chip("ROUND", "1")
+	var venue: Control = %Root.get_node("Venue")
+	venue.add_child(_round_chip)
+	venue.move_child(_round_chip, 0)
+	venue.add_theme_constant_override("separation", roundi(Pal.em(0.35)))
+	# Hype: square cream plate, segmented bar instead of the rounded track.
+	%HypeMeter.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.CREAM), 0.6, 0.3))
+	var track: Control = %HypeMeter.get_node("HBox/HypeTrack")
+	track.hide()
+	_hype_bar = HudKit.SegmentBar.new(14.5, 1.35)
+	track.get_parent().add_child(_hype_bar)
+	track.get_parent().move_child(_hype_bar, track.get_index() + 1)
+	# Rival: diamond portrait + skewed bar; intent becomes a diamond (built in _fill_intent).
+	%Intent.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var hp_row: HBoxContainer = %Rival.get_node("Hp")
+	hp_row.get_node("HpBar").hide()
+	_rival_portrait = HudKit.Diamond.new(2.6)
+	_rival_portrait.add_child(Ui.label("?", 1.0, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	hp_row.add_child(_rival_portrait)
+	hp_row.move_child(_rival_portrait, 0)
+	_rival_bar = HudKit.SkewBar.new(11.0, 1.35, 0.8)
+	hp_row.add_child(_rival_bar)
+	hp_row.move_child(_rival_bar, 1)
+	hp_row.add_theme_constant_override("separation", roundi(Pal.em(0.5)))
+	# Player: diamond portrait over the old heart badge, bar + Composure + Heat pips beside it.
+	for c in %HpBadge.get_children():
+		c.hide()
+	var portrait := HudKit.Diamond.new(6.0)
+	portrait.add_child(Ui.label("A", 2.0, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	Ui.fill(portrait)
+	%HpBadge.add_child(portrait)
+	%PlayerBlock.hide()
+	%HeatOrb.hide()
+	var col := Ui.vbox(0.35)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	_player_bar = HudKit.SkewBar.new(11.5, 1.75, 1.1)
+	_tip(_player_bar, "Confidence", Keywords.BASE.Confidence.text, "confidence")
+	_player_bar.mouse_filter = Control.MOUSE_FILTER_PASS
+	col.add_child(_player_bar)
+	_player_block = HudKit.tag("COMPOSURE 0", Pal.BLUE)
+	_player_block.mouse_filter = Control.MOUSE_FILTER_PASS
+	_tip(_player_block, "Composure", Keywords.BASE.Composure.text, "composure")
+	var block_row := Ui.hbox(0.3)
+	block_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	block_row.add_child(_player_block)
+	col.add_child(block_row)
+	_heat_row = Ui.hbox(0.2)
+	_heat_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_heat_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	for i in Duel.MAX_HEAT:
+		var pip := Ui.icon("heat", Pal.ORANGE, 1.9)
+		_heat_row.add_child(pip)
+		_heat_pips.append(pip)
+	_heat_text = Ui.outlined("HEAT 3/3", 0.75, Pal.CREAM, 0.12)
+	_heat_row.add_child(_heat_text)
+	_tip(_heat_row, "Heat", Keywords.BASE.Heat.text, "heat")
+	col.add_child(_heat_row)
+	%HpBadge.get_parent().add_child(col)
+	%HpBadge.get_parent().move_child(col, %HpBadge.get_index() + 1)
+	%HpBadge.get_parent().add_theme_constant_override("separation", roundi(Pal.em(1.1)))
+	# Piles: card backs (draw = blue, discard = paper) with the count on an ink chip.
+	%DrawPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.BLUE), 0.5, 0.25))
+	%DrawPile.get_node("HBox/Icon").self_modulate = Pal.CREAM
+	%DrawCount.add_theme_color_override("font_color", Pal.CREAM)
+	%DiscardPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.PAPER), 0.5, 0.25))
+
+
+## Square pixel look on top of Ui.style_button (keeps its colors and font).
+func _square_button(b: Button, bg: Color) -> void:
+	var px := Pal.em(0.6)
+	var normal := Ui.pad(HudKit.box(bg), px / Pal.EM, 0.3)
+	var hover := Ui.pad(HudKit.box(bg.lightened(0.08)), px / Pal.EM, 0.3)
+	var pressed := Ui.pad(HudKit.box(bg.darkened(0.05), Pal.INK, 0.18, 0.08), px / Pal.EM, 0.3)
+	var disabled := Ui.pad(HudKit.box(Color(bg, 0.45), Color(Pal.INK, 0.45), 0.18, 0.25), px / Pal.EM, 0.3)
+	disabled.shadow_color = Color(Pal.INK, 0.45)
+	for pair in [["normal", normal], ["hover", hover], ["pressed", pressed], ["disabled", disabled], ["hover_pressed", pressed]]:
+		b.add_theme_stylebox_override(pair[0], pair[1])
 
 
 func _badge_bg(icon_name: String, color: Color, size_em: float, shadow_em: float) -> Control:
@@ -254,6 +351,10 @@ func _refresh() -> void:
 	%RivalTitle.text = d.enemy_def.title
 	%HpFill.anchor_right = float(d.enemy.confidence) / d.enemy.max_confidence
 	%HpText.text = "%d / %d" % [d.enemy.confidence, d.enemy.max_confidence]
+	_rival_bar.ratio = float(d.enemy.confidence) / d.enemy.max_confidence
+	_rival_bar.text_label.text = "%d / %d" % [d.enemy.confidence, d.enemy.max_confidence]
+	(_rival_portrait.get_child(0) as Label).text = d.enemy_def.name.left(1)
+	(_round_chip.find_child("Value", true, false) as Label).text = str(round_number)
 	_block_badge(%EnemyBlock, d.enemy.composure)
 	_fill_statuses(%EnemyStatuses, d.enemy)
 	%Rival.reset_size()
@@ -261,7 +362,15 @@ func _refresh() -> void:
 	# Player
 	%PlayerConf.text = str(d.player.confidence)
 	%PlayerConfMax.text = "/%d" % d.player.max_confidence
-	_block_badge(%PlayerBlock, d.player.composure)
+	%PlayerBlock.hide()
+	_player_bar.ratio = float(d.player.confidence) / d.player.max_confidence
+	_player_bar.stripe = minf(1.0, float(d.player.composure) / d.player.max_confidence)
+	_player_bar.text_label.text = "%d/%d" % [d.player.confidence, d.player.max_confidence]
+	_player_block.visible = d.player.composure > 0
+	(_player_block.get_child(0) as Label).text = "COMPOSURE %d" % d.player.composure
+	for i in _heat_pips.size():
+		_heat_pips[i].self_modulate = Pal.ORANGE if i < d.player.heat else Pal.INK_SOFT
+	_heat_text.text = "HEAT %d/%d" % [d.player.heat, Duel.MAX_HEAT]
 	_fill_statuses(%PlayerStatuses, d.player)
 	%HeatValue.text = str(d.player.heat)
 	%HeatMax.text = "/%d" % Duel.MAX_HEAT
@@ -275,7 +384,9 @@ func _refresh() -> void:
 	%HypeFill.anchor_right = float(d.hype) / Duel.MAX_HYPE
 	%HypeFill.get_theme_stylebox("panel").bg_color = Pal.ORANGE if full else Pal.GOLD
 	%HypeValue.text = str(d.hype)
-	_hype_pulse = _pulse(%HypeFill, full, _hype_pulse)
+	_hype_bar.value = d.hype
+	_hype_bar.full = full
+	_hype_pulse = _pulse(_hype_bar, full, _hype_pulse)
 
 	# Hand
 	_rebuild_hand(live)
@@ -298,28 +409,44 @@ func _refresh() -> void:
 		_pop_in(%EndBox)
 
 
+## Intent (ref 3 #11): a diamond with the main number (red attack, blue block, purple status),
+## extra parts as small icons beside it, and the intent name on an ink tag.
 func _fill_intent(it: IntentDef) -> void:
 	for c in %IntentParts.get_children():
 		c.queue_free()
+	var main_color := Pal.PURPLE
+	var main_value := it.status_amount
+	if it.has_attack():
+		main_color = Pal.RED
+		main_value = duel.pressure_from("enemy", it.attack)
+	elif it.block > 0:
+		main_color = Pal.BLUE
+		main_value = it.block
+	var dia := HudKit.Diamond.new(3.0, main_color)
+	dia.add_child(Ui.outlined(str(main_value), 1.15, Pal.CREAM, 0.12))
+	%IntentParts.add_child(dia)
+	var extras := Ui.hbox(0.2)
+	%IntentParts.add_child(extras)
+	%IntentParts.add_child(HudKit.tag(it.label.to_upper(), Pal.INK, Pal.CREAM, 0.6))
 	var said: PackedStringArray = []
 	if it.has_attack():
 		var v := duel.pressure_from("enemy", it.attack)
-		%IntentParts.add_child(_intent_part("pressure", Pal.RED, v))
+		extras.add_child(Ui.icon("pressure", Pal.RED, 1.1))
 		said.append("deal %d Pressure" % v)
 	if it.block > 0:
-		%IntentParts.add_child(_intent_part("composure", Pal.BLUE, it.block))
+		extras.add_child(_intent_part("composure", Pal.BLUE, it.block) if it.has_attack() else Ui.icon("composure", Pal.BLUE, 1.1))
 		said.append("gain %d Composure" % it.block)
 	if it.has_status():
 		var on_player := it.status_target == IntentDef.StatusTarget.PLAYER
-		%IntentParts.add_child(_intent_part(it.status, Pal.PURPLE if on_player else Pal.GREEN, it.status_amount))
+		extras.add_child(_intent_part(it.status, Pal.PURPLE if on_player else Pal.GREEN, it.status_amount))
 		said.append("%s %s %d" % ["give you" if on_player else "gain", StatusDefs.display_name(it.status), it.status_amount])
 	_tip(%Intent, "Intent: %s" % it.label, "%s will %s." % [duel.enemy_def.name, ", ".join(said)], "taunt")
 
 
 func _intent_part(icon_name: String, color: Color, n: int) -> Control:
-	var row := Ui.hbox(0.15)
-	row.add_child(Ui.icon(icon_name, color, 1.3))
-	row.add_child(Ui.label(str(n), 1.1))
+	var row := Ui.hbox(0.1)
+	row.add_child(Ui.icon(icon_name, color, 1.1))
+	row.add_child(Ui.outlined(str(n), 0.85, Pal.CREAM, 0.1))
 	return row
 
 
@@ -937,7 +1064,7 @@ func _report(result: Dictionary) -> void:
 func _reject(reason: String) -> void:
 	_toast(reason)
 	if reason.contains("Heat"):
-		var orb: Control = %HeatOrb
+		var orb: Control = _heat_row
 		orb.pivot_offset = orb.size / 2.0
 		var tw := create_tween()
 		tw.tween_property(orb, "scale", Vector2.ONE * 1.2, 0.13)
