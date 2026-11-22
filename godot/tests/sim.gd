@@ -29,9 +29,12 @@ func _initialize() -> void:
 	_stations()
 	_rival_turn_steps()
 	_symmetric_kitchen()
+	_rival_ai()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
+	_smart_playthroughs("starter vs Tony", GameDB.enemy("tony"))
+	_smart_playthroughs("starter vs Rosa", GameDB.enemy("rosa"))
 
 	print("\n%d check(s) failed" % failures if failures else "\nAll checks passed")
 	quit(1 if failures else 0)
@@ -54,9 +57,16 @@ func inst(ids: Array) -> Array[CardInstance]:
 
 
 func new_duel(seed_: int, enemy: EnemyDef = null, hype := 0, all := false) -> Duel:
-	return Duel.new(GameDB.deck("starter"), enemy if enemy else GameDB.enemy("tony"),
+	return Duel.new(GameDB.deck("starter"), enemy if enemy else intent_only("tony"),
 			all_recipes if all else basics, {seed = seed_, hype = hype})
 
+
+## A rival on its old intent pattern (no deck / AI), so tests control exactly what it does.
+func intent_only(id: String) -> EnemyDef:
+	var e: EnemyDef = GameDB.enemy(id).duplicate()
+	e.deck = null
+	e.ai = null
+	return e
 
 ## Put exact cards in hand (and nothing else).
 func give_hand(d: Duel, ids: Array) -> Array[CardInstance]:
@@ -160,7 +170,7 @@ func _statuses() -> void:
 	d.end_turn(); d.run_enemy_turn()
 	check("Rattled expires after 2 rival turns", not d.enemy.statuses.has("rattled"))
 
-	d = new_duel(6, GameDB.enemy("rosa"))
+	d = new_duel(6, intent_only("rosa"))
 	var conf := d.player.confidence
 	check("intent preview matches Rosa taunt (4)", d.pressure_from("enemy", d.intent().attack) == 4)
 	d.end_turn(); d.run_enemy_turn() # Rosa: Taunt (4 Pressure, Flustered 2)
@@ -307,7 +317,7 @@ func _stations() -> void:
 
 ## Rival turn runs one paced step at a time (GRAND_DESIGN §1.5).
 func _rival_turn_steps() -> void:
-	var d := new_duel(6, GameDB.enemy("rosa"))
+	var d := new_duel(6, intent_only("rosa"))
 	var conf := d.player.confidence
 	var hand_card := d.hand[0].uid
 	d.end_turn()
@@ -380,6 +390,77 @@ func _symmetric_kitchen() -> void:
 	check("Apis draws the same with or without a rival deck", _ids(a.hand) == _ids(b.hand), "%s vs %s" % [_ids(a.hand), _ids(b.hand)])
 
 
+## Drafting rival (GRAND_DESIGN §3): legal, deterministic, fair, takes lethal, cooks in order.
+func _rival_ai() -> void:
+	var tony := GameDB.enemy("tony")
+	check("Tony drafts with his own deck", tony.drafts())
+	var d := Duel.new(GameDB.deck("starter"), tony, basics, {seed = 5})
+	var k := d.kitchen("enemy")
+	check("rival uses its def's Heat and hand size", k.max_heat == 2 and k.hand_size == 4)
+	var conserved := true
+	var kinds: Array[String] = []
+	for _t in 4:
+		d.end_turn()
+		while d.phase == "enemy":
+			var a := d.enemy_step()
+			kinds.append(a.kind)
+			if a.kind == "end" or a.kind == "none":
+				break
+		d.start_player_turn()
+		if k.card_total() != 10:
+			conserved = false
+	check("rival plays cards over 4 turns", kinds.has("place") and kinds.has("serve"), str(kinds))
+	check("rival hurts Apis", d.player.confidence < d.player.max_confidence)
+	check("rival cards conserved every turn", conserved)
+
+	# Same seed, same public info -> same rival turn (deterministic, no peeking at Apis's cards).
+	var runs: Array = []
+	for first in ["egg", "butter"]:
+		var x := Duel.new(GameDB.deck("starter"), tony, basics, {seed = 9})
+		x.stations[0] = inst([first])
+		x.hand = inst(["chili", "beef"] if first == "egg" else ["tomato"])
+		x.end_turn()
+		var steps: Array[String] = []
+		while x.phase == "enemy":
+			var a := x.enemy_step()
+			steps.append("%s:%s" % [a.kind, a.get("station", -1)])
+			if a.kind == "end" or a.kind == "none":
+				break
+		runs.append(steps)
+	check("rival ignores what Apis holds and which cards are on Apis's stations", runs[0] == runs[1], str(runs))
+
+	# Lethal: a ready Perfect Omelette and Apis at 5 -> serve it first.
+	d = Duel.new(GameDB.deck("starter"), GameDB.enemy("rosa"), basics, {seed = 3, confidence = 5})
+	d.end_turn()
+	d.begin_enemy_turn()
+	d.kitchen("enemy").stations[0] = inst(["butter", "egg", "tomato"])
+	check("mood: Confident with a big dish ready", RivalAI.mood(d) == "confident")
+	var first := d.enemy_step()
+	check("rival takes lethal right away", first.kind == "serve" and first.station == 0 and d.phase == "lost", str(first))
+
+	# Cooks in book order: butter -> egg -> tomato = Perfect Omelette.
+	var omelette_deck: Array[CardDef] = []
+	for id in ["butter", "egg", "tomato", "egg"]:
+		omelette_deck.append(GameDB.card(id))
+	d = Duel.new(GameDB.deck("starter"), tony, basics, {seed = 4, enemy_deck = omelette_deck})
+	d.end_turn()
+	var served := {}
+	while d.phase == "enemy":
+		var a := d.enemy_step()
+		if a.kind == "serve":
+			served = a
+		if a.kind == "end" or a.kind == "none":
+			break
+	check("rival builds and serves a Perfect Omelette", served.get("recipe") == GameDB.recipe("omelette") and served.get("perfect", false), str(served))
+
+	# The Signature Dish stays Apis's move.
+	d = Duel.new(GameDB.deck("starter"), tony, basics, {seed = 2})
+	d.end_turn()
+	d.begin_enemy_turn()
+	d._add_hype(100, "enemy")
+	check("a full rival crowd brings no Signature Dish", not has_signature(d.kitchen("enemy").hand) and d.kitchen("enemy").hype == 100)
+
+
 func _ids(cards: Array[CardInstance]) -> Array[String]:
 	var out: Array[String] = []
 	for c in cards:
@@ -423,3 +504,46 @@ func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Arr
 		turns_total += d.turn
 	check("%s: cards conserved, every duel ends" % label, conserved)
 	print("      random bot: %d/%d wins, avg %.1f turns, %d Signature Dishes" % [wins, n, float(turns_total) / n, signatures.count])
+
+
+## Balancing (GRAND_DESIGN §8 G): RivalAI plays Apis's starter deck against each rival.
+## Prints win rate, duel length and Confidence left; checks only that every duel ends.
+func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
+	var me := AiProfile.new()
+	me.w_attack = 1.0
+	me.w_defend = 0.6
+	me.w_patience = 0.3
+	me.w_debuff = 0.6
+	var n := 300
+	var wins := 0
+	var turns_total := 0
+	var conf_left := 0
+	var ended := true
+	for s in range(1, n + 1):
+		var d := Duel.new(GameDB.deck("starter"), enemy, basics, {seed = s})
+		var safety := 0
+		while not d.over() and safety < 60:
+			safety += 1
+			for _i in RivalAI.MAX_STEPS:
+				var a := RivalAI.choose(d, "player", me)
+				match a.kind:
+					"place":
+						d.play(a.uid, a.station)
+					"technique":
+						d.play(a.uid)
+					"serve":
+						d.serve(a.station)
+				if a.kind == "end" or d.over():
+					break
+			if not d.over():
+				d.end_turn()
+				d.run_enemy_turn()
+		if not d.over():
+			ended = false
+		if d.phase == "won":
+			wins += 1
+			conf_left += d.player.confidence
+		turns_total += d.turn
+	check("smart Apis vs %s: every duel ends" % label.trim_prefix("starter vs "), ended)
+	print("      smart bot %s: %d/%d wins, avg %.1f turns, avg Confidence left on a win %.0f/60" % [
+			label, wins, n, float(turns_total) / n, float(conf_left) / maxi(1, wins)])

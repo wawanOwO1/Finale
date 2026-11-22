@@ -28,6 +28,8 @@ const TAG_COLORS := {
 @onready var rival_intent_anchor: Marker3D = $Rival/IntentAnchor
 @onready var player_anchor: Marker3D = $Player/Anchor
 @onready var board_anchor: Marker3D = $BoardAnchor
+## Top of the rival's counter: its face-down stations sit here (GRAND_DESIGN §3.5).
+@onready var rival_stations_anchor: Marker3D = $RivalCounter/RivalStationsAnchor
 
 var _time := 0.0
 var _hit_at := {player = -10.0, rival = -10.0}

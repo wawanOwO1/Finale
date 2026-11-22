@@ -35,7 +35,8 @@ var duel: Duel
 ## main.gd hands it over.
 var director: TurnDirector
 ## Screen positions of the 3D anchors, pushed every frame by main.gd.
-var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400)}
+var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400),
+		rival_stations = Vector2(1300, 420)}
 
 var _views: Array[CardView] = []
 var _prev_hand := {}
@@ -186,15 +187,34 @@ func rival_think(seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout
 
 
-## A rival step was applied: the intent badge pulses (numbers float from the duel's signals).
-func rival_act(_action: Dictionary) -> void:
+## A rival step was applied (GRAND_DESIGN §1.3). Numbers, statuses and the dish reveal float up
+## from the duel's own signals; this adds what the step itself looks like, never the card face.
+func rival_act(action: Dictionary) -> void:
 	if _emote.kind == "think":
 		_emote.clear()
-	var intent: Control = %Intent
-	intent.pivot_offset = intent.size / 2.0
-	var tw := create_tween()
-	tw.tween_property(intent, "scale", Vector2.ONE * 1.25, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(intent, "scale", Vector2.ONE, 0.15)
+	match action.get("kind", ""):
+		"place":
+			# The new face-down card drops onto its station.
+			var col := %RivalStations.get_child(action.station) as Control if action.station < %RivalStations.get_child_count() else null
+			var back := col.get_child(col.get_child_count() - 1) as Control if col and col.get_child_count() > 0 else null
+			if back:
+				back.pivot_offset = back.size / 2.0
+				back.position.y -= Pal.em(1.2)
+				back.scale = Vector2.ONE * 1.3
+				var tw := create_tween().set_parallel()
+				tw.tween_property(back, "position:y", back.position.y + Pal.em(1.2), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw.tween_property(back, "scale", Vector2.ONE, 0.22)
+		"technique":
+			_float(anchors.rival + Vector2(0, -Pal.em(1.5)), "Technique!", Pal.CREAM, 1.0, "technique")
+		"serve":
+			pass
+		_:
+			# Old intent-pattern rival: its intent badge pulses.
+			var intent: Control = %Intent
+			intent.pivot_offset = intent.size / 2.0
+			var tw := create_tween()
+			tw.tween_property(intent, "scale", Vector2.ONE * 1.25, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(intent, "scale", Vector2.ONE, 0.15)
 
 
 func _on_duel_ended(winner: String) -> void:
@@ -233,11 +253,18 @@ func _emote_on_hit(target: String, amount: int, _source: String) -> void:
 				_emote.pop("angry", true))
 
 
+## On Apis's turn the rival shows a mood instead of an intent (GRAND_DESIGN §3.4): vague on
+## purpose. A drafting rival: Confident = a big dish is ready on its counter, Wary = it is low.
 func _emote_on_intent() -> void:
 	if duel == null or duel.phase != "player" or _announcer.visible:
 		return
+	if duel.drafting():
+		var m := RivalAI.mood(duel)
+		if m != "":
+			_emote.pop(m)
+		return
 	var it := duel.intent()
-	if it.has_attack() and duel.pressure_from("enemy", it.attack) >= 10:
+	if it and it.has_attack() and duel.pressure_from("enemy", it.attack) >= 10:
 		_emote.pop("confident")
 
 
@@ -394,9 +421,13 @@ func _refresh() -> void:
 	var live := d.phase == "player"
 
 	# Rival
-	%Intent.visible = not d.over()
-	if not d.over():
+	# Old pattern rivals show their intent; a drafting rival shows face-down stations instead.
+	%Intent.visible = not d.over() and not d.drafting()
+	if %Intent.visible:
 		_fill_intent(d.intent())
+	%RivalKitchen.visible = d.drafting()
+	if d.drafting():
+		_refresh_rival_kitchen()
 	%RivalName.text = d.enemy_def.name
 	%RivalTitle.text = d.enemy_def.title
 	%HpFill.anchor_right = float(d.enemy.confidence) / d.enemy.max_confidence
@@ -524,8 +555,44 @@ const CARD_W_EM := 7.4
 const CARD_H_EM := 6.4
 ## Visible strip of a covered card (name + tag icon).
 const BAND_EM := 1.75
+## Rival face-down stations (card backs fanned down like the player's stacks).
+const RIVAL_BACK_W_EM := 2.2
+const RIVAL_BACK_H_EM := 2.9
+const RIVAL_BACK_STEP_EM := 0.55
 ## Light tag colors get ink text, dark ones cream.
 const DARK_TAGS: PackedStringArray = ["VEGGIE", "SPICE", "SAUCE"]
+
+
+## The rival's side, face down (GRAND_DESIGN §3.5): how many cards sit on each station and in
+## its hand, and its Heat. Never which cards: the dish shows only when it is served.
+func _refresh_rival_kitchen() -> void:
+	var k := duel.kitchen("enemy")
+	for c in %RivalStations.get_children():
+		%RivalStations.remove_child(c)
+		c.queue_free()
+	for i in Duel.STATIONS:
+		var n := k.stack(i).size()
+		var col := Control.new()
+		col.custom_minimum_size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM) + Pal.em(RIVAL_BACK_STEP_EM) * maxi(n - 1, 0))
+		if n == 0:
+			col.add_child(_rival_back(Color(Pal.INK, 0.08), Color(Pal.INK, 0.35), 0))
+		for j in n:
+			col.add_child(_rival_back(Pal.RED_DARK, Pal.INK, j))
+		_tip(col, "%s's station %d" % [duel.enemy_def.name, i + 1],
+				"%d card%s, face down. You see the dish only when it is served." % [n, "" if n == 1 else "s"], "serve")
+		%RivalStations.add_child(col)
+	%RivalHand.text = "Hand %d" % k.hand.size()
+	%RivalHeat.text = "Heat %d/%d" % [duel.enemy.heat, k.max_heat]
+	%RivalKitchen.reset_size()
+
+
+func _rival_back(bg: Color, border: Color, index: int) -> Panel:
+	var p := Panel.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", Ui.box(bg, border, 0.12, 0.3, 0.0))
+	p.position = Vector2(0, Pal.em(RIVAL_BACK_STEP_EM) * index)
+	p.size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM))
+	return p
 
 
 func _refresh_stations() -> void:
@@ -859,6 +926,7 @@ func _process(_delta: float) -> void:
 	# 3D-following blocks: rival HUD over its head, stations hang down from above the prep table
 	# (stacks grow downward like solitaire), emote bubble beside the rival's head.
 	%Rival.position = anchors.rival - Vector2(%Rival.size.x / 2.0, %Rival.size.y)
+	%RivalKitchen.position = anchors.rival_stations - %RivalKitchen.size / 2.0
 	%Board.reset_size()
 	%Board.position = Vector2(anchors.board.x - %Board.size.x / 2.0, anchors.board.y - Pal.em(STATION_TOP_EM))
 	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
@@ -1206,12 +1274,14 @@ func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name :
 	tw.tween_callback(row.queue_free)
 
 
-## Dish reveal over the served station. Apis only for now; the rival's reveal over its own
-## counter comes with the drafting AI (GRAND_DESIGN §1.3).
+## Dish reveal over the served station: Apis's station, or the rival's face-down stations
+## (the rival's dish is revealed only now, as it hits; GRAND_DESIGN §1.3).
 func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) -> void:
-	if side != "player":
-		return
-	%DishKicker.text = "DISH SERVED" if recipe else "NO RECIPE MATCHED"
+	var rival := side == "enemy"
+	if rival:
+		%DishKicker.text = ("%s SERVES" % duel.enemy_def.name.to_upper()) if recipe else "%s IMPROVISES" % duel.enemy_def.name.to_upper()
+	else:
+		%DishKicker.text = "DISH SERVED" if recipe else "NO RECIPE MATCHED"
 	%DishName.text = recipe.name if recipe else "Improvised Dish"
 	for c in %DishTags.get_children():
 		c.queue_free()
@@ -1229,7 +1299,9 @@ func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool,
 	b.reset_size()
 	var board: Rect2 = %Board.get_global_rect()
 	var si := duel.last_served_station if duel else -1
-	if si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
+	if rival:
+		board = %RivalKitchen.get_global_rect()
+	elif si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
 		board = _cols[si].get_global_rect()
 	var p := Vector2(board.get_center().x - b.size.x / 2.0, board.position.y - 12.0 - b.size.y)
 	b.position = p

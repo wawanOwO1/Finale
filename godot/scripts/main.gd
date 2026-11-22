@@ -46,6 +46,7 @@ func _process(_delta: float) -> void:
 		rival = _screen(stage.rival_intent_anchor),
 		player = _screen(stage.player_anchor),
 		board = _screen(stage.board_anchor),
+		rival_stations = _screen(stage.rival_stations_anchor),
 	}
 
 

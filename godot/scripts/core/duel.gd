@@ -109,12 +109,16 @@ var _intent_index := 0
 var _enemy_queue: Array[Dictionary] = []
 var _enemy_started := false
 var _enemy_ended := false
+## Drafting rival: the decided-but-not-played next action (RivalAI.choose), and steps this turn.
+var _ai_next := {}
+var _ai_steps := 0
 var _next_uid := 0
 
 
 ## opts: { confidence, max_confidence, hype, seed, enemy_deck: Array[CardDef],
-##         enemy_recipes: Array[RecipeDef] } — all optional. Until the drafting AI lands
-## (GRAND_DESIGN §3) the rival's Kitchen is empty unless a test hands it a deck.
+##         enemy_recipes: Array[RecipeDef] } — all optional. A drafting rival (EnemyDef with a
+## deck and an AI profile) brings its own deck, books, Heat and hand size; enemy_deck /
+## enemy_recipes override them (tests).
 func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef], opts := {}) -> void:
 	var rng_seed: int = opts.get("seed", int(Time.get_unix_time_from_system() * 1000.0))
 	var max_conf: int = opts.get("max_confidence", 60)
@@ -125,11 +129,18 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	kitchens.enemy = Kitchen.new("enemy", enemy, SeededRng.new(rng_seed ^ ENEMY_RNG_SALT))
 	kitchens.player.recipes = recipes_
 	var enemy_recipes: Array[RecipeDef] = []
-	enemy_recipes.assign(opts.get("enemy_recipes", []))
+	var enemy_deck: Array[CardDef] = []
+	if enemy_def.drafts():
+		enemy_recipes = GameDB.book_recipes(enemy_def.books)
+		enemy_deck.assign(enemy_def.deck.cards)
+		kitchens.enemy.max_heat = enemy_def.max_heat
+		kitchens.enemy.hand_size = enemy_def.hand_size
+	if opts.has("enemy_recipes"):
+		enemy_recipes.assign(opts.enemy_recipes)
+	if opts.has("enemy_deck"):
+		enemy_deck.assign(opts.enemy_deck)
 	kitchens.enemy.recipes = enemy_recipes
 	_fill_deck("player", deck)
-	var enemy_deck: Array[CardDef] = []
-	enemy_deck.assign(opts.get("enemy_deck", []))
 	_fill_deck("enemy", enemy_deck)
 	_start_turn("player")
 	# Starting Hype goes through _add_hype so a full meter hands out the Signature Dish.
@@ -151,9 +162,17 @@ func chef_name(side: String) -> String:
 	return "Apis" if side == "player" else enemy_def.name
 
 
+## The rival's next intent (old pattern AI). null for a drafting rival or an empty pattern.
 func intent() -> IntentDef:
 	var p := enemy_def.pattern
+	if drafting() or p.is_empty():
+		return null
 	return p[_intent_index % p.size()]
+
+
+## The rival drafts with its own Kitchen (GRAND_DESIGN §3) instead of the intent pattern.
+func drafting() -> bool:
+	return enemy_def.drafts()
 
 
 ## { ready: Array[RecipeDef], almost: Array[RecipeDef] } for one station.
@@ -208,9 +227,22 @@ func over() -> bool:
 	return phase == "won" or phase == "lost"
 
 
+## Kind of the rival's next step ("place", "serve", "attack", … or "end"), without playing it.
+func enemy_next_kind() -> String:
+	if phase != "enemy" or _enemy_ended:
+		return "end"
+	if drafting():
+		return _peek_ai().kind
+	return _enemy_queue[0].kind if not _enemy_queue.is_empty() else "end"
+
+
 ## Rival steps still queued this turn (0 = the next enemy_step ends the turn).
 func enemy_actions_left() -> int:
-	return _enemy_queue.size() if phase == "enemy" and not _enemy_ended else 0
+	if phase != "enemy" or _enemy_ended:
+		return 0
+	if drafting():
+		return 0 if _peek_ai().kind == "end" else 1
+	return _enemy_queue.size()
 
 
 # ---------------------------------------------------------------- checks
@@ -361,31 +393,37 @@ func end_turn() -> Dictionary:
 
 
 ## Start of the rival's turn: the same start as Apis's (Composure fades, Spicy ticks, Heat,
-## draw), then the turn's actions are queued.
+## draw). A pattern rival then queues its intent's actions; a drafting rival decides one
+## action at a time in enemy_step.
 func begin_enemy_turn() -> void:
 	if phase != "enemy" or _enemy_started:
 		return
 	_enemy_started = true
 	_enemy_queue.clear()
+	_ai_next = {}
+	_ai_steps = 0
 	_start_turn("enemy")
 	if over():
 		return
-	# Intent pattern for now; the drafting AI replaces this queue (GRAND_DESIGN §3).
 	var it := intent()
-	_say("%s: %s!" % [enemy_def.name, it.label])
-	if it.has_attack():
-		_enemy_queue.append({kind = "attack", base = it.attack})
-	if it.block > 0:
-		_enemy_queue.append({kind = "block", amount = it.block})
-	if it.has_status():
-		var side := "player" if it.status_target == IntentDef.StatusTarget.PLAYER else "enemy"
-		_enemy_queue.append({kind = "status", status = it.status, amount = it.status_amount, target = side})
+	if it:
+		_say("%s: %s!" % [enemy_def.name, it.label])
+		if it.has_attack():
+			_enemy_queue.append({kind = "attack", base = it.attack})
+		if it.block > 0:
+			_enemy_queue.append({kind = "block", amount = it.block})
+		if it.has_status():
+			var side := "player" if it.status_target == IntentDef.StatusTarget.PLAYER else "enemy"
+			_enemy_queue.append({kind = "status", status = it.status, amount = it.status_amount, target = side})
 	changed.emit()
 
 
-## Applies the rival's next action and returns it: { kind: "attack"|"block"|"status"|"end", … }.
-## "end" also closes the rival's turn (hand discarded, end-of-turn decay). Returns kind "none"
-## when it is not the rival's turn (or the duel ended mid-turn).
+## Applies the rival's next action and returns it. "end" also closes the rival's turn (hand
+## discarded, end-of-turn decay). "none" = not the rival's turn (or the duel ended mid-turn).
+##   Pattern rival:  { kind: "attack", amount } | { kind: "block", amount } | { kind: "status", … }
+##   Drafting rival: { kind: "place", station, card } | { kind: "technique", card }
+##                   | { kind: "serve", station, recipe, perfect }
+## `card` is for the visuals' timing only: the HUD never shows the rival's cards (GRAND_DESIGN §3.5).
 func enemy_step() -> Dictionary:
 	if phase != "enemy":
 		return {kind = "none"}
@@ -394,9 +432,20 @@ func enemy_step() -> Dictionary:
 		return {kind = "none"}
 	if _enemy_ended:
 		return {kind = "end"}
+	if drafting():
+		var next := _peek_ai()
+		_ai_next = {}
+		if next.kind != "end":
+			_ai_steps += 1
+			var done := _apply_ai(next)
+			if not done.is_empty():
+				changed.emit()
+				return done
 	if _enemy_queue.is_empty():
 		_enemy_ended = true
-		enemy_acted.emit(intent())
+		var it := intent()
+		if it:
+			enemy_acted.emit(it)
 		_intent_index += 1
 		_end_turn_cleanup("enemy")
 		changed.emit()
@@ -615,7 +664,8 @@ func _heal(amount: int, side: String) -> void:
 func _add_hype(amount: int, side: String) -> void:
 	var k := kitchen(side)
 	k.hype = mini(MAX_HYPE, k.hype + amount)
-	if k.hype >= MAX_HYPE and not k.signature_given:
+	# The Signature Dish is the MC's move (GDD §4.5): a rival's full crowd brings no card.
+	if side == "player" and k.hype >= MAX_HYPE and not k.signature_given:
 		k.signature_given = true
 		k.hand.append(_instance(SIGNATURE_CARD))
 		_say("The crowd goes wild! Signature Dish unlocked!")
@@ -635,6 +685,36 @@ func _draw(n: int, side: String) -> void:
 
 
 # ---------------------------------------------------------------- helpers
+
+## The drafting rival's next action, decided once and kept until it is played.
+func _peek_ai() -> Dictionary:
+	if _ai_next.is_empty():
+		_ai_next = {kind = "end"} if _ai_steps >= RivalAI.MAX_STEPS else RivalAI.choose(self)
+	return _ai_next
+
+
+## Plays a RivalAI action with the normal rules. Returns the step for the visuals, or {} when
+## the action was refused (then the rival ends its turn instead of looping).
+func _apply_ai(a: Dictionary) -> Dictionary:
+	var k := kitchen("enemy")
+	match a.kind:
+		"place", "technique":
+			var i := k.hand_index(a.uid)
+			if i < 0:
+				return {}
+			var card := k.hand[i]
+			var station: int = a.get("station", -1)
+			if not play(a.uid, station, "enemy").ok:
+				return {}
+			return {kind = a.kind, station = station, card = card}
+		"serve":
+			var recipe := RecipeMatch.best_dish(k.recipes, k.stack(a.station))
+			var perfect := recipe != null and RecipeMatch.in_order(recipe, k.stack(a.station))
+			if not serve(a.station, "enemy").ok:
+				return {}
+			return {kind = "serve", station = a.station, recipe = recipe, perfect = perfect}
+	return {}
+
 
 func _fill_deck(side: String, deck: Array[CardDef]) -> void:
 	var k := kitchen(side)

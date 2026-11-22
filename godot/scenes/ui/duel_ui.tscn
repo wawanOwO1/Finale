@@ -420,6 +420,51 @@ mouse_filter = 2
 theme_override_constants/separation = 4
 alignment = 1
 
+[node name="RivalKitchen" type="PanelContainer" parent="Root"]
+visible = false
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 1200.0
+offset_top = 380.0
+offset_right = 1400.0
+offset_bottom = 480.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("pill")
+
+[node name="VBox" type="VBoxContainer" parent="Root/RivalKitchen"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="RivalStations" type="HBoxContainer" parent="Root/RivalKitchen/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="RivalInfo" type="HBoxContainer" parent="Root/RivalKitchen/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="RivalHand" type="Label" parent="Root/RivalKitchen/VBox/RivalInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.231, 0.141, 0.078, 1)
+theme_override_font_sizes/font_size = 13
+text = "Hand 4"
+
+[node name="RivalHeat" type="Label" parent="Root/RivalKitchen/VBox/RivalInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.439, 0.165, 1)
+theme_override_font_sizes/font_size = 13
+text = "Heat 2/2"
+
 [node name="Board" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 0

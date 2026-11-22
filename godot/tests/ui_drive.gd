@@ -106,6 +106,11 @@ func _initialize() -> void:
 	await _wait(1.6)
 	_check("end turn button advances the turn", duel.turn == 2)
 	_check("input unlocks on the player's turn", not ui._locked())
+	# Drafting rival (GRAND_DESIGN §3.5): face-down stations, never a card face.
+	var rk: Control = ui.get_node("%RivalKitchen")
+	_check("rival kitchen shows for a drafting rival", rk.visible and duel.drafting())
+	_check("rival cards are never drawn face up", rk.find_children("*", "CardView", true, false).is_empty())
+	_crop("7d_rival_kitchen", Rect2(0.55, 0.15, 0.4, 0.45))
 	# Fast-forward: hold Space through a whole rival turn.
 	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
 	_space(true)

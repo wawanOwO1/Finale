@@ -132,7 +132,7 @@ class Kitchen:              # satu per sisi: duel.kitchen["player"], duel.kitche
 
 ---
 
-## 3. Rival AI
+## 3. Rival AI — ✅ inti selesai 22 Nov (fase C), lihat §3.7
 
 ### 3.1 Data (`EnemyDef` baru)
 
@@ -213,6 +213,16 @@ Mood samar: pemain tahu "akan ada serangan besar", tapi tidak tahu berapa dan da
 | Marco | Cooking 2 turn | `showman`: menahan stack 2 giliran untuk Mixed Grill/Classic Steak. Mood Confident muncul satu giliran sebelumnya. |
 | Élodie | Plate penuh → Rattled | Gimmick: kalau station pemain mana pun berisi ≥ 5 kartu di awal giliran rival, pemain Rattled 1. |
 | Bruno | Burnt tiap 2 giliran, Focus fase 2 | Gimmick: Burnt tiap 2 giliran. Fase 2 (≤ 50%): Heat +1 dan Focus +1 per giliran. |
+
+### 3.7 Status implementasi (fase C, 22 Nov)
+
+- ✅ `AiProfile` (Inspector) + `EnemyDef.deck / books / max_heat / hand_size / ai`. Rival tanpa deck/AI tetap memakai pola Intent lama.
+- ✅ `RivalAI` (`scripts/core/rival_ai.gd`): taruh bahan, Technique, Serve; lookahead "jalur yang bisa diselesaikan dengan tangan ini"; ambil lethal; tahan Heat untuk Serve; bisa memainkan sisi mana pun (dipakai bot pintar di `tests/sim.gd`).
+- ✅ HUD: station rival tertutup + Hand + Heat di atas meja rival (`%RivalKitchen` di `duel_ui.tscn`, anchor `RivalStationsAnchor` di `stage.tscn`), banner hidangan rival saat Serve, mood Confident/Wary.
+- ✅ Signature Dish hanya untuk Apis (GDD §4.5); Hype rival hanya meter penonton.
+- ✅ Data: Tony (`greedy`, Heat 2, tangan 4, Basics), Rosa (`trickster`, Heat 3, tangan 4, Basics + Spice).
+- Balancing awal (bot pintar, deck starter): Tony 98% menang, ±2.8 giliran, sisa Confidence ±44/60. Rosa 85% menang, ±3.5 giliran, sisa ±36/60.
+- ⏳ Belum: pindah/clear station oleh AI, gimmick Élodie/Bruno (rival-nya belum ada di data), profil `showman`/`patient`/`boss`, tie-break pakai stream RNG terpisah (fase D).
 
 ---
 

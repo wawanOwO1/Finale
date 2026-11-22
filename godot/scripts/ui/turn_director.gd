@@ -17,6 +17,10 @@ signal rival_acted(action: Dictionary)
 @export var hold_attack := 0.7
 @export var hold_block := 0.55
 @export var hold_status := 0.6
+## Drafting rival steps: a face-down card onto a station, a technique, a Serve (dish reveal).
+@export var hold_place := 0.4
+@export var hold_technique := 0.7
+@export var hold_serve := 1.4
 ## E2: pause after Composure fades / Spicy ticks, before the first step.
 @export var start_pause := 0.35
 ## E4: pause after the last step, before the YOUR TURN banner.
@@ -59,14 +63,18 @@ func rival_turn() -> void:
 	# E2: Composure fades, Spicy ticks (its number floats up before the first action).
 	d.begin_enemy_turn()
 	await _wait(start_pause)
+	var last := ""
 	while _live(d):
-		if not is_fast() and d.enemy_actions_left() > 0:
+		# "…" before a new kind of move; cards dropped one after another flow without it.
+		var next := d.enemy_next_kind()
+		if not is_fast() and next != "end" and not (last == "place" and next == "place"):
 			await ui.rival_think(think)
 		if not _live(d):
 			break
 		var a := d.enemy_step()
 		if a.kind == "end" or a.kind == "none":
 			break
+		last = a.kind
 		rival_acted.emit(a)
 		ui.rival_act(a)
 		await _wait(_hold(a.kind))
@@ -93,6 +101,12 @@ func _hold(kind: String) -> float:
 			return hold_block
 		"status":
 			return hold_status
+		"place":
+			return hold_place
+		"technique":
+			return hold_technique
+		"serve":
+			return hold_serve
 	return 0.5
 
 
