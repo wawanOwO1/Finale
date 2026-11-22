@@ -3,9 +3,10 @@ extends Control
 ## One card in hand. Layout lives in card_view.tscn; this fills it from a CardInstance and
 ## owns the card's own motion (fan pose, hover lift, deal-in, shake). DuelUI does the drag.
 
-const ING_BG := Color("#fbf3e2")
-const TECH_BG := Color("#f8f4fd")
-const SIG_BG := Color("#fbd36a")
+## Card v2 (canvas board "Kartu v2"): cream rim (gold for Signature), dark body, teal cost block,
+## name banner, art window tinted per type, Quality bar on ingredients.
+const TECH_ART := Color("#2f6f7a")
+const SIG_ART := Color("#4a2a3a")
 const HOVER_LIFT_EM := 4.4
 const HOVER_SCALE := 1.16
 
@@ -34,17 +35,19 @@ func setup(card_: CardInstance, playable_: bool, tips_left: bool) -> void:
 	%Text.text = "[center]%s[/center]" % Keywords.highlight(d.text)
 
 	var body: StyleBoxFlat = %Body.get_theme_stylebox("panel").duplicate()
-	body.bg_color = SIG_BG if sig else (ING_BG if d.is_ingredient() else TECH_BG)
-	if sig:
-		body.border_color = Color("#7a2a10")
-		body.shadow_color = Color("#7a2a10")
+	body.bg_color = Pal.CARD_RIM_RARE if sig else Pal.CARD_RIM
 	%Body.add_theme_stylebox_override("panel", body)
+	var banner: StyleBoxFlat = %Banner.get_theme_stylebox("panel").duplicate()
+	banner.bg_color = Pal.GOLD if sig else Pal.CARD_BANNER
+	%Banner.add_theme_stylebox_override("panel", banner)
 
 	var art: StyleBoxFlat = %Art.get_theme_stylebox("panel").duplicate()
-	art.bg_color = Color(1, 1, 1, 0.4) if sig else Pal.tag_color(tag).lerp(Color.WHITE, 0.82)
+	art.bg_color = SIG_ART if sig else (Pal.tag_color(tag).darkened(0.55) if d.is_ingredient() else TECH_ART)
 	%Art.add_theme_stylebox_override("panel", art)
 	%ArtIcon.texture = Ui.icon_tex("crown" if sig else tag)
-	%ArtIcon.self_modulate = Pal.RED_DARK if sig else Pal.tag_color(tag)
+	%ArtIcon.self_modulate = Pal.GOLD if sig else (Pal.tag_color(tag).lightened(0.15) if d.is_ingredient() else Pal.CREAM)
+	%QualityBar.visible = d.is_ingredient()
+	%QualityBar.value = d.quality
 
 	# Keyword tips beside the card (left side for cards right of center).
 	for child in %Tips.get_children():

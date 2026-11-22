@@ -20,6 +20,19 @@ const PURPLE := Color("#8a3fb0")
 const TIP_BG := Color("#2e1d10f2")
 const TIP_TEXT := Color("#fbefd9")
 const MODAL_DIM := Color("#2a1a0ccc")
+## HUD v2 (canvas board "HUD v2"): dark panels that sit on the bright stage without blending in.
+const HUD_PANEL := Color("#2e221b")
+const HUD_INK := Color("#1a120d")
+const HUD_LINE := Color("#5c4231")
+const HUD_MUTED := Color("#c9b8a3")
+const HUD_EMPTY := Color("#4a382c")
+const HUD_DASH := Color("#6e5240")
+## Card v2 (canvas board "Kartu v2").
+const CARD_RIM := Color("#d9cdb8")
+const CARD_RIM_RARE := Color("#f2d27a")
+const CARD_BODY := Color("#241d19")
+const CARD_COST := Color("#2f6f7a")
+const CARD_BANNER := Color("#e9dcc6")
 
 ## Ingredient tag colors (cards, tiles, book chips).
 const TAG := {

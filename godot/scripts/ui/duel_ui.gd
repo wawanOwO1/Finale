@@ -44,23 +44,15 @@ var _busy := false
 var round_number := 1
 ## One frame per station (PanelContainer); meta "holder" = the stack Control.
 var _cols: Array[PanelContainer] = []
-var _stations_box: HBoxContainer
 ## Dragging a station's top card to another station.
 var _sdrag := {}
 var _announcer: Announcer
 var _emote_holder: Control
 var _emote: EmoteBubble
 var _result_done := false
-# Pixel HUD pieces (HudKit), built over the .tscn nodes so their placement stays editable.
-var _round_chip: HBoxContainer
-var _hype_bar: HudKit.SegmentBar
-var _rival_bar: HudKit.SkewBar
-var _rival_portrait: HudKit.Diamond
-var _player_bar: HudKit.SkewBar
-var _player_block: PanelContainer
-var _heat_row: HBoxContainer
-var _heat_pips: Array[TextureRect] = []
-var _heat_text: Label
+## Recipe Book page shown (index into _book_recipes).
+var _book_recipes: Array[RecipeDef] = []
+var _book_page := 0
 var _smug_armed := true
 var _angry_shown := false
 var _hype_pulse: Tween
@@ -94,20 +86,18 @@ func _ready() -> void:
 
 # ================================================================ public API
 
-## Pre-duel Recipe Book (during the duel the Order Tickets give the hints).
+## Pre-duel Recipe Book (Recipe Book v2 board): one recipe per spread, dish on the left page,
+## cooking order on the right, chapter ribbons per book. During the duel the Order Tickets hint.
 ## Await it: `await ui.show_cookbook(recipes)`.
 func show_cookbook(recipes: Array[RecipeDef]) -> void:
 	%Overlay.hide()
-	for child in %BookList.get_children():
-		child.queue_free()
-	for r in recipes:
-		%BookList.add_child(_book_row(r))
+	_book_recipes = recipes
+	_build_ribbons()
+	_show_book_page(0)
 	%Cookbook.show()
 	_pop_in(%BookBox)
 	await %StartButton.pressed
 	%Cookbook.hide()
-
-
 func bind(d: Duel) -> void:
 	duel = d
 	_prev_hand = {}
@@ -194,49 +184,40 @@ func _emote_on_intent() -> void:
 
 func set_pixel_on(on: bool) -> void:
 	var b: Button = %PixelButton
-	Ui.style_button(b, Pal.INK if on else Pal.CREAM, Pal.CREAM if on else Pal.INK, 1.0, 0.3, 0.3)
-	_square_button(b, Pal.INK if on else Pal.CREAM)
-	%PixelIcon.self_modulate = Pal.CREAM if on else Pal.INK
-
-
+	Ui.style_button(b, Pal.HUD_PANEL, Pal.CREAM, 1.0, 0.3, 0.3)
+	_square_button(b, Pal.GOLD.darkened(0.35) if on else Pal.HUD_PANEL)
+	%PixelIcon.self_modulate = Pal.GOLD if on else Pal.CREAM
 # ================================================================ static build
 
 func _build_static() -> void:
 	# Top bar
-	_tip(%HypeMeter, "Hype", Keywords.BASE.Hype.text, "hype")
+	_tip(%Hype, "Hype", Keywords.BASE.Hype.text, "hype")
 	_tip(%PixelButton, "Pixel filter", "Toggle the low-res pixel look. Shortcut: P.", "pixel")
 	set_pixel_on(false)
-	# Badges with icons
-	%HpBadge.add_child(_badge_bg("confidence", Pal.RED, 6.5, 0.2))
-	%HpBadge.move_child(%HpBadge.get_child(-1), 0)
-	_tip(%HpBadge, "Confidence", Keywords.BASE.Confidence.text, "confidence")
-	%HeatOrb.add_child(_badge_bg("heat", Pal.ORANGE, 4.4, 0.18))
-	%HeatOrb.move_child(%HeatOrb.get_child(-1), 0)
-	_tip(%HeatOrb, "Heat", Keywords.BASE.Heat.text, "heat")
-	for b in [%EnemyBlock, %PlayerBlock]:
-		var big: bool = b == %PlayerBlock
-		b.add_child(_badge_bg("composure", Pal.BLUE, 2.8 if big else 1.9, 0.1))
-		b.move_child(b.get_child(-1), 0)
-		_tip(b, "Composure", Keywords.BASE.Composure.text, "composure")
+	_tip(%PlayerHp, "Confidence", Keywords.BASE.Confidence.text + "\nBlue cap: Composure.", "confidence")
+	_tip(%RivalHp, "Confidence", Keywords.BASE.Confidence.text + "\nBlue cap: Composure.", "confidence")
+	_tip(%HeatRow, "Heat", Keywords.BASE.Heat.text, "heat")
 	_tip(%DrawPile, "Draw pile", "Cards you will draw. Shuffled from the discard pile when empty.", "draw")
 	_tip(%DiscardPile, "Discard pile", "Played and discarded cards. Shuffled back when the draw pile runs out.", "discard")
+	# Piles: blue chip for draw, dark chip for discard (HUD v2).
+	%DrawPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.BLUE, Pal.HUD_INK, 0.2, 0.3), 0.5, 0.25))
+	%DrawPile.get_node("HBox/Icon").self_modulate = Pal.CREAM
+	%DrawCount.add_theme_color_override("font_color", Pal.CREAM)
+	%DiscardPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.HUD_PANEL, Pal.HUD_INK, 0.2, 0.3), 0.5, 0.2))
+	%DiscardPile.get_node("HBox/Icon").self_modulate = Pal.HUD_MUTED
+	%DiscardCount.add_theme_color_override("font_color", Pal.CREAM)
 	# Buttons
-	Ui.style_button(%EndTurn, Pal.RED, Color.WHITE, 1.2, 1.3, 0.55)
-	_square_button(%EndTurn, Pal.RED)
+	Ui.style_button(%EndTurn, Pal.RED, Pal.CREAM, 1.75, 1.0, 0.4)
+	HudKit.style_red_button(%EndTurn)
 	%EndTurn.text = "END TURN"
-	Ui.style_button(%StartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
+	Ui.style_button(%StartButton, Pal.RED, Pal.CREAM, 1.75, 1.6, 0.5)
+	HudKit.style_red_button(%StartButton)
+	for b: Button in [%PrevPage, %NextPage]:
+		Ui.style_button(b, Pal.INK_SOFT, Pal.CREAM, 1.2, 0.5, 0.1)
+		_square_button(b, Pal.INK_SOFT)
+	%PrevPage.pressed.connect(func() -> void: _show_book_page(_book_page - 1))
+	%NextPage.pressed.connect(func() -> void: _show_book_page(_book_page + 1))
 	Ui.style_button(%RestartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
-	# Stations replace the old Prep Board row: hide its header, slots and single Serve button.
-	for n in [%Board.get_node("VBox/Head"), %Slots, %ServeButton]:
-		n.hide()
-	%Board.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	%Board.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	%Board.get_node("VBox").alignment = BoxContainer.ALIGNMENT_BEGIN
-	_stations_box = Ui.hbox(STATION_GAP_EM)
-	_stations_box.alignment = BoxContainer.ALIGNMENT_BEGIN
-	_stations_box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	%Board.get_node("VBox").add_child(_stations_box)
-	_restyle_hud()
 	# Cut-in background
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -244,78 +225,6 @@ func _build_static() -> void:
 	mat.shader = sh
 	%CutInRays.material = mat
 	%CutInSfx.add_theme_font_override("font", Ui.italic_font())
-
-
-## HUD restyle to the canvas kit (ART_DIRECTION §4): square ink boxes with hard shadows,
-## ROUND chip, segmented Hype, skewed Confidence bars, diamond portraits and intent, Heat pips.
-func _restyle_hud() -> void:
-	# Top-left: ROUND chip above the venue name.
-	_round_chip = HudKit.chip("ROUND", "1")
-	var venue: Control = %Root.get_node("Venue")
-	venue.add_child(_round_chip)
-	venue.move_child(_round_chip, 0)
-	venue.add_theme_constant_override("separation", roundi(Pal.em(0.35)))
-	# Hype: square cream plate, segmented bar instead of the rounded track.
-	%HypeMeter.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.CREAM), 0.6, 0.3))
-	var track: Control = %HypeMeter.get_node("HBox/HypeTrack")
-	track.hide()
-	_hype_bar = HudKit.SegmentBar.new(14.5, 1.35)
-	track.get_parent().add_child(_hype_bar)
-	track.get_parent().move_child(_hype_bar, track.get_index() + 1)
-	# Rival: diamond portrait + skewed bar; intent becomes a diamond (built in _fill_intent).
-	%Intent.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	var hp_row: HBoxContainer = %Rival.get_node("Hp")
-	hp_row.get_node("HpBar").hide()
-	_rival_portrait = HudKit.Diamond.new(2.6)
-	_rival_portrait.add_child(Ui.label("?", 1.0, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	hp_row.add_child(_rival_portrait)
-	hp_row.move_child(_rival_portrait, 0)
-	_rival_bar = HudKit.SkewBar.new(11.0, 1.35, 0.8)
-	hp_row.add_child(_rival_bar)
-	hp_row.move_child(_rival_bar, 1)
-	hp_row.add_theme_constant_override("separation", roundi(Pal.em(0.5)))
-	# Player: diamond portrait over the old heart badge, bar + Composure + Heat pips beside it.
-	for c in %HpBadge.get_children():
-		c.hide()
-	var portrait := HudKit.Diamond.new(6.0)
-	portrait.add_child(Ui.label("A", 2.0, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	Ui.fill(portrait)
-	%HpBadge.add_child(portrait)
-	%PlayerBlock.hide()
-	%HeatOrb.hide()
-	var col := Ui.vbox(0.35)
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	_player_bar = HudKit.SkewBar.new(11.5, 1.75, 1.1)
-	_tip(_player_bar, "Confidence", Keywords.BASE.Confidence.text, "confidence")
-	_player_bar.mouse_filter = Control.MOUSE_FILTER_PASS
-	col.add_child(_player_bar)
-	_player_block = HudKit.tag("COMPOSURE 0", Pal.BLUE)
-	_player_block.mouse_filter = Control.MOUSE_FILTER_PASS
-	_tip(_player_block, "Composure", Keywords.BASE.Composure.text, "composure")
-	var block_row := Ui.hbox(0.3)
-	block_row.alignment = BoxContainer.ALIGNMENT_BEGIN
-	block_row.add_child(_player_block)
-	col.add_child(block_row)
-	_heat_row = Ui.hbox(0.2)
-	_heat_row.alignment = BoxContainer.ALIGNMENT_BEGIN
-	_heat_row.mouse_filter = Control.MOUSE_FILTER_PASS
-	for i in Duel.MAX_HEAT:
-		var pip := Ui.icon("heat", Pal.ORANGE, 1.9)
-		_heat_row.add_child(pip)
-		_heat_pips.append(pip)
-	_heat_text = Ui.outlined("HEAT 3/3", 0.75, Pal.CREAM, 0.12)
-	_heat_row.add_child(_heat_text)
-	_tip(_heat_row, "Heat", Keywords.BASE.Heat.text, "heat")
-	col.add_child(_heat_row)
-	%HpBadge.get_parent().add_child(col)
-	%HpBadge.get_parent().move_child(col, %HpBadge.get_index() + 1)
-	%HpBadge.get_parent().add_theme_constant_override("separation", roundi(Pal.em(1.1)))
-	# Piles: card backs (draw = blue, discard = paper) with the count on an ink chip.
-	%DrawPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.BLUE), 0.5, 0.25))
-	%DrawPile.get_node("HBox/Icon").self_modulate = Pal.CREAM
-	%DrawCount.add_theme_color_override("font_color", Pal.CREAM)
-	%DiscardPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.PAPER), 0.5, 0.25))
-
 
 ## Square pixel look on top of Ui.style_button (keeps its colors and font).
 func _square_button(b: Button, bg: Color) -> void:
@@ -329,11 +238,6 @@ func _square_button(b: Button, bg: Color) -> void:
 		b.add_theme_stylebox_override(pair[0], pair[1])
 
 
-func _badge_bg(icon_name: String, color: Color, size_em: float, shadow_em: float) -> Control:
-	var bg := Ui.icon_shadowed(icon_name, color, size_em, shadow_em)
-	Ui.fill(bg)
-	return bg
-
 
 # ================================================================ render
 
@@ -343,50 +247,36 @@ func _refresh() -> void:
 	var d := duel
 	var live := d.phase == "player"
 
-	# Rival
+	# Rival panel (top-right)
 	%Intent.visible = live
 	if live:
 		_fill_intent(d.intent())
 	%RivalName.text = d.enemy_def.name
 	%RivalTitle.text = d.enemy_def.title
-	%HpFill.anchor_right = float(d.enemy.confidence) / d.enemy.max_confidence
-	%HpText.text = "%d / %d" % [d.enemy.confidence, d.enemy.max_confidence]
-	_rival_bar.ratio = float(d.enemy.confidence) / d.enemy.max_confidence
-	_rival_bar.text_label.text = "%d / %d" % [d.enemy.confidence, d.enemy.max_confidence]
-	(_rival_portrait.get_child(0) as Label).text = d.enemy_def.name.left(1)
-	(_round_chip.find_child("Value", true, false) as Label).text = str(round_number)
-	_block_badge(%EnemyBlock, d.enemy.composure)
+	%RivalHp.ratio = float(d.enemy.confidence) / d.enemy.max_confidence
+	%RivalHp.shield = d.enemy.composure
+	%RivalHp.text = "%d/%d" % [d.enemy.confidence, d.enemy.max_confidence]
+	%RoundLabel.text = "ROUND %d" % round_number
 	_fill_statuses(%EnemyStatuses, d.enemy)
-	%Rival.reset_size()
 
 	# Player
-	%PlayerConf.text = str(d.player.confidence)
-	%PlayerConfMax.text = "/%d" % d.player.max_confidence
-	%PlayerBlock.hide()
-	_player_bar.ratio = float(d.player.confidence) / d.player.max_confidence
-	_player_bar.stripe = minf(1.0, float(d.player.composure) / d.player.max_confidence)
-	_player_bar.text_label.text = "%d/%d" % [d.player.confidence, d.player.max_confidence]
-	_player_block.visible = d.player.composure > 0
-	(_player_block.get_child(0) as Label).text = "COMPOSURE %d" % d.player.composure
-	for i in _heat_pips.size():
-		_heat_pips[i].self_modulate = Pal.ORANGE if i < d.player.heat else Pal.INK_SOFT
-	_heat_text.text = "HEAT %d/%d" % [d.player.heat, Duel.MAX_HEAT]
+	%PlayerHp.ratio = float(d.player.confidence) / d.player.max_confidence
+	%PlayerHp.shield = d.player.composure
+	%PlayerHp.text = "%d/%d" % [d.player.confidence, d.player.max_confidence]
+	var pips := %HeatRow.get_children().filter(func(n: Node) -> bool: return n is TextureRect)
+	for i in pips.size():
+		pips[i].self_modulate = Pal.ORANGE if i < d.player.heat else Pal.HUD_EMPTY
+	%HeatText.text = "HEAT %d/%d" % [d.player.heat, Duel.MAX_HEAT]
 	_fill_statuses(%PlayerStatuses, d.player)
-	%HeatValue.text = str(d.player.heat)
-	%HeatMax.text = "/%d" % Duel.MAX_HEAT
-	var heat_icon: TextureRect = %HeatOrb.get_child(0).get_node("Icon")
-	heat_icon.self_modulate = Color("#9b8a76") if d.player.heat == 0 else Pal.ORANGE
 	%DrawCount.text = str(d.draw_pile.size())
 	%DiscardCount.text = str(d.discard.size())
 
 	# Hype
 	var full := d.hype >= Duel.MAX_HYPE or d.signature_armed
-	%HypeFill.anchor_right = float(d.hype) / Duel.MAX_HYPE
-	%HypeFill.get_theme_stylebox("panel").bg_color = Pal.ORANGE if full else Pal.GOLD
-	%HypeValue.text = str(d.hype)
-	_hype_bar.value = d.hype
-	_hype_bar.full = full
-	_hype_pulse = _pulse(_hype_bar, full, _hype_pulse)
+	%HypeBar.max_value = Duel.MAX_HYPE
+	%HypeBar.value = d.hype
+	%HypeBar.full = full
+	_hype_pulse = _pulse(%HypeBar, full, _hype_pulse)
 
 	# Hand
 	_rebuild_hand(live)
@@ -409,8 +299,8 @@ func _refresh() -> void:
 		_pop_in(%EndBox)
 
 
-## Intent (ref 3 #11): a diamond with the main number (red attack, blue block, purple status),
-## extra parts as small icons beside it, and the intent name on an ink tag.
+## Intent (HUD v2): a big diamond with the main number (red attack, blue block, purple status),
+## the intent name in gold beside it and the extra parts as small icons under the name.
 func _fill_intent(it: IntentDef) -> void:
 	for c in %IntentParts.get_children():
 		c.queue_free()
@@ -422,31 +312,27 @@ func _fill_intent(it: IntentDef) -> void:
 	elif it.block > 0:
 		main_color = Pal.BLUE
 		main_value = it.block
-	var dia := HudKit.Diamond.new(3.0, main_color)
-	dia.add_child(Ui.outlined(str(main_value), 1.15, Pal.CREAM, 0.12))
-	%IntentParts.add_child(dia)
-	var extras := Ui.hbox(0.2)
-	%IntentParts.add_child(extras)
-	%IntentParts.add_child(HudKit.tag(it.label.to_upper(), Pal.INK, Pal.CREAM, 0.6))
+	%IntentDiamond.fill = main_color
+	%IntentValue.text = str(main_value)
+	%IntentName.text = it.label.to_upper()
 	var said: PackedStringArray = []
+	# The diamond shows the main number; the parts row lists only the extras beside it.
 	if it.has_attack():
 		var v := duel.pressure_from("enemy", it.attack)
-		extras.add_child(Ui.icon("pressure", Pal.RED, 1.1))
+		%IntentParts.add_child(Ui.icon("pressure", Pal.RED, 1.3))
 		said.append("deal %d Pressure" % v)
 	if it.block > 0:
-		extras.add_child(_intent_part("composure", Pal.BLUE, it.block) if it.has_attack() else Ui.icon("composure", Pal.BLUE, 1.1))
+		%IntentParts.add_child(_intent_part("composure", Pal.BLUE, it.block) if it.has_attack() else Ui.icon("composure", Pal.BLUE, 1.3))
 		said.append("gain %d Composure" % it.block)
 	if it.has_status():
 		var on_player := it.status_target == IntentDef.StatusTarget.PLAYER
-		extras.add_child(_intent_part(it.status, Pal.PURPLE if on_player else Pal.GREEN, it.status_amount))
+		%IntentParts.add_child(_intent_part(it.status, Pal.PURPLE if on_player else Pal.GREEN, it.status_amount))
 		said.append("%s %s %d" % ["give you" if on_player else "gain", StatusDefs.display_name(it.status), it.status_amount])
 	_tip(%Intent, "Intent: %s" % it.label, "%s will %s." % [duel.enemy_def.name, ", ".join(said)], "taunt")
-
-
 func _intent_part(icon_name: String, color: Color, n: int) -> Control:
 	var row := Ui.hbox(0.1)
-	row.add_child(Ui.icon(icon_name, color, 1.1))
-	row.add_child(Ui.outlined(str(n), 0.85, Pal.CREAM, 0.1))
+	row.add_child(Ui.icon(icon_name, color, 1.3))
+	row.add_child(Ui.outlined(str(n), 1.0, Pal.CREAM, 0.1))
 	return row
 
 
@@ -460,22 +346,18 @@ func _fill_statuses(box: HBoxContainer, f: Duel.Fighter) -> void:
 		box.add_child(chip)
 
 
-func _block_badge(badge: Control, value: int) -> void:
-	badge.visible = value > 0
-	(badge.get_node("Value") as Label).text = str(value)
-
 
 # ================================================================ stations
 
 const STATION_GAP_EM := 0.9
-## Top of the stations, above the prep-table anchor.
-const STATION_TOP_EM := 10.5
 const CARD_W_EM := 7.4
 const CARD_H_EM := 6.4
 ## Visible strip of a covered card (name + tag icon).
 const BAND_EM := 1.75
 ## Light tag colors get ink text, dark ones cream.
 const DARK_TAGS: PackedStringArray = ["VEGGIE", "SPICE", "SAUCE"]
+## Recipe Book chapter ribbon colors (Recipe Book v2 board).
+const BOOK_COLORS := {basics = Color("#3f7fae"), grill = Color("#d9a42a"), spice = Color("#d8342c"), comfort = Color("#2f8a86")}
 
 
 func _refresh_stations() -> void:
@@ -484,7 +366,7 @@ func _refresh_stations() -> void:
 	_cols.clear()
 	for i in Duel.STATIONS:
 		var frame := _station_column(i)
-		_stations_box.add_child(frame)
+		%StationsRow.add_child(frame)
 		_cols.append(frame)
 	_highlight_stations(-1)
 
@@ -496,6 +378,7 @@ func _station_column(i: int) -> PanelContainer:
 	var col := Ui.vbox(0.35)
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	col.custom_minimum_size.x = Pal.em(CARD_W_EM)
+	col.add_child(Ui.label("Station %d" % (i + 1), 0.85, Pal.HUD_MUTED))
 	col.add_child(_ticket_view(i, tk))
 
 	var holder := Control.new()
@@ -503,8 +386,8 @@ func _station_column(i: int) -> PanelContainer:
 	var n := st.size()
 	holder.custom_minimum_size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM) + Pal.em(BAND_EM) * maxi(n - 1, 0))
 	if n == 0:
-		var ph := Ui.panel(Ui.box(Color(Pal.CREAM, 0.12), Color(Pal.CREAM, 0.55), 0.14, 0.7, 0.0),
-				Ui.label("+  Station %d" % (i + 1), 0.8, Color(Pal.CREAM, 0.85), HORIZONTAL_ALIGNMENT_CENTER))
+		var ph := HudKit.Dashed.new()
+		ph.add_child(Ui.label("+", 1.6, Pal.HUD_DASH, HORIZONTAL_ALIGNMENT_CENTER))
 		ph.position = Vector2.ZERO
 		ph.size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM))
 		holder.add_child(ph)
@@ -523,15 +406,20 @@ func _station_column(i: int) -> PanelContainer:
 		var row := Ui.hbox(0.3)
 		var serve := Button.new()
 		var armed := d.signature_armed
-		serve.text = "Serve x2" if armed else "Serve"
-		Ui.style_button(serve, Pal.GOLD if armed else Pal.RED, Pal.INK if armed else Color.WHITE, 0.9, 0.8, 0.4)
+		serve.text = "SERVE x2" if armed else "SERVE"
+		Ui.style_button(serve, Pal.GOLD if armed else Pal.RED, Pal.INK if armed else Pal.CREAM, 0.9, 0.6, 0.3)
+		if armed:
+			_square_button(serve, Pal.GOLD)
+		else:
+			HudKit.style_red_button(serve)
 		serve.disabled = not d.can_serve(i).ok
 		serve.pressed.connect(func() -> void: _serve(i))
 		_tip(serve, "Serve", Keywords.BASE.Serve.text, "serve")
 		row.add_child(serve)
 		var clear := Button.new()
 		clear.text = "Clear"
-		Ui.style_button(clear, Pal.INK_SOFT, Pal.CREAM, 0.75, 0.5, 0.4)
+		Ui.style_button(clear, Pal.HUD_EMPTY, Pal.HUD_MUTED, 0.75, 0.4, 0.3)
+		_square_button(clear, Pal.HUD_EMPTY)
 		clear.disabled = d.moved_this_turn
 		clear.pressed.connect(func() -> void: if not _locked(): _report(duel.clear_station(i)))
 		_tip(clear, "Clear station", "Throw this whole stack into the discard pile. Free, but uses your one move this turn.", "discard")
@@ -552,19 +440,19 @@ func _ticket_view(i: int, tk: Dictionary) -> Control:
 	vb.alignment = BoxContainer.ALIGNMENT_BEGIN
 	var head := Ui.hbox(0.3)
 	head.alignment = BoxContainer.ALIGNMENT_BEGIN
-	var title := "Station %d" % (i + 1)
+	var title := "Empty"
 	if recipe:
 		title = recipe.name
 	elif state == "improvised":
 		title = "???"
-	var name_l := Ui.label(title, 0.85, Pal.INK if state != "empty" else Pal.INK_SOFT)
+	var name_l := Ui.label(title.to_upper(), 0.85, Pal.INK if state != "empty" else Pal.INK_SOFT)
 	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_l.clip_text = true
 	head.add_child(name_l)
 	if state == "perfect" or state == "cooked":
 		var stamp_bg := Pal.GOLD if state == "perfect" else Pal.PAPER
-		var stamp := Ui.panel(Ui.pad(Ui.box(stamp_bg, Pal.INK, 0.1, 0.2, 0.0), 0.25, 0.0),
-				Ui.label("PERFECT!" if state == "perfect" else "COOKED", 0.55))
+		var stamp := Ui.panel(Ui.pad(Ui.box(stamp_bg, Pal.ORANGE if state == "perfect" else Pal.INK, 0.14, 0.2, 0.0), 0.25, 0.0),
+				Ui.label("PERFECT!" if state == "perfect" else "COOKED", 0.6, Pal.RED_DARK if state == "perfect" else Pal.INK))
 		stamp.rotation_degrees = 8.0
 		head.add_child(stamp)
 	vb.add_child(head)
@@ -593,9 +481,10 @@ func _ticket_view(i: int, tk: Dictionary) -> Control:
 		line += " · +%d Garnish" % tk.garnish
 	vb.add_child(Ui.label(line, 0.6, Pal.INK_SOFT))
 
-	var bg := Pal.PAPER if state == "improvised" else Pal.CREAM
-	var border := Pal.GOLD if state == "perfect" else Pal.INK
-	var p := Ui.panel(Ui.pad(Ui.box(bg, border, 0.2 if state == "perfect" else 0.13, 0.3, 0.15), 0.45, 0.3), vb)
+	var p := HudKit.Ticket.new()
+	p.paper = Pal.PAPER if state == "improvised" else Pal.CREAM
+	p.glow = Pal.GOLD if state == "perfect" else Color.TRANSPARENT
+	p.add_child(vb)
 	p.custom_minimum_size.x = Pal.em(CARD_W_EM)
 	if recipe:
 		var seq: PackedStringArray = []
@@ -645,7 +534,7 @@ func _stack_card(c: CardInstance, top: bool) -> PanelContainer:
 	var tag := c.def.first_tag()
 	var bg := Pal.tag_color(tag)
 	var fg := Pal.CREAM if tag in DARK_TAGS else Pal.INK
-	var s := Ui.box(bg, Pal.GOLD if top else Pal.INK, 0.16 if top else 0.12, 0.55, 0.0)
+	var s := HudKit.box(bg, Pal.GOLD if top else Pal.HUD_INK, 0.2 if top else 0.16, 0.18)
 	s.content_margin_left = Pal.em(0.45)
 	s.content_margin_right = Pal.em(0.45)
 	s.content_margin_top = Pal.em(0.2)
@@ -806,11 +695,10 @@ func _layout_hand() -> void:
 
 
 func _process(_delta: float) -> void:
-	# 3D-following blocks: rival HUD over its head, stations hang down from above the prep table
-	# (stacks grow downward like solitaire), emote bubble beside the rival's head.
-	%Rival.position = anchors.rival - Vector2(%Rival.size.x / 2.0, %Rival.size.y)
+	# HUD v2 panels are fixed in the scene; only the emote bubble follows the rival's head.
+	# The Stations panel grows downward with its stacks (solitaire).
 	%Board.reset_size()
-	%Board.position = Vector2(anchors.board.x - %Board.size.x / 2.0, anchors.board.y - Pal.em(STATION_TOP_EM))
+	%Rival.reset_size()
 	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
 	_update_hover()
 
@@ -1064,7 +952,7 @@ func _report(result: Dictionary) -> void:
 func _reject(reason: String) -> void:
 	_toast(reason)
 	if reason.contains("Heat"):
-		var orb: Control = _heat_row
+		var orb: Control = %HeatRow
 		orb.pivot_offset = orb.size / 2.0
 		var tw := create_tween()
 		tw.tween_property(orb, "scale", Vector2.ONE * 1.2, 0.13)
@@ -1237,23 +1125,88 @@ func _pop_in(box: Control) -> void:
 
 # ================================================================ Recipe Book
 
-func _book_row(r: RecipeDef) -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", roundi(Pal.em(0.8)))
-	var name_l := Ui.label(r.name, 1.0)
-	name_l.custom_minimum_size.x = Pal.em(8)
-	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	row.add_child(name_l)
-	var seq := Ui.hbox(0.25)
-	for i in r.requires.size():
-		if i > 0:
-			seq.add_child(Ui.icon("arrow", Pal.INK_SOFT, 0.8))
-		seq.add_child(Ui.req_chip(r.requires[i]))
-	row.add_child(seq)
-	var eff := Ui.rich("%s [color=%s][font_size=%d]+ Quality[/font_size][/color]" % [Keywords.highlight(r.text),
-			Pal.hex(Pal.INK_SOFT), roundi(Pal.em(0.7))], 0.85)
-	eff.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	eff.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(eff)
-	var s := Ui.pad(Ui.box(Color(1, 1, 1, 0.53), Color.TRANSPARENT, 0.0, 0.55, 0.0), 0.6, 0.45)
-	return Ui.panel(s, row)
+func _build_ribbons() -> void:
+	for c in %BookRibbons.get_children():
+		if c is Button:
+			c.queue_free()
+	var seen: PackedStringArray = []
+	for i in _book_recipes.size():
+		var id := _book_recipes[i].book
+		if id in seen:
+			continue
+		seen.append(id)
+		var first := i
+		var b := Button.new()
+		b.text = id.capitalize()
+		var color: Color = BOOK_COLORS.get(id, Pal.INK_SOFT)
+		Ui.style_button(b, color, Pal.CREAM, 1.15, 1.0, 0.55)
+		HudKit.style_ribbon(b, color)
+		b.custom_minimum_size = Vector2(Pal.em(9.5), Pal.em(3.6))
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func() -> void: _show_book_page(first))
+		b.set_meta("book", id)
+		%BookRibbons.add_child(b)
+
+
+## One recipe per spread: dish + name on the left page, the cooking order top to bottom on the right.
+func _show_book_page(i: int) -> void:
+	if _book_recipes.is_empty():
+		return
+	_book_page = wrapi(i, 0, _book_recipes.size())
+	var r := _book_recipes[_book_page]
+	%PageDishName.text = r.name
+	%PageDishBook.text = "%s · %d steps" % [r.book.capitalize(), r.requires.size()]
+	%PageNum.text = "%d / %d" % [_book_page + 1, _book_recipes.size()]
+	for c in %PageDishArt.get_children():
+		c.queue_free()
+	%PageDishArt.add_child(_dish_art(r))
+	for c in %BookSteps.get_children():
+		c.queue_free()
+	for k in r.requires.size():
+		if k > 0:
+			# Containers reset child rotation, so the arrow turns inside a plain holder.
+			var holder := Control.new()
+			holder.custom_minimum_size = Vector2.ONE * Pal.em(1.3)
+			holder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var arrow := Ui.icon("arrow", Pal.HUD_INK, 1.3)
+			arrow.size = holder.custom_minimum_size
+			arrow.pivot_offset = arrow.size / 2.0
+			arrow.rotation_degrees = 90.0
+			holder.add_child(arrow)
+			%BookSteps.add_child(holder)
+		%BookSteps.add_child(_book_step(r.requires[k]))
+	%BookEffect.text = "[center]%s[/center]" % Keywords.highlight(r.text, Pal.RED_DARK)
+	for b in %BookRibbons.get_children():
+		if b is Button:
+			var on: bool = b.get_meta("book") == r.book
+			b.position.x = 0.0
+			b.modulate = Color.WHITE if on else Color(0.82, 0.78, 0.74)
+
+
+## Left-page dish: the recipe's ingredients piled on a plate, first step at the bottom.
+func _dish_art(r: RecipeDef) -> Control:
+	var plate := HudKit.Plate.new()
+	plate.custom_minimum_size = Vector2(Pal.em(15), Pal.em(15))
+	var pile := Ui.vbox(-0.6)
+	for k in range(r.requires.size() - 1, -1, -1):
+		var tag := _req_tag(r.requires[k])
+		pile.add_child(Ui.icon(tag, Pal.tag_color(tag), 4.2 if k == 0 else 3.4))
+	plate.add_child(pile)
+	return plate
+
+
+## Right-page step: cream tile with the ingredient icon and its name.
+func _book_step(req: String) -> Control:
+	var tag := _req_tag(req)
+	var key := req.begins_with("card:")
+	var row := Ui.hbox(0.5)
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	row.add_child(Ui.icon(tag, Pal.tag_color(tag), 2.0))
+	row.add_child(Ui.label(_req_name(req), 1.05, Pal.INK))
+	var s := HudKit.box(Pal.GOLD.lightened(0.55) if key else Pal.CREAM, Pal.INK_SOFT, 0.18, 0.15)
+	s.shadow_color = Color("#b99a72")
+	var p := Ui.panel(Ui.pad(s, 0.6, 0.15), row)
+	p.custom_minimum_size = Vector2(Pal.em(13), Pal.em(2.9))
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	return p

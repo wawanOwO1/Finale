@@ -31,7 +31,7 @@ func _initialize() -> void:
 	var duel: Duel = main.duel
 	_shot("2_duel")
 	_crop("2a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
-	_crop("2b_board_rival", Rect2(0.05, 0.0, 0.65, 0.45))
+	_crop("2b_board_rival", Rect2(0.0, 0.0, 1.0, 0.5))
 
 	# Hover the middle card: it should lift.
 	var views: Array = ui._views
@@ -94,7 +94,7 @@ func _initialize() -> void:
 	_check("end turn button advances the turn", duel.turn == 2)
 	_shot("7_turn2")
 	_crop("7a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
-	_crop("7b_rival", Rect2(0.5, 0.0, 0.3, 0.25))
+	_crop("7b_rival", Rect2(0.75, 0.08, 0.25, 0.32))
 	# Signature Dish cut-in
 	ui._play_cutin("Omelette")
 	await _wait(0.5)
@@ -137,7 +137,7 @@ func _inst(duel: Duel, ids: Array) -> Array[CardInstance]:
 
 func _serve_button(ui: Node, station: int) -> Button:
 	for b in ui._cols[station].find_children("*", "Button", true, false):
-		if (b as Button).text.begins_with("Serve"):
+		if (b as Button).text.to_lower().begins_with("serve"):
 			return b
 	return null
 

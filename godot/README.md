@@ -61,6 +61,7 @@ godot/
     game_db.gd            GameDB: load semua .tres di data/ lalu cari by id
     stage/                Stage (3D diorama), Chef
     ui/                   DuelUI (HUD + drag), CardView, Ui (builder panel/ikon), Pal (palet warna), Keywords
+    ui/hud/               HudPanel (panel + tab), HpBar, SegBar, DiamondBadge: widget HUD v2 yang dipasang di .tscn
     main.gd               Entry point: cookbook → duel
   scenes/
     main.tscn             Stage + DuelUI
@@ -130,11 +131,13 @@ Catatan syarat jam (GDD §9):
 
 ## Status port UI
 
-Sudah setara versi web: top bar + meter Hype, panel rival yang mengikuti kepala rival (intent pill,
-bar Confidence, Composure, status), 3 Station yang mengikuti meja prep, badge hati/Heat/Composure,
-pile draw/discard, kartu bergaya (badge biaya, ikon tag, keyword berwarna, tooltip keyword saat hover),
+HUD v2 (board "HUD v2" di canvas, lihat ART_DIRECTION §4): panel gelap bertab yang tetap di layar.
+Top bar ROUND + Hype bersegmen, panel rival kanan atas (diamond intent, nama, bar Confidence dengan
+cap Composure biru, status), panel STATIONS kiri atas (tiket bergerigi, stack solitaire, SERVE/Clear),
+panel PLAYER kiri bawah (diamond potret, bar Confidence, pip Heat), pile draw/discard, kartu gelap
+bergaya "Kartu v2" (blok biaya teal, banner nama, jendela art per tipe, bar Quality, tooltip keyword),
 drag & drop dengan ghost miring, zona "Release to play", angka melayang, banner dish, cut-in Signature
-Dish, Recipe Book, layar Victory/Defeat, tooltip di semua elemen, filter pixel (tombol kanan atas / P).
+Dish, Recipe Book v2 (satu resep per halaman, urutan masak, pita bab), layar Victory/Defeat, tooltip di semua elemen, filter pixel (tombol kanan atas / P).
 
 Perbedaan kecil yang tersisa:
 - Font: pakai SystemFont "Trebuchet MS" (Windows). Di build **Web**, SystemFont tidak tersedia dan jatuh

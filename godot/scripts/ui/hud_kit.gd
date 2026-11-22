@@ -161,3 +161,137 @@ class Diamond extends Container:
 		if half:
 			var p := _pts(b * 1.4)
 			draw_colored_polygon(PackedVector2Array([p[1], p[2], p[3]]), lower)
+
+
+## Big red button (END TURN, SERVE, book close): square, light inner edge, dark bottom lip.
+static func style_red_button(b: Button) -> void:
+	var make := func(bg: Color, lip: float, shadow: float) -> StyleBoxFlat:
+		var s := box(bg, Pal.HUD_INK, 0.24, shadow)
+		s.content_margin_left = b.get_theme_stylebox("normal").content_margin_left
+		s.content_margin_right = s.content_margin_left
+		s.content_margin_top = b.get_theme_stylebox("normal").content_margin_top
+		s.content_margin_bottom = s.content_margin_top + Pal.em(lip)
+		s.border_width_bottom = roundi(Pal.em(0.24 + lip))
+		s.border_color = Pal.HUD_INK
+		s.expand_margin_bottom = 0
+		return s
+	var normal: StyleBoxFlat = make.call(Pal.RED, 0.18, 0.3)
+	var hover: StyleBoxFlat = make.call(Pal.RED.lightened(0.1), 0.18, 0.3)
+	var pressed: StyleBoxFlat = make.call(Pal.RED_DARK, 0.0, 0.08)
+	pressed.content_margin_top += Pal.em(0.18)
+	var disabled: StyleBoxFlat = make.call(Color(Pal.RED, 0.45), 0.18, 0.3)
+	disabled.border_color = Color(Pal.HUD_INK, 0.5)
+	disabled.shadow_color = Color(Pal.INK, 0.4)
+	for pair in [["normal", normal], ["hover", hover], ["pressed", pressed], ["disabled", disabled], ["hover_pressed", pressed]]:
+		b.add_theme_stylebox_override(pair[0], pair[1])
+	b.add_theme_color_override("font_outline_color", Pal.HUD_INK)
+	b.add_theme_constant_override("outline_size", roundi(Pal.em(0.2)))
+
+
+## Recipe Book chapter ribbon: colored tab with a dark lip, pointing out of the book.
+static func style_ribbon(b: Button, color: Color) -> void:
+	for pair in [["normal", color], ["hover", color.lightened(0.1)], ["pressed", color.darkened(0.1)], ["hover_pressed", color.darkened(0.1)]]:
+		var s := box(pair[1], Pal.HUD_INK, 0.24, 0.3)
+		s.border_width_left = 0
+		s.border_width_bottom = roundi(Pal.em(0.45))
+		s.content_margin_left = Pal.em(1.0)
+		s.content_margin_right = Pal.em(1.2)
+		s.content_margin_top = Pal.em(0.4)
+		s.content_margin_bottom = Pal.em(0.5)
+		b.add_theme_stylebox_override(pair[0], s)
+	b.add_theme_color_override("font_outline_color", Pal.HUD_INK)
+	b.add_theme_constant_override("outline_size", roundi(Pal.em(0.2)))
+
+
+## Empty station slot: dashed outline (no StyleBox does dashes). Children are centered.
+class Dashed extends Container:
+	var color := Pal.HUD_DASH
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_SORT_CHILDREN:
+			for c in get_children():
+				fit_child_in_rect(c as Control, Rect2(Vector2.ZERO, size))
+
+	func _draw() -> void:
+		var w := maxf(2.0, Pal.em(0.2))
+		var dash := Pal.em(0.6)
+		var r := Rect2(Vector2.ONE * w / 2.0, size - Vector2.ONE * w)
+		for e in [[r.position, Vector2(r.end.x, r.position.y)], [Vector2(r.end.x, r.position.y), r.end],
+				[r.end, Vector2(r.position.x, r.end.y)], [Vector2(r.position.x, r.end.y), r.position]]:
+			draw_dashed_line(e[0], e[1], color, w, dash)
+
+
+## Order Ticket as a cream receipt with zigzag top and bottom edges and a hard shadow.
+## `glow` (gold when Perfect) draws a frame around the paper.
+class Ticket extends Container:
+	var paper := Pal.CREAM:
+		set(v):
+			paper = v
+			queue_redraw()
+	var glow := Color.TRANSPARENT:
+		set(v):
+			glow = v
+			queue_redraw()
+	var tooth := Pal.em(0.5)
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_PASS
+
+	func _get_minimum_size() -> Vector2:
+		var m := Vector2.ZERO
+		for c in get_children():
+			m = m.max((c as Control).get_combined_minimum_size())
+		return m + Vector2(Pal.em(0.9), Pal.em(0.6) + tooth * 2.0)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_SORT_CHILDREN:
+			for c in get_children():
+				fit_child_in_rect(c as Control, Rect2(Vector2(Pal.em(0.45), tooth + Pal.em(0.3)), size - Vector2(Pal.em(0.9), tooth * 2.0 + Pal.em(0.6))))
+
+	func _shape(off: Vector2) -> PackedVector2Array:
+		var pts := PackedVector2Array()
+		var n := maxi(2, roundi(size.x / (tooth * 2.0)))
+		var step := size.x / n
+		for i in n + 1:
+			pts.append(off + Vector2(i * step, 0.0 if i % 2 == 0 else tooth))
+		for i in range(n, -1, -1):
+			pts.append(off + Vector2(i * step, size.y - (0.0 if i % 2 == 0 else tooth)))
+		return pts
+
+	func _draw() -> void:
+		draw_colored_polygon(_shape(Vector2.ONE * Pal.em(0.22)), Pal.HUD_INK)
+		if glow.a > 0.0:
+			var g := _shape(Vector2.ZERO)
+			g.append(g[0])
+			draw_polyline(g, glow, Pal.em(0.4))
+		draw_colored_polygon(_shape(Vector2.ZERO), paper)
+
+
+## Recipe Book dish: a plate (two ellipses) under the children, which sit centered on it.
+class Plate extends Container:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_SORT_CHILDREN:
+			for c in get_children():
+				var ms := (c as Control).get_combined_minimum_size()
+				fit_child_in_rect(c as Control, Rect2(Vector2((size.x - ms.x) / 2.0, size.y * 0.72 - ms.y), ms))
+
+	func _ellipse(c: Vector2, r: Vector2) -> PackedVector2Array:
+		var pts := PackedVector2Array()
+		for i in 32:
+			var a := TAU * i / 32.0
+			pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
+		return pts
+
+	func _draw() -> void:
+		var c := Vector2(size.x / 2.0, size.y * 0.74)
+		var r := Vector2(size.x * 0.46, size.y * 0.13)
+		draw_colored_polygon(_ellipse(c + Vector2(0, Pal.em(0.4)), r), Color(0.36, 0.24, 0.14, 0.35))
+		draw_colored_polygon(_ellipse(c, r), Pal.INK)
+		draw_colored_polygon(_ellipse(c, r - Vector2.ONE * Pal.em(0.25)), Color.WHITE)
+		draw_colored_polygon(_ellipse(c, r * 0.62), Color("#ece4d6"))
