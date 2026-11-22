@@ -221,7 +221,7 @@ Kode sudah siap sebagian: `RecipeDef.requires` sudah berurutan dan `RecipeMatch.
 | **Mulai duel** | Kamera pelan ke meja → **3 · 2 · 1** (angka besar, pop + tick SFX) → **ROUND 2** (kecil di atas) **FIGHT!** (besar) → kartu dibagikan | ±3 s |
 | **Combo / resep** | Tiket "stamp" → nama hidangan di pita → angka Pressure terbang | ±1 s |
 | **Signature Dish** | Cut-in (GDD §4.5) + teks **"SIGNATURE!"** | ±2 s |
-| **Menang** | Emote Sad lawan → **FINISHED** (layar sedikit freeze + flash) → **APIS WINS!** (atau nama pemain) + confetti pixel → reward | ±3 s |
+| **Menang** | Emote Sad lawan → **FINISHED** → **YOU WINS!** → layar Victory | ±3 s |
 | **Kalah** | Emote Smug lawan → **FINISHED** → **LOSER** (huruf jatuh satu per satu, warna abu-merah) → ringkasan run | ±3 s |
 
 "ROUND N" = duel ke-N di Course Path (Market Street). Variasi teks menang (diacak): *APIS WINS!*, *ORDER UP!*, *CHEF'S KISS!*. Teks kalah tetap **LOSER** supaya kontras.
@@ -256,7 +256,7 @@ Konvensi file: `godot/assets/pixel/<kategori>/<nama>.png`, tanpa filter, import 
 2. ~~Aturan urutan~~ → **lunak** (Perfect ×1.5 / Cooked ×1.0).
 3. ~~Hint resep~~ → **Order Ticket boleh memberi hint.**
 4. ~~Jumlah station~~ → **3**, tampil sebagai tumpukan solitaire.
-5. **Masih terbuka · nama di layar menang:** "APIS WINS!" atau nama yang diketik pemain?
+5. ~~Nama di layar menang~~ → **YOU WINS!** (kalah: LOSER).
 
 ---
 

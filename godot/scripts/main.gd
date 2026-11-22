@@ -16,6 +16,8 @@ extends Node
 
 var duel: Duel
 var pixelated := false
+## Duel number shown by the announcer ("ROUND 2"). Goes up after a win.
+var round_number := 1
 
 
 func _ready() -> void:
@@ -48,6 +50,9 @@ func _start_duel() -> void:
 	stage.set_plate([])
 	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
+	if duel and duel.phase == "won":
+		round_number += 1
+	ui.round_number = round_number
 	duel = Duel.new(GameDB.deck("dev" if dev_deck else "starter"), GameDB.enemy(enemy_id), recipes,
 			{hype = start_hype})
 	# Visuals listen to the duel's signals; the duel never knows about them (GDD §9).
@@ -61,7 +66,12 @@ func _start_duel() -> void:
 
 func _sync_plate() -> void:
 	var tags: Array = []
-	for c in duel.plate:
+	# 3D plate shows the fullest station (the one closest to a dish).
+	var biggest: Array[CardInstance] = []
+	for s: Array[CardInstance] in duel.stations:
+		if s.size() > biggest.size():
+			biggest = s
+	for c in biggest:
 		tags.append(c.def.first_tag())
 	stage.set_plate(tags)
 

@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_perfect_order()
 	_statuses()
 	_signature()
+	_stations()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -89,7 +90,7 @@ func _core_loop() -> void:
 
 	d = new_duel(2)
 	d.hand = []
-	d.plate = inst(["butter", "bread"]) # out of order (book: CARB -> FAT)
+	d.stations[0] = inst(["butter", "bread"]) # out of order (book: CARB -> FAT)
 	var before := d.enemy.confidence
 	check("toast serve ok", d.serve_as("toast").ok)
 	check("toast out of order deals 6 + 2 Quality", lost(d, before) == 8, str(lost(d, before)))
@@ -98,18 +99,18 @@ func _core_loop() -> void:
 	check("toast draws 1", d.hand.size() == 1)
 
 	d = new_duel(3)
-	d.plate = inst(["egg", "egg", "bread"])
+	d.stations[0] = inst(["egg", "egg", "bread"])
 	before = d.enemy.confidence
 	d.serve_as("")
 	check("improvised deals 2 × 3", lost(d, before) == 6)
 	check("serving a non-matching recipe is refused", not new_duel(3).serve_as("omelette").ok)
 
 	d = new_duel(4)
-	d.plate = inst(["egg"])
+	d.stations[0] = inst(["egg"])
 	d.player.composure = 4
 	var conf := d.player.confidence
 	d.end_turn() # Tony: Prepping 6
-	check("plate kept across turns", d.plate.size() == 1)
+	check("stations kept across turns", d.stack(0).size() == 1)
 	check("composure absorbs 4 of 6", conf - d.player.confidence == 2)
 	check("composure reset on new turn", d.player.composure == 0 and d.turn == 2)
 
@@ -119,14 +120,15 @@ func _core_loop() -> void:
 func _perfect_order() -> void:
 	check("omelette in book order (FAT, PROTEIN, VEGGIE)", RecipeMatch.in_order(GameDB.recipe("omelette"), inst(["butter", "egg", "tomato"])))
 	check("omelette out of order", not RecipeMatch.in_order(GameDB.recipe("omelette"), inst(["egg", "butter", "tomato"])))
-	check("extras between still count as in order", RecipeMatch.in_order(GameDB.recipe("omelette"), inst(["butter", "bread", "egg", "tomato"])))
+	check("extras between the steps break Perfect", not RecipeMatch.in_order(GameDB.recipe("omelette"), inst(["butter", "bread", "egg", "tomato"])))
+	check("garnish after the steps keeps Perfect", RecipeMatch.in_order(GameDB.recipe("omelette"), inst(["butter", "egg", "tomato", "garlic"])))
 	check("best_dish prefers the in-order recipe",
 			RecipeMatch.best_dish(basics, inst(["bread", "butter", "tomato", "egg"])).id == "toast")
 	check("best_dish prefers the bigger recipe when both in order",
 			RecipeMatch.best_dish(basics, inst(["butter", "egg", "tomato", "bread"])).id == "omelette")
 
 	var d := new_duel(20, dummy)
-	d.plate = inst(["bread", "butter"])
+	d.stations[0] = inst(["bread", "butter"])
 	var before := d.enemy.confidence
 	var seen := {perfect = false}
 	d.dish_revealed.connect(func(_r, perfect, _s, _b): seen.perfect = perfect)
@@ -134,7 +136,7 @@ func _perfect_order() -> void:
 	check("Perfect Order Toast: (6 + 2) x1.5 = 12", lost(d, before) == 12 and seen.perfect)
 
 	d = new_duel(21, dummy)
-	d.plate = inst(["egg", "egg"])
+	d.stations[0] = inst(["egg", "egg"])
 	var dish := {name = ""}
 	d.dish_revealed.connect(func(r: RecipeDef, _p, _s, _b): dish.name = r.name if r else "Improvised")
 	d.serve()
@@ -179,7 +181,7 @@ func _statuses() -> void:
 	check("Spicy then drops to 1", d.enemy.stacks("spicy") == 1)
 
 	d = new_duel(8, dummy, 0, true)
-	d.plate = inst(["egg", "chili"])
+	d.stations[0] = inst(["egg", "chili"])
 	d.serve_as("skewers")
 	check("Skewers gives Focus 1", d.player.stacks("focus") == 1)
 	h = give_hand(d, ["quickChop"])
@@ -189,14 +191,14 @@ func _statuses() -> void:
 
 	d = new_duel(9, dummy)
 	d.player.statuses["burnt"] = 1
-	d.plate = inst(["butter", "bread"])
+	d.stations[0] = inst(["butter", "bread"])
 	before = d.enemy.confidence
 	d.serve_as("toast")
 	check("Burnt halves the Serve: (6+2) / 2 = 4", lost(d, before) == 4)
 	check("Burnt is used up", not d.player.statuses.has("burnt"))
 
 	d = new_duel(10, dummy, 0, true)
-	d.plate = inst(["bread", "tomato", "cheese"])
+	d.stations[0] = inst(["rice", "mushroom", "cheese"])
 	d.serve_as("mushroomRisotto")
 	check("Risotto gives Inspired 1", d.player.stacks("inspired") == 1)
 	d.end_turn()
@@ -205,7 +207,7 @@ func _statuses() -> void:
 	d = new_duel(11, dummy)
 	d.player.statuses["spicy"] = 3
 	d.player.statuses["flustered"] = 2
-	d.plate = inst(["tomato", "tomato"])
+	d.stations[0] = inst(["tomato", "tomato"])
 	d.serve_as("freshSalad")
 	check("Fresh Salad removes 1 debuff (Spicy before Flustered)",
 			not d.player.statuses.has("spicy") and d.player.stacks("flustered") == 2)
@@ -216,7 +218,7 @@ func _statuses() -> void:
 func _signature() -> void:
 	var d := new_duel(12, dummy)
 	check("no Signature card below 100 Hype", not has_signature(d.hand))
-	d.plate = inst(["butter", "bread"])
+	d.stations[0] = inst(["butter", "bread"])
 	d.hype = 75
 	d.serve_as("toast")
 	check("Hype 100 puts Signature Dish in hand", d.hype == 100 and has_signature(d.hand))
@@ -230,20 +232,73 @@ func _signature() -> void:
 			d.play(c.uid)
 			break
 	check("playing it arms the next Serve", d.signature_armed and d.exhausted.size() == 1)
-	d.plate = inst(["butter", "bread"])
+	d.stations[0] = inst(["butter", "bread"])
 	var before := d.enemy.confidence
 	d.serve_as("toast")
 	check("Signature Serve: (6+2) × 2 = 16", lost(d, before) == 16)
 	check("cut-in event fires with the dish name", cut_in.dish == "Toast")
 	check("Hype spent, not re-armed", d.hype == 0 and not d.signature_armed)
 	d.end_turn()
-	d.plate = inst(["bread", "butter"])
+	d.stations[0] = inst(["bread", "butter"])
 	d.hype = 99
 	d.serve_as("toast")
 	check("only once per duel", d.hype == 100 and not has_signature(d.hand))
 
 	d = new_duel(13, dummy, 100)
 	check("start Hype 100 hands out the Signature Dish", has_signature(d.hand))
+
+
+# ---------------------------------------------------------------- Station Stack
+
+func _stations() -> void:
+	var d := new_duel(30, dummy, 0, true)
+	check("three empty stations", d.stations.size() == 3 and d.ingredient_count() == 0)
+	var h := give_hand(d, ["butter", "egg", "bread"])
+	d.play(h[0].uid, 1)
+	check("ingredient goes to the chosen station", d.stack(1).size() == 1)
+	d.play(h[1].uid)
+	check("auto station continues a recipe path (butter -> egg)", d.stack(1).size() == 2)
+	d.play(h[2].uid)
+	check("auto station starts a new stack when off path", d.stack(0).size() == 1 and d.stack(0)[0].def.id == "bread")
+
+	var tk := d.ticket(1)
+	check("ticket while building: butter, egg -> a 3-step dish, step 3 is next",
+			tk.state == "building" and tk.recipe.id in ["omelette", "mixedGrill"] and tk.steps[1].state == "done" and tk.steps[2].state == "next", str(tk.state))
+	check("empty station has an empty ticket", d.ticket(2).state == "empty")
+	d.stations[2] = inst(["chili", "cheese"])
+	check("off-path stack is Improvised", d.ticket(2).state == "improvised")
+	d.stations[2] = inst(["butter", "bread"])
+	check("toast out of order is Cooked", d.ticket(2).state == "cooked" and d.ticket(2).recipe.id == "toast")
+	d.stations[2] = inst(["bread", "butter", "garlic"])
+	check("toast in order + garnish is Perfect", d.ticket(2).state == "perfect" and d.ticket(2).garnish == 1)
+
+	check("move top card", d.move_top(1, 2).ok and d.stack(1).size() == 1 and d.stack(2).back().def.id == "egg")
+	check("only one move per turn", not d.move_top(2, 1).ok)
+	check("clear also uses the move", not d.clear_station(0).ok)
+	d.end_turn()
+	var discard_before := d.discard.size()
+	check("clear station after a new turn", d.clear_station(0).ok and d.stack(0).is_empty() and d.discard.size() == discard_before + 1)
+
+	d = new_duel(31, dummy, 0, true)
+	d.stations[1] = inst(["butter", "egg", "tomato"])
+	var before := d.enemy.confidence
+	check("serve a chosen station", d.serve(1).ok and d.stack(1).is_empty() and d.last_served_station == 1)
+	check("Perfect Omelette: (10 + 3) x1.5 = 19", lost(d, before) == 19, str(lost(d, before)))
+	check("serving an empty station is refused", not new_duel(32).serve(2).ok)
+
+	d = new_duel(33, dummy)
+	d.stations[0] = inst(["egg", "egg", "egg", "egg", "egg", "egg"])
+	h = give_hand(d, ["tomato"])
+	check("full station refuses a card", not d.can_play(h[0].uid, 0).ok and d.can_play(h[0].uid, 1).ok)
+
+	d = new_duel(34, dummy, 0, true)
+	d.stations[0] = inst(["bread", "beef", "cheese", "tomato", "bread"])
+	before = d.enemy.confidence
+	d.serve(0)
+	var q := 0
+	for id in ["bread", "beef", "cheese", "tomato", "bread"]:
+		q += GameDB.card(id).quality
+	check("Perfect Burger: (22 + Q) x1.5", lost(d, before) == floori((22 + q) * 1.5), str(lost(d, before)))
 
 
 # ---------------------------------------------------------------- random playthroughs
@@ -270,9 +325,11 @@ func _playthroughs(label: String, deck_id: String, enemy: EnemyDef, recipes: Arr
 				if playable.is_empty():
 					break
 				d.play(playable[floori(pick_rng.next() * playable.size())].uid)
-			if d.can_serve().ok and (not d.recipe_check().ready.is_empty() or d.plate.size() >= 4):
-				d.serve()
-			var total := d.draw_pile.size() + d.hand.size() + d.discard.size() + d.plate.size() + d.exhausted.size()
+			for st in Duel.STATIONS:
+				if d.can_serve(st).ok and (not d.recipe_check(st).ready.is_empty() or d.stack(st).size() >= 4):
+					d.serve(st)
+					break
+			var total := d.draw_pile.size() + d.hand.size() + d.discard.size() + d.ingredient_count() + d.exhausted.size()
 			if total != deck.size() + (1 if d.signature_given else 0):
 				conserved = false
 			if d.phase == "player":

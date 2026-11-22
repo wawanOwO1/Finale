@@ -11,7 +11,7 @@ const BASE := {
 	"Heat": {icon = "heat", text = "Spent to play cards and to Serve. Refills to 3 each turn."},
 	"Draw": {icon = "draw", text = "Take cards from your draw pile."},
 	"Retain": {icon = "check", text = "Stays in your hand at the end of the turn."},
-	"Serve": {icon = "serve", text = "Cook everything on the Prep Board. Ingredients in Recipe Book order give a Perfect Order (x1.5)."},
+	"Serve": {icon = "serve", text = "Cook a whole Station. The Order Ticket shows the dish: steps in Recipe Book order give a Perfect Order (x1.5), any other order still cooks it."},
 }
 
 static var _all := {}
@@ -61,5 +61,5 @@ static func card_role(def: CardDef) -> Dictionary:
 		return {name = "Signature Dish", icon = "crown", text = "Drag up to play. Your next Serve has x2 effect."}
 	if def.is_ingredient():
 		return {name = "Ingredient", icon = def.first_tag(),
-				text = "Drag onto the Prep Board. Order matters: match your Recipe Book."}
+				text = "Drag onto a Station. It stacks on top: follow the Order Ticket to cook a Perfect dish."}
 	return {name = "Technique", icon = "technique", text = "Drag up out of your hand to play it."}

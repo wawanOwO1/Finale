@@ -17,18 +17,32 @@ func _initialize() -> void:
 	print("window %s  canvas %s" % [root.size, ui.get_node("%Root").size])
 	await _probe(ui.get_node("%StartButton"))
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
-	await _wait(1.0)
-	for n in ["%EndTurn", "%ServeButton", "%PixelButton"]:
-		await _probe(ui.get_node(n))
+	await _wait(5.0)  # 3·2·1 FIGHT! intro
+	# Give station 1 a card so its Serve / Clear buttons exist.
+	var c := CardInstance.new(90000, GameDB.card("bread"))
+	main.duel.stack(0).append(c)
+	main.duel.changed.emit()
+	await _wait(0.3)
+	for b in _buttons(ui):
+		await _probe(b)
 	# Resize the window at runtime, like dragging its border or toggling fullscreen.
 	for sz in [Vector2i(1280, 720), Vector2i(1700, 1000), Vector2i(1000, 900)]:
 		root.size = sz
 		await _wait(0.5)
 		print("-- resized: window %s  canvas %s" % [root.size, ui.get_node("%Root").size])
-		for n in ["%EndTurn", "%ServeButton", "%PixelButton"]:
-			await _probe(ui.get_node(n))
+		for b in _buttons(ui):
+			await _probe(b)
 	print("HIT PROBE: %s" % ("all buttons fully clickable" if failures == 0 else "%d misses" % failures))
 	quit(1 if failures else 0)
+
+
+## End Turn, pixel toggle and every station button (Serve, Clear).
+func _buttons(ui: Node) -> Array[Control]:
+	var out: Array[Control] = [ui.get_node("%EndTurn"), ui.get_node("%PixelButton")]
+	for col in ui._cols:
+		for b in col.find_children("*", "Button", true, false):
+			out.append(b)
+	return out
 
 
 func _probe(b: Control) -> void:

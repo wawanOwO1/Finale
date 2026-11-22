@@ -25,10 +25,12 @@ signal changed
 
 const MAX_HEAT := 3
 const HAND_SIZE := 5
-const PLATE_SIZE := 5
+## Station Stack (ART_DIRECTION §6): three columns, each stacks up to 6 ingredients in order.
+const STATIONS := 3
+const STATION_SIZE := 6
 const SERVE_COST := 1
 const MAX_HYPE := 100
-## Ingredients placed in Recipe Book order.
+## Station starts with the recipe's steps in Recipe Book order (Perfect). Any other order = Cooked ×1.
 const PERFECT_ORDER_MULT := 1.5
 
 ## Signature Dish (GDD §4.5): appears in hand when Hype is full, once per duel.
@@ -60,7 +62,10 @@ var recipes: Array[RecipeDef]
 var draw_pile: Array[CardInstance] = []
 var hand: Array[CardInstance] = []
 var discard: Array[CardInstance] = []
-var plate: Array[CardInstance] = []
+## STATIONS stacks of CardInstance, first placed first. Each entry is an Array[CardInstance].
+var stations: Array = []
+## Station of the last Serve (UI places the dish banner over it).
+var last_served_station := 0
 ## Cards removed from this duel (played Signature Dish).
 var exhausted: Array[CardInstance] = []
 
@@ -69,6 +74,8 @@ var turn := 0
 ## "player" | "won" | "lost"
 var phase := "player"
 var served_this_turn := false
+## Top card moved to another station (once per turn, free). Clearing a station also uses it.
+var moved_this_turn := false
 ## Signature Dish card was handed out (once per duel).
 var signature_given := false
 ## Signature Dish played; the next Serve is doubled.
@@ -90,6 +97,9 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	enemy_def = enemy_def_
 	enemy = Fighter.new(enemy_def.confidence, enemy_def.confidence)
 	recipes = recipes_
+	for i in STATIONS:
+		var s: Array[CardInstance] = []
+		stations.append(s)
 	for def in deck:
 		draw_pile.append(_instance(def))
 	_rng.shuffle(draw_pile)
@@ -106,9 +116,40 @@ func intent() -> IntentDef:
 	return p[_intent_index % p.size()]
 
 
-## { ready: Array[RecipeDef], almost: Array[RecipeDef] }
-func recipe_check() -> Dictionary:
-	return RecipeMatch.check(recipes, plate)
+## { ready: Array[RecipeDef], almost: Array[RecipeDef] } for one station.
+func recipe_check(station := 0) -> Dictionary:
+	return RecipeMatch.check(recipes, stack(station))
+
+
+func stack(station: int) -> Array[CardInstance]:
+	return stations[station]
+
+
+## Order Ticket for one station (see RecipeMatch.ticket).
+func ticket(station: int) -> Dictionary:
+	return RecipeMatch.ticket(recipes, stack(station))
+
+
+func ingredient_count() -> int:
+	var n := 0
+	for s: Array[CardInstance] in stations:
+		n += s.size()
+	return n
+
+
+## Where an ingredient goes when no station is given: a station whose recipe path it continues,
+## else an empty station, else any station with room. -1 = all full.
+func auto_station(card: CardInstance) -> int:
+	for i in STATIONS:
+		if not stack(i).is_empty() and stack(i).size() < STATION_SIZE and RecipeMatch.accepts_next(recipes, stack(i), card):
+			return i
+	for i in STATIONS:
+		if stack(i).is_empty():
+			return i
+	for i in STATIONS:
+		if stack(i).size() < STATION_SIZE:
+			return i
+	return -1
 
 
 func fighter(side: String) -> Fighter:
@@ -129,7 +170,8 @@ func pressure_from(attacker: String, base: int) -> int:
 
 
 ## { ok: bool, reason: String }
-func can_play(uid: int) -> Dictionary:
+## station: target for an ingredient (-1 = auto_station). Ignored for techniques.
+func can_play(uid: int, station := -1) -> Dictionary:
 	if phase != "player":
 		return _fail("The duel is over.")
 	var i := _hand_index(uid)
@@ -138,18 +180,20 @@ func can_play(uid: int) -> Dictionary:
 	var card := hand[i]
 	if card.def.cost > player.heat:
 		return _fail("Not enough Heat.")
-	if card.def.is_ingredient() and plate.size() >= PLATE_SIZE:
-		return _fail("The Plate is full.")
+	if card.def.is_ingredient():
+		var s := station if station >= 0 else auto_station(card)
+		if s < 0 or s >= STATIONS or stack(s).size() >= STATION_SIZE:
+			return _fail("That station is full." if station >= 0 else "Every station is full.")
 	return _ok()
 
 
-func can_serve() -> Dictionary:
+func can_serve(station := 0) -> Dictionary:
 	if phase != "player":
 		return _fail("The duel is over.")
 	if served_this_turn:
 		return _fail("Already served this turn.")
-	if plate.is_empty():
-		return _fail("The Plate is empty.")
+	if station < 0 or station >= STATIONS or stack(station).is_empty():
+		return _fail("That station is empty.")
 	if player.heat < SERVE_COST:
 		return _fail("Not enough Heat.")
 	return _ok()
@@ -157,16 +201,60 @@ func can_serve() -> Dictionary:
 
 # ---------------------------------------------------------------- actions
 
-func play(uid: int) -> Dictionary:
-	var result := can_play(uid)
+## Move the top (newest) card of one station onto another. Once per turn, free.
+func can_move(from: int, to: int) -> Dictionary:
+	if phase != "player":
+		return _fail("The duel is over.")
+	if moved_this_turn:
+		return _fail("Already moved a card this turn.")
+	if from == to or from < 0 or to < 0 or from >= STATIONS or to >= STATIONS:
+		return _fail("Pick another station.")
+	if stack(from).is_empty():
+		return _fail("That station is empty.")
+	if stack(to).size() >= STATION_SIZE:
+		return _fail("That station is full.")
+	return _ok()
+
+
+func move_top(from: int, to: int) -> Dictionary:
+	var result := can_move(from, to)
+	if not result.ok:
+		return result
+	var card: CardInstance = stack(from).pop_back()
+	stack(to).append(card)
+	moved_this_turn = true
+	_say("%s moves to station %d." % [card.def.name, to + 1])
+	changed.emit()
+	return _ok()
+
+
+## Throw a whole station into the discard pile. Free, but uses the turn's move.
+func clear_station(station: int) -> Dictionary:
+	if phase != "player":
+		return _fail("The duel is over.")
+	if moved_this_turn:
+		return _fail("Already moved a card this turn.")
+	if station < 0 or station >= STATIONS or stack(station).is_empty():
+		return _fail("That station is empty.")
+	discard.append_array(stack(station))
+	stack(station).clear()
+	moved_this_turn = true
+	_say("Station %d cleared." % (station + 1))
+	changed.emit()
+	return _ok()
+
+
+func play(uid: int, station := -1) -> Dictionary:
+	var result := can_play(uid, station)
 	if not result.ok:
 		return result
 	var card: CardInstance = hand.pop_at(_hand_index(uid))
 	player.heat -= card.def.cost
 
 	if card.def.is_ingredient():
-		plate.append(card)
-		_say("%s goes on the Plate." % card.def.name)
+		var s := station if station >= 0 else auto_station(card)
+		stack(s).append(card)
+		_say("%s goes on station %d." % [card.def.name, s + 1])
 	else:
 		(exhausted if card.def.exhaust else discard).append(card)
 		_say("Apis uses %s." % card.def.name)
@@ -179,34 +267,34 @@ func play(uid: int) -> Dictionary:
 	return _ok()
 
 
-## Serve the whole Prep Board. The Recipe Book is closed during a duel, so the game cooks
-## the best matching dish (RecipeMatch.best_dish). Tests use serve_as() to force one.
-func serve() -> Dictionary:
-	var result := can_serve()
+## Serve one whole station. The game cooks the best matching dish (RecipeMatch.best_dish),
+## the one its Order Ticket shows. Tests use serve_as() to force one.
+func serve(station := 0) -> Dictionary:
+	var result := can_serve(station)
 	if not result.ok:
 		return result
-	return _do_serve(RecipeMatch.best_dish(recipes, plate))
+	return _do_serve(RecipeMatch.best_dish(recipes, stack(station)), station)
 
 
 ## Force a recipe by id, or "" for an Improvised Dish (tests / debug).
-func serve_as(recipe_id: String) -> Dictionary:
-	var result := can_serve()
+func serve_as(recipe_id: String, station := 0) -> Dictionary:
+	var result := can_serve(station)
 	if not result.ok:
 		return result
 	var recipe: RecipeDef = null
 	if recipe_id != "":
-		for r: RecipeDef in recipe_check().ready:
+		for r: RecipeDef in recipe_check(station).ready:
 			if r.id == recipe_id:
 				recipe = r
 		if recipe == null:
-			return _fail("That recipe does not match the Plate.")
-	return _do_serve(recipe)
+			return _fail("That recipe does not match the station.")
+	return _do_serve(recipe, station)
 
 
 func end_turn() -> Dictionary:
 	if phase != "player":
 		return _fail("The duel is over.")
-	# Hand is discarded except Retain cards; the Plate stays (GDD §4.2 step 4).
+	# Hand is discarded except Retain cards; stations stay (GDD §4.2 step 4).
 	var kept: Array[CardInstance] = []
 	for c in hand:
 		(kept if c.def.retain else discard).append(c)
@@ -221,13 +309,14 @@ func end_turn() -> Dictionary:
 
 # ---------------------------------------------------------------- serve
 
-func _do_serve(recipe: RecipeDef) -> Dictionary:
-	var perfect := recipe != null and RecipeMatch.in_order(recipe, plate)
+func _do_serve(recipe: RecipeDef, station: int) -> Dictionary:
+	var served: Array[CardInstance] = stack(station).duplicate()
+	var perfect := recipe != null and RecipeMatch.in_order(recipe, served)
 
 	player.heat -= SERVE_COST
 	served_this_turn = true
-	var served := plate
-	plate = []
+	last_served_station = station
+	stack(station).clear()
 	var quality := RecipeMatch.plate_quality(served)
 	var enemy_before := enemy.confidence + enemy.composure
 
@@ -275,6 +364,7 @@ func _start_player_turn() -> void:
 	turn += 1
 	player.composure = 0
 	served_this_turn = false
+	moved_this_turn = false
 	_tick_spicy("player")
 	if phase != "player":
 		return

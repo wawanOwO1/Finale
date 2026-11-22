@@ -57,14 +57,71 @@ static func plate_quality(plate: Array[CardInstance]) -> int:
 	return sum
 
 
-## Perfect Order: the recipe's ingredients sit on the board in Recipe Book order (others may
-## sit in between). Greedy subsequence matching is optimal here.
+## Perfect Order (ART_DIRECTION §6.2): the stack starts with the recipe's steps exactly, in
+## Recipe Book order. Anything placed after the last step is Garnish and does not break it.
 static func in_order(recipe: RecipeDef, plate: Array[CardInstance]) -> bool:
-	var r := 0
-	for c in plate:
-		if r < recipe.requires.size() and fits(recipe.requires[r], c):
-			r += 1
-	return r == recipe.requires.size()
+	var n := recipe.requires.size()
+	if plate.size() < n:
+		return false
+	for i in n:
+		if not fits(recipe.requires[i], plate[i]):
+			return false
+	return true
+
+
+## True when the whole stack is the start of the recipe's step list (still on the path).
+static func is_prefix(recipe: RecipeDef, stack: Array[CardInstance]) -> bool:
+	if stack.size() > recipe.requires.size():
+		return false
+	for i in stack.size():
+		if not fits(recipe.requires[i], stack[i]):
+			return false
+	return true
+
+
+## Would placing `card` on top of `stack` keep it on the path of some known recipe?
+static func accepts_next(known: Array[RecipeDef], stack: Array[CardInstance], card: CardInstance) -> bool:
+	var next: Array[CardInstance] = stack.duplicate()
+	next.append(card)
+	for r in known:
+		if is_prefix(r, next):
+			return true
+	return false
+
+
+## The Order Ticket over a station (ART_DIRECTION §6.3).
+## { state: "empty" | "building" | "perfect" | "cooked" | "improvised", recipe: RecipeDef or null,
+##   steps: Array of { req: String, state: "done" | "next" | "todo" }, garnish: int }
+## A finished dish wins over one still being built; while building, the recipe closest to done
+## (then the strongest) is shown with its next step.
+static func ticket(known: Array[RecipeDef], stack: Array[CardInstance]) -> Dictionary:
+	var out := {state = "empty", recipe = null, steps = [], garnish = 0}
+	if stack.is_empty():
+		return out
+	var dish := best_dish(known, stack)
+	if dish:
+		var perfect := in_order(dish, stack)
+		out.state = "perfect" if perfect else "cooked"
+		out.recipe = dish
+		out.garnish = stack.size() - dish.requires.size()
+		for req in dish.requires:
+			out.steps.append({req = req, state = "done"})
+		return out
+	var best: RecipeDef = null
+	for r in known:
+		if not is_prefix(r, stack):
+			continue
+		if best == null or r.requires.size() - stack.size() < best.requires.size() - stack.size() 				or (r.requires.size() == best.requires.size() and r.power() > best.power()):
+			best = r
+	if best == null:
+		out.state = "improvised"
+		return out
+	out.state = "building"
+	out.recipe = best
+	for i in best.requires.size():
+		var st := "done" if i < stack.size() else ("next" if i == stack.size() else "todo")
+		out.steps.append({req = best.requires[i], state = st})
+	return out
 
 
 ## The dish the board cooks into: a Perfect Order match first, then more slots, then power.

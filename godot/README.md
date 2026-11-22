@@ -18,10 +18,21 @@ Setup duel (pengganti URL param lama) ada di Inspector node **Main**:
 | `?deck=dev` | `Dev Deck` |
 | `?hype=100` | `Start Hype` |
 
-**Cara main (sama seperti versi web):** kartu di-**drag**. Bahan → seret ke Prep Board. Teknik → seret ke atas
+**Cara main:** kartu di-**drag**. Bahan → seret ke salah satu dari **3 Station**. Teknik → seret ke atas
 keluar dari tangan lalu lepas. Klik biasa pada kartu hanya memunculkan hint "Drag a card to play it".
 
-Shortcut in-game: **E** = End Turn, **S** = Serve, **P** = filter pixel, **F11** = fullscreen.
+**Station Stack** (lihat `../ART_DIRECTION.md` §6):
+- Bahan menumpuk ke bawah seperti solitaire. Kartu lama hanya terlihat pita nama + ikon tag, kartu terbaru terbuka penuh (bingkai emas).
+- Order Ticket di atas tiap station memberi hint resep dan langkah berikutnya. Urutan pas dari kartu pertama = **Perfect** ×1.5,
+  bahan lengkap tapi urutan beda = **Cooked** ×1, bahan setelah resep lengkap = **Garnish**, tidak cocok = Improvised.
+- Tiap station punya tombol **Serve** (1 Heat, sekali per giliran) dan **Clear**.
+- Kartu teratas bisa di-drag ke station lain, **sekali per giliran** (Clear juga memakai jatah ini).
+
+Alur match: 3 · 2 · 1 → ROUND N / FIGHT! di awal, FINISHED → YOU WINS! atau LOSER di akhir (`scripts/ui/announcer.gd`).
+Lawan memunculkan emote di samping kepala (`scripts/ui/emote_bubble.gd`): Smug saat Confidence-mu ≤30%,
+Shocked saat kena ≥15, Angry saat lawan ≤25%, Sad saat lawan kalah, Confident saat intent ≥10.
+
+Shortcut in-game: **E** = End Turn, **S** = Serve station terbaik, **P** = filter pixel, **F11** = fullscreen.
 
 Resolusi desain 1920x1080 (stretch `canvas_items` + `expand`), tapi window dibuka **1600x900**
 (`window_*_override`) supaya window + title bar muat di layar 1080p. UI mengikuti ukuran window
@@ -120,7 +131,7 @@ Catatan syarat jam (GDD §9):
 ## Status port UI
 
 Sudah setara versi web: top bar + meter Hype, panel rival yang mengikuti kepala rival (intent pill,
-bar Confidence, Composure, status), Prep Board yang mengikuti meja prep, badge hati/Heat/Composure,
+bar Confidence, Composure, status), 3 Station yang mengikuti meja prep, badge hati/Heat/Composure,
 pile draw/discard, kartu bergaya (badge biaya, ikon tag, keyword berwarna, tooltip keyword saat hover),
 drag & drop dengan ghost miring, zona "Release to play", angka melayang, banner dish, cut-in Signature
 Dish, Recipe Book, layar Victory/Defeat, tooltip di semua elemen, filter pixel (tombol kanan atas / P).
@@ -154,7 +165,7 @@ Bus: `Music` (-6 dB) dan `SFX` di `default_bus_layout.tres`. Test: `tests/audio_
 | Menang | `sfx/Round won` + `music/Clear_Victory.mp3` |
 | Kalah | `music/Game_Over_Smile.mp3` |
 | Giliran baru | `sfx/Turn change` |
-| Bahan ditaruh di Prep Board | `sfx/Prep Board chopping` |
+| Bahan ditaruh di Station | `sfx/Prep Board chopping` |
 | Kartu teknik dimainkan | `sfx/Pan sizzle` |
 | Kartu Signature Dish dimainkan | `sfx/Signature Dish activation` |
 | Serve | `sfx/Ingredient added to a pot` lalu `sfx/Cooking bell ding` |

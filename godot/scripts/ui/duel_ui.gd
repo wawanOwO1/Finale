@@ -4,8 +4,9 @@ extends CanvasLayer
 ## Placement of every block lives in duel_ui.tscn (move them in the 2D editor); this script
 ## fills them from the Duel state on `changed`, runs the card drag, tooltips and feedback.
 ##
-## Cards are DRAGGED: ingredients onto the Prep Board, techniques up out of the hand.
-## Shortcuts: E = End Turn, S = Serve, P = pixel filter.
+## Cards are DRAGGED: ingredients onto a Station (solitaire stack), techniques up out of the hand.
+## The top card of a station can be dragged onto another station (once per turn).
+## Shortcuts: E = End Turn, S = Serve the best station, P = pixel filter.
 
 signal restart_requested
 signal pixel_toggled
@@ -39,7 +40,19 @@ var _placed_uid := -1
 var _hover: CardView
 var _drag := {}
 var _busy := false
-var _slots: Array[PanelContainer] = []
+## Round shown by the announcer ("ROUND 2"). Set by main.gd before bind().
+var round_number := 1
+## One frame per station (PanelContainer); meta "holder" = the stack Control.
+var _cols: Array[PanelContainer] = []
+var _stations_box: HBoxContainer
+## Dragging a station's top card to another station.
+var _sdrag := {}
+var _announcer: Announcer
+var _emote_holder: Control
+var _emote: EmoteBubble
+var _result_done := false
+var _smug_armed := true
+var _angry_shown := false
 var _hype_pulse: Tween
 var _serve_pulse: Tween
 var _toast_tw: Tween
@@ -51,18 +64,27 @@ var _mouse := Vector2(-1000, -1000)
 
 
 func _ready() -> void:
-	%ServeButton.pressed.connect(func() -> void: if duel: duel.serve())
 	%EndTurn.pressed.connect(func() -> void: if duel: duel.end_turn())
 	%RestartButton.pressed.connect(func() -> void: restart_requested.emit())
 	%PixelButton.pressed.connect(func() -> void: pixel_toggled.emit())
 	_build_static()
 	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip]:
 		n.hide()
+	# Rival emote follows the head; announcer covers everything but the tooltip.
+	_emote_holder = Control.new()
+	_emote_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	%Root.add_child(_emote_holder)
+	%Root.move_child(_emote_holder, %Floaters.get_index())
+	_emote = EmoteBubble.new()
+	_emote_holder.add_child(_emote)
+	_announcer = Announcer.new()
+	%Root.add_child(_announcer)
+	%Root.move_child(_announcer, %Tooltip.get_index())
 
 
 # ================================================================ public API
 
-## Pre-duel Recipe Book (the book is closed during the duel: memorize the orders).
+## Pre-duel Recipe Book (during the duel the Order Tickets give the hints).
 ## Await it: `await ui.show_cookbook(recipes)`.
 func show_cookbook(recipes: Array[RecipeDef]) -> void:
 	%Overlay.hide()
@@ -79,6 +101,15 @@ func show_cookbook(recipes: Array[RecipeDef]) -> void:
 func bind(d: Duel) -> void:
 	duel = d
 	_prev_hand = {}
+	_result_done = false
+	_smug_armed = true
+	_angry_shown = false
+	_sdrag = {}
+	_emote.clear()
+	d.confidence_lost.connect(_emote_on_hit)
+	d.signature_served.connect(func(_dish: String) -> void: _emote.pop("shocked"))
+	d.turn_started.connect(func(_turn: int) -> void: _emote_on_intent())
+	d.duel_ended.connect(_on_duel_ended)
 	%VenueSub.text = "vs %s" % d.enemy_def.name
 	d.changed.connect(_refresh)
 	d.signature_served.connect(_play_cutin)
@@ -95,6 +126,60 @@ func bind(d: Duel) -> void:
 		_float(_anchor(target), "%s %d" % [StatusDefs.display_name(status), amount],
 				Color("#b46ad6") if bad else Color("#7ac36a"), 1.1, status, 0.24))
 	_refresh()
+	_intro()
+
+
+## 3 · 2 · 1 · ROUND N · FIGHT! Input is blocked until it ends.
+func _intro() -> void:
+	_busy = true
+	_hide_tip()
+	await _announcer.intro(round_number)
+	_busy = false
+	_emote_on_intent()
+
+
+func _on_duel_ended(winner: String) -> void:
+	var won := winner == "player"
+	if won:
+		_emote.pop("sad")
+	else:
+		_emote.clear()
+		_emote.pop("smug")
+	_busy = true
+	_hide_tip()
+	await get_tree().create_timer(0.7).timeout
+	await _announcer.result(won)
+	_busy = false
+	_result_done = true
+	_refresh()
+
+
+## Rival emotes (ART_DIRECTION §5): smug when Apis is low, shocked by a big hit, angry when beaten down.
+func _emote_on_hit(target: String, amount: int, _source: String) -> void:
+	if duel == null or duel.phase != "player":
+		return
+	if target == "player":
+		var low := duel.player.confidence <= duel.player.max_confidence * 0.3
+		if low and _smug_armed:
+			_smug_armed = false
+			_emote.pop("smug")
+		return
+	if amount >= 15:
+		_emote.pop("shocked")
+	if not _angry_shown and duel.enemy.confidence <= duel.enemy.max_confidence * 0.25:
+		_angry_shown = true
+		var wait := 1.7 if _emote.visible else 0.05
+		get_tree().create_timer(wait).timeout.connect(func() -> void:
+			if duel and duel.phase == "player":
+				_emote.pop("angry", true))
+
+
+func _emote_on_intent() -> void:
+	if duel == null or duel.phase != "player" or _announcer.visible:
+		return
+	var it := duel.intent()
+	if it.has_attack() and duel.pressure_from("enemy", it.attack) >= 10:
+		_emote.pop("confident")
 
 
 func set_pixel_on(on: bool) -> void:
@@ -124,21 +209,20 @@ func _build_static() -> void:
 		_tip(b, "Composure", Keywords.BASE.Composure.text, "composure")
 	_tip(%DrawPile, "Draw pile", "Cards you will draw. Shuffled from the discard pile when empty.", "draw")
 	_tip(%DiscardPile, "Discard pile", "Played and discarded cards. Shuffled back when the draw pile runs out.", "discard")
-	_tip(%ServeButton, "Serve", Keywords.BASE.Serve.text, "serve")
 	# Buttons
 	Ui.style_button(%EndTurn, Pal.CREAM, Pal.INK, 1.1, 1.3, 0.6)
 	Ui.style_button(%StartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
 	Ui.style_button(%RestartButton, Pal.RED, Color.WHITE, 1.1, 1.6, 0.6)
-	_style_serve(false)
-	# Prep Board slots with arrows between
-	for i in Duel.PLATE_SIZE:
-		if i > 0:
-			%Slots.add_child(Ui.icon("arrow", Color(Pal.INK, 0.33), 0.8))
-		var slot := PanelContainer.new()
-		slot.custom_minimum_size = Vector2(Pal.em(4), Pal.em(5))
-		slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		%Slots.add_child(slot)
-		_slots.append(slot)
+	# Stations replace the old Prep Board row: hide its header, slots and single Serve button.
+	for n in [%Board.get_node("VBox/Head"), %Slots, %ServeButton]:
+		n.hide()
+	%Board.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	%Board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	%Board.get_node("VBox").alignment = BoxContainer.ALIGNMENT_BEGIN
+	_stations_box = Ui.hbox(STATION_GAP_EM)
+	_stations_box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_stations_box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	%Board.get_node("VBox").add_child(_stations_box)
 	# Cut-in background
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -196,19 +280,16 @@ func _refresh() -> void:
 	# Hand
 	_rebuild_hand(live)
 
-	# Prep Board: ingredients in placement order. The book is closed: no recipe hints.
-	for i in _slots.size():
-		_fill_slot(_slots[i], d.plate[i] if i < d.plate.size() else null, i)
+	# Stations: solitaire stacks with an Order Ticket each (ART_DIRECTION §6).
+	_refresh_stations()
 	_placed_uid = -1
-	%BoardCount.text = "%d/%d" % [d.plate.size(), Duel.PLATE_SIZE]
-	%Board.visible = live
-	%ServeButton.disabled = not d.can_serve().ok
-	_style_serve(d.signature_armed)
 	%EndTurn.disabled = not live
+	if d.player.confidence > d.player.max_confidence * 0.3:
+		_smug_armed = true
 
-	# End of duel
-	%Overlay.visible = not live
-	if not live:
+	# End of duel (after the FINISHED announcer)
+	%Overlay.visible = not live and _result_done
+	if not live and _result_done:
 		var won := d.phase == "won"
 		%ResultTitle.text = "Victory" if won else "Defeat"
 		%ResultTitle.add_theme_color_override("font_color", Pal.RED if won else Pal.INK_SOFT)
@@ -257,56 +338,288 @@ func _block_badge(badge: Control, value: int) -> void:
 	(badge.get_node("Value") as Label).text = str(value)
 
 
-func _fill_slot(slot: PanelContainer, c: CardInstance, i: int) -> void:
-	for child in slot.get_children():
-		child.queue_free()
-	slot.remove_meta("tip")
-	var next := duel != null and i == duel.plate.size()
-	if c == null:
-		var dragging_ing: bool = not _drag.is_empty() and _drag.get("started", false) and _drag.view.card.def.is_ingredient()
-		var border := Pal.ORANGE if next and dragging_ing else Color(Pal.INK, 0.33)
-		var bg := Color(Pal.ORANGE, 0.12) if next and dragging_ing else Color(Pal.INK, 0.05)
-		slot.add_theme_stylebox_override("panel", Ui.box(bg, border, 0.14, 0.55, 0.0))
-		var n := Ui.label(str(i + 1), 1.3, Color(Pal.INK, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
-		slot.add_child(n)
-		return
+# ================================================================ stations
+
+const STATION_GAP_EM := 0.9
+## Top of the stations, above the prep-table anchor.
+const STATION_TOP_EM := 10.5
+const CARD_W_EM := 7.4
+const CARD_H_EM := 6.4
+## Visible strip of a covered card (name + tag icon).
+const BAND_EM := 1.75
+## Light tag colors get ink text, dark ones cream.
+const DARK_TAGS: PackedStringArray = ["VEGGIE", "SPICE", "SAUCE"]
+
+
+func _refresh_stations() -> void:
+	for c in _cols:
+		c.queue_free()
+	_cols.clear()
+	for i in Duel.STATIONS:
+		var frame := _station_column(i)
+		_stations_box.add_child(frame)
+		_cols.append(frame)
+	_highlight_stations(-1)
+
+
+func _station_column(i: int) -> PanelContainer:
+	var d := duel
+	var st := d.stack(i)
+	var tk := d.ticket(i)
+	var col := Ui.vbox(0.35)
+	col.alignment = BoxContainer.ALIGNMENT_BEGIN
+	col.custom_minimum_size.x = Pal.em(CARD_W_EM)
+	col.add_child(_ticket_view(i, tk))
+
+	var holder := Control.new()
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var n := st.size()
+	holder.custom_minimum_size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM) + Pal.em(BAND_EM) * maxi(n - 1, 0))
+	if n == 0:
+		var ph := Ui.panel(Ui.box(Color(Pal.CREAM, 0.12), Color(Pal.CREAM, 0.55), 0.14, 0.7, 0.0),
+				Ui.label("+  Station %d" % (i + 1), 0.8, Color(Pal.CREAM, 0.85), HORIZONTAL_ALIGNMENT_CENTER))
+		ph.position = Vector2.ZERO
+		ph.size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM))
+		holder.add_child(ph)
+	for k in n:
+		var card := _stack_card(st[k], k == n - 1)
+		card.position = Vector2(0, Pal.em(BAND_EM) * k)
+		card.size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM))
+		holder.add_child(card)
+		if st[k].uid == _placed_uid:
+			card.pivot_offset = card.size / 2.0
+			card.scale = Vector2.ONE * 0.6
+			create_tween().tween_property(card, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	col.add_child(holder)
+
+	if n > 0 and d.phase == "player":
+		var row := Ui.hbox(0.3)
+		var serve := Button.new()
+		var armed := d.signature_armed
+		serve.text = "Serve x2" if armed else "Serve"
+		Ui.style_button(serve, Pal.GOLD if armed else Pal.RED, Pal.INK if armed else Color.WHITE, 0.9, 0.8, 0.4)
+		serve.disabled = not d.can_serve(i).ok
+		serve.pressed.connect(func() -> void: _serve(i))
+		_tip(serve, "Serve", Keywords.BASE.Serve.text, "serve")
+		row.add_child(serve)
+		var clear := Button.new()
+		clear.text = "Clear"
+		Ui.style_button(clear, Pal.INK_SOFT, Pal.CREAM, 0.75, 0.5, 0.4)
+		clear.disabled = d.moved_this_turn
+		clear.pressed.connect(func() -> void: if not _locked(): _report(duel.clear_station(i)))
+		_tip(clear, "Clear station", "Throw this whole stack into the discard pile. Free, but uses your one move this turn.", "discard")
+		row.add_child(clear)
+		col.add_child(row)
+
+	var frame := Ui.panel(Ui.pad(StyleBoxEmpty.new(), 0.25, 0.25), col)
+	frame.set_meta("holder", holder)
+	frame.set_meta("station", i)
+	return frame
+
+
+## Order Ticket (ref 7): dish name, its steps as tag chips (done / next / todo), state line.
+func _ticket_view(i: int, tk: Dictionary) -> Control:
+	var state: String = tk.state
+	var recipe: RecipeDef = tk.recipe
+	var vb := Ui.vbox(0.2)
+	vb.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var head := Ui.hbox(0.3)
+	head.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var title := "Station %d" % (i + 1)
+	if recipe:
+		title = recipe.name
+	elif state == "improvised":
+		title = "???"
+	var name_l := Ui.label(title, 0.85, Pal.INK if state != "empty" else Pal.INK_SOFT)
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_l.clip_text = true
+	head.add_child(name_l)
+	if state == "perfect" or state == "cooked":
+		var stamp_bg := Pal.GOLD if state == "perfect" else Pal.PAPER
+		var stamp := Ui.panel(Ui.pad(Ui.box(stamp_bg, Pal.INK, 0.1, 0.2, 0.0), 0.25, 0.0),
+				Ui.label("PERFECT!" if state == "perfect" else "COOKED", 0.55))
+		stamp.rotation_degrees = 8.0
+		head.add_child(stamp)
+	vb.add_child(head)
+
+	var steps := Ui.hbox(0.15)
+	steps.alignment = BoxContainer.ALIGNMENT_BEGIN
+	for s: Dictionary in tk.steps:
+		steps.add_child(_step_chip(s.req, s.state))
+	if tk.steps.is_empty():
+		steps.custom_minimum_size.y = Pal.em(1.3)
+	vb.add_child(steps)
+
+	var line := ""
+	match state:
+		"empty":
+			line = "Drop an ingredient"
+		"building":
+			line = "Next: %s" % _req_name(tk.steps[mini(duel.stack(i).size(), tk.steps.size() - 1)].req)
+		"perfect":
+			line = "Perfect order x%s" % Duel.PERFECT_ORDER_MULT
+		"cooked":
+			line = "Out of order x1"
+		"improvised":
+			line = "No recipe: %d Pressure" % (2 * duel.stack(i).size())
+	if tk.garnish > 0:
+		line += " · +%d Garnish" % tk.garnish
+	vb.add_child(Ui.label(line, 0.6, Pal.INK_SOFT))
+
+	var bg := Pal.PAPER if state == "improvised" else Pal.CREAM
+	var border := Pal.GOLD if state == "perfect" else Pal.INK
+	var p := Ui.panel(Ui.pad(Ui.box(bg, border, 0.2 if state == "perfect" else 0.13, 0.3, 0.15), 0.45, 0.3), vb)
+	p.custom_minimum_size.x = Pal.em(CARD_W_EM)
+	if recipe:
+		var seq: PackedStringArray = []
+		for r in recipe.requires:
+			seq.append(_req_name(r))
+		_tip(p, recipe.name, "%s.\nOrder: %s." % [recipe.text, " > ".join(seq)], "book")
+	if state == "empty":
+		p.modulate.a = 0.75
+	return p
+
+
+func _req_name(req: String) -> String:
+	if req.begins_with("card:"):
+		var def := GameDB.card(req.substr(5))
+		return def.name if def else req
+	return req.capitalize()
+
+
+func _req_tag(req: String) -> String:
+	if req.begins_with("card:"):
+		var def := GameDB.card(req.substr(5))
+		return def.first_tag() if def else ""
+	return req
+
+
+func _step_chip(req: String, state: String) -> Control:
+	var tag := _req_tag(req)
+	var done := state == "done"
+	var bg := Pal.tag_color(tag) if done else Pal.CREAM
+	var border := Pal.ORANGE if state == "next" else Pal.INK
+	var fg := (Pal.CREAM if tag in DARK_TAGS else Pal.INK) if done else Pal.tag_color(tag)
+	var chip := Ui.panel(Ui.pad(Ui.box(bg, border, 0.16 if state == "next" else 0.1, 0.25, 0.0), 0.12, 0.08), Ui.icon(tag, fg, 0.95))
+	if state == "todo":
+		chip.modulate.a = 0.4
+	elif state == "next":
+		var tw := chip.create_tween().set_loops()
+		tw.tween_property(chip, "modulate:a", 0.45, 0.5)
+		tw.tween_property(chip, "modulate:a", 1.0, 0.5)
+	chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	_tip(chip, _req_name(req), "Recipe step: %s (%s)." % [_req_name(req), state], tag)
+	return chip
+
+
+## One card in a station. Covered cards show only the band (name + tag icon); the top card is
+## fully open with a gold frame (it is the one you can drag to another station).
+func _stack_card(c: CardInstance, top: bool) -> PanelContainer:
 	var tag := c.def.first_tag()
-	slot.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	var tile := Ui.panel(Ui.box(Pal.CREAM, Pal.INK, 0.16, 0.55, 0.15))
-	tile.mouse_filter = Control.MOUSE_FILTER_STOP
-	var col := Ui.vbox(0.15)
-	col.add_child(Ui.icon(tag, Pal.tag_color(tag), 2.0))
-	var nm := Ui.label(c.def.name, 0.65, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	col.add_child(nm)
-	var dots := Ui.hbox(0.15)
-	for q in c.def.quality:
-		var dot := Panel.new()
-		dot.custom_minimum_size = Vector2.ONE * Pal.em(0.45)
-		dot.add_theme_stylebox_override("panel", Ui.box(Pal.GOLD, Pal.INK, 0.08, 0.3, 0.0))
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		dots.add_child(dot)
-	col.add_child(dots)
-	tile.add_child(col)
-	slot.add_child(tile)
-	_tip(tile, c.def.name, "%s · Quality %d" % [", ".join(c.def.tags), c.def.quality], tag)
-	if c.uid == _placed_uid:
-		tile.pivot_offset = slot.custom_minimum_size / 2
-		tile.scale = Vector2.ONE * 0.6
-		create_tween().tween_property(tile, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var bg := Pal.tag_color(tag)
+	var fg := Pal.CREAM if tag in DARK_TAGS else Pal.INK
+	var s := Ui.box(bg, Pal.GOLD if top else Pal.INK, 0.16 if top else 0.12, 0.55, 0.0)
+	s.content_margin_left = Pal.em(0.45)
+	s.content_margin_right = Pal.em(0.45)
+	s.content_margin_top = Pal.em(0.2)
+	s.content_margin_bottom = Pal.em(0.3)
+	var vb := Ui.vbox(0.15)
+	vb.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var band := Ui.hbox(0.2)
+	var nm := Ui.label(c.def.name, 0.8, fg)
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	band.add_child(nm)
+	band.add_child(Ui.icon(tag, fg, 0.9))
+	vb.add_child(band)
+	if top:
+		vb.add_child(Ui.icon(tag, Color(fg, 0.85), 2.6))
+		var dots := Ui.hbox(0.15)
+		for q in c.def.quality:
+			var dot := Panel.new()
+			dot.custom_minimum_size = Vector2.ONE * Pal.em(0.45)
+			dot.add_theme_stylebox_override("panel", Ui.box(Pal.GOLD, Pal.INK, 0.08, 0.3, 0.0))
+			dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			dots.add_child(dot)
+		vb.add_child(dots)
+	var p := Ui.panel(s, vb)
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	_tip(p, c.def.name, "%s · Quality %d%s" % [", ".join(c.def.tags), c.def.quality,
+			"\nDrag onto another station to move it (once per turn)." if top else ""], tag)
+	return p
 
 
-func _style_serve(armed: bool) -> void:
-	var b: Button = %ServeButton
-	Ui.style_button(b, Pal.GOLD if armed else Pal.RED, Pal.INK if armed else Color.WHITE, 1.05, 1.1, 0.4)
-	b.text = ""
-	%ServeLabel.text = "Serve x2" if armed else "Serve"
-	var fg := Pal.INK if armed else Color.WHITE
-	for n in [%ServeLabel, %ServeCost]:
-		n.add_theme_color_override("font_color", fg)
-	for n in [%ServeIcon, %ServeCostIcon]:
-		n.self_modulate = fg
-	%ServeContent.modulate.a = 0.45 if b.disabled else 1.0
-	_serve_pulse = _pulse(b, armed, _serve_pulse)
+## Station under the cursor, or -1.
+func _station_at(m: Vector2) -> int:
+	for i in _cols.size():
+		if is_instance_valid(_cols[i]) and _cols[i].get_global_rect().grow(Pal.em(0.6)).has_point(m):
+			return i
+	return -1
+
+
+## Where the next card of a station lands (global rect).
+func _next_card_rect(i: int) -> Rect2:
+	var holder: Control = _cols[i].get_meta("holder")
+	var n := duel.stack(i).size()
+	var r := holder.get_global_rect()
+	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * n), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)))
+
+
+## Top card of a station (global rect), or an empty Rect2.
+func _top_card_rect(i: int) -> Rect2:
+	var n := duel.stack(i).size()
+	if n == 0 or i >= _cols.size() or not is_instance_valid(_cols[i]):
+		return Rect2()
+	var holder: Control = _cols[i].get_meta("holder")
+	var r := holder.get_global_rect()
+	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * (n - 1)), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)))
+
+
+## While dragging an ingredient: gold = continues a recipe (or empty), orange = off path, grey = full.
+## `over` is the station under the cursor (stronger highlight).
+func _highlight_stations(over: int, card: CardInstance = null) -> void:
+	for i in _cols.size():
+		var frame := _cols[i]
+		if not is_instance_valid(frame):
+			continue
+		if card == null:
+			frame.add_theme_stylebox_override("panel", Ui.pad(StyleBoxEmpty.new(), 0.25, 0.25))
+			continue
+		var st := duel.stack(i)
+		var color := Pal.GOLD
+		if st.size() >= Duel.STATION_SIZE:
+			color = Color(Pal.INK, 0.5)
+		elif not st.is_empty() and not RecipeMatch.accepts_next(duel.recipes, st, card):
+			color = Pal.ORANGE
+		var on := i == over
+		var s := Ui.box(Color(color, 0.28 if on else 0.1), Color(color, 1.0 if on else 0.6), 0.2 if on else 0.12, 0.7, 0.0)
+		frame.add_theme_stylebox_override("panel", Ui.pad(s, 0.25, 0.25))
+
+
+func _serve(i: int) -> void:
+	if _locked():
+		return
+	_report(duel.serve(i))
+
+
+## S key: a finished dish first (Perfect, then Cooked), else the biggest stack.
+func _best_station() -> int:
+	var best := -1
+	var best_key := [-1, -1]
+	for i in Duel.STATIONS:
+		if not duel.can_serve(i).ok:
+			continue
+		var tk := duel.ticket(i)
+		var rank: int = {perfect = 3, cooked = 2}.get(tk.state, 0)
+		var key := [rank, duel.stack(i).size()]
+		if key[0] > best_key[0] or (key[0] == best_key[0] and key[1] > best_key[1]):
+			best_key = key
+			best = i
+	return best
+
+
+## Input is ignored while the announcer or a drag animation runs.
+func _locked() -> bool:
+	return duel == null or _busy or %Cookbook.visible or _announcer.visible
 
 
 func _pulse(node: CanvasItem, on: bool, current: Tween) -> Tween:
@@ -366,16 +679,19 @@ func _layout_hand() -> void:
 
 
 func _process(_delta: float) -> void:
-	# 3D-following blocks: rival HUD over its head, Prep Board over the prep table.
+	# 3D-following blocks: rival HUD over its head, stations hang down from above the prep table
+	# (stacks grow downward like solitaire), emote bubble beside the rival's head.
 	%Rival.position = anchors.rival - Vector2(%Rival.size.x / 2.0, %Rival.size.y)
-	%Board.position = anchors.board - Vector2(%Board.size.x / 2.0, %Board.size.y)
+	%Board.reset_size()
+	%Board.position = Vector2(anchors.board.x - %Board.size.x / 2.0, anchors.board.y - Pal.em(STATION_TOP_EM))
+	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
 	_update_hover()
 
 
 ## Hover is polled (not mouse_entered) so a lifted card does not flicker at its bottom edge.
 func _update_hover() -> void:
 	var target: CardView = null
-	if _drag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible:
+	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible:
 		var m: Vector2 = _mouse
 		var w := Pal.em(8.4)
 		var h := Pal.em(11.8)
@@ -405,16 +721,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key and key.pressed and not key.echo:
 		match key.keycode:
 			KEY_E:
-				if duel and not %Cookbook.visible:
+				if not _locked():
 					duel.end_turn()
 			KEY_S:
-				if duel and not %Cookbook.visible:
-					duel.serve()
+				if not _locked():
+					var best := _best_station()
+					if best >= 0:
+						_serve(best)
+					else:
+						_reject("Nothing to serve.")
 			KEY_P:
 				pixel_toggled.emit()
 		return
 	var mb := event as InputEventMouseButton
-	if mb and mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and _hover and not _busy and duel:
+	if mb and mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and _hover and not _locked():
 		get_viewport().set_input_as_handled()
 		var check := duel.can_play(_hover.card.uid)
 		if not check.ok:
@@ -428,6 +748,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouse:
 		_mouse = (%Root as Control).make_input_local(event).position
+	if _station_drag_input(event):
+		return
 	if _drag.is_empty():
 		return
 	var m := _mouse
@@ -454,8 +776,7 @@ func _drag_begin(m: Vector2) -> void:
 	_drag.started = true
 	_hide_tip()
 	if view.card.def.is_ingredient():
-		%Board.add_theme_stylebox_override("panel", _board_style(false, true))
-		_refresh_slots()
+		_highlight_stations(-1, view.card)
 	else:
 		%PlayZone.show()
 
@@ -473,7 +794,7 @@ func _drag_move(m: Vector2) -> void:
 	ghost.position = m - _drag.off - ghost.size / 2.0
 	ghost.rotation_degrees = _drag.tilt
 	if _drag.view.card.def.is_ingredient():
-		%Board.add_theme_stylebox_override("panel", _board_style(_over_board(m), true))
+		_highlight_stations(_station_at(m), _drag.view.card)
 	else:
 		_set_play_zone(_in_play_zone(m))
 
@@ -489,15 +810,15 @@ func _drag_release(m: Vector2) -> void:
 	var uid: int = d.view.card.uid
 	_busy = true
 	var tw := create_tween().set_parallel()
-	if def.is_ingredient() and _over_board(m):
-		# Shrink into the next board slot.
-		var slot := _slots[mini(duel.plate.size(), Duel.PLATE_SIZE - 1)]
-		var r := slot.get_global_rect()
+	var target := _station_at(m) if def.is_ingredient() else -1
+	if target >= 0 and duel.can_play(uid, target).ok:
+		# Shrink onto the station's next card spot.
+		var r := _next_card_rect(target)
 		tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tw.tween_property(ghost, "position", r.get_center() - ghost.size / 2.0, 0.2)
-		tw.tween_property(ghost, "scale", Vector2.ONE * (r.size.y / ghost.size.y), 0.2)
+		tw.tween_property(ghost, "scale", Vector2.ONE * (r.size.x / ghost.size.x), 0.2)
 		tw.tween_property(ghost, "rotation_degrees", 0.0, 0.2)
-		tw.chain().tween_callback(_drag_finish.bind(uid, true))
+		tw.chain().tween_callback(_drag_finish.bind(uid, true, target))
 	elif not def.is_ingredient() and _in_play_zone(m):
 		# Whoosh toward the rival (attacks, debuffs) or Apis (Composure, draw, Hype).
 		var to: Vector2 = anchors.rival if _hits_rival(def) else anchors.player
@@ -515,9 +836,11 @@ func _drag_release(m: Vector2) -> void:
 		tw.tween_property(ghost, "scale", Vector2.ONE, 0.18)
 		tw.tween_property(ghost, "rotation_degrees", view.home_rot, 0.18)
 		tw.chain().tween_callback(_drag_finish.bind(uid, false))
+		if target >= 0:
+			_reject(duel.can_play(uid, target).reason)
 
 
-func _drag_finish(uid: int, play: bool) -> void:
+func _drag_finish(uid: int, play: bool, station := -1) -> void:
 	var d := _drag
 	_drag = {}
 	_busy = false
@@ -525,22 +848,68 @@ func _drag_finish(uid: int, play: bool) -> void:
 		d.ghost.queue_free()
 	if is_instance_valid(d.view):
 		d.view.visible = true
-	%Board.add_theme_stylebox_override("panel", _board_style(false, false))
 	%PlayZone.hide()
+	_highlight_stations(-1)
 	if play:
 		_placed_uid = uid
-		_report(duel.play(uid))
-	else:
-		_refresh_slots()
+		_report(duel.play(uid, station))
 
 
-func _refresh_slots() -> void:
-	for i in _slots.size():
-		_fill_slot(_slots[i], duel.plate[i] if i < duel.plate.size() else null, i)
-
-
-func _over_board(m: Vector2) -> bool:
-	return %Board.get_global_rect().grow(40).has_point(m)
+## Drag the top card of a station onto another one (Duel.move_top). Returns true when the
+## event was used. Runs in _input so it wins over the tooltip controls on the cards.
+func _station_drag_input(event: InputEvent) -> bool:
+	var m := _mouse
+	var mb := event as InputEventMouseButton
+	if _sdrag.is_empty():
+		if mb == null or mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed or _locked() or not _drag.is_empty():
+			return false
+		for i in Duel.STATIONS:
+			if _top_card_rect(i).has_point(m):
+				get_viewport().set_input_as_handled()
+				_sdrag = {from = i, start = m, started = false, ghost = null, off = Vector2.ZERO}
+				return true
+		return false
+	if event is InputEventMouseMotion:
+		if not _sdrag.started:
+			if m.distance_to(_sdrag.start) < DRAG_THRESHOLD:
+				return true
+			if duel.moved_this_turn:
+				_reject("Already moved a card this turn.")
+				_sdrag = {}
+				return true
+			var r := _top_card_rect(_sdrag.from)
+			var ghost := _stack_card(duel.stack(_sdrag.from).back(), true)
+			%DragLayer.add_child(ghost)
+			ghost.size = r.size
+			ghost.position = r.position
+			ghost.rotation_degrees = 3.0
+			_sdrag.off = m - r.position
+			_sdrag.ghost = ghost
+			_sdrag.started = true
+			_hide_tip()
+			var holder: Control = _cols[_sdrag.from].get_meta("holder")
+			holder.get_child(-1).modulate.a = 0.25
+		_sdrag.ghost.position = m - _sdrag.off
+		var over := _station_at(m)
+		for i in _cols.size():
+			var on: bool = i == over and i != _sdrag.from
+			var s := Ui.box(Color(Pal.BLUE, 0.25 if on else 0.0), Color(Pal.BLUE, 1.0 if on else 0.0), 0.2, 0.7, 0.0)
+			_cols[i].add_theme_stylebox_override("panel", Ui.pad(s, 0.25, 0.25))
+		return true
+	if mb and mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+		get_viewport().set_input_as_handled()
+		var d := _sdrag
+		_sdrag = {}
+		if is_instance_valid(d.ghost):
+			d.ghost.queue_free()
+		if d.started:
+			var to := _station_at(m)
+			if to >= 0 and to != d.from:
+				_report(duel.move_top(d.from, to))
+				return true
+			_refresh()
+		return true
+	return false
 
 
 func _in_play_zone(m: Vector2) -> bool:
@@ -558,16 +927,6 @@ func _hits_rival(def: CardDef) -> bool:
 		if e.kind == EffectDef.Kind.PRESSURE or (e.kind == EffectDef.Kind.STATUS and e.target == EffectDef.Target.ENEMY):
 			return true
 	return false
-
-
-func _board_style(hover: bool, dragging: bool) -> StyleBoxFlat:
-	var s: StyleBoxFlat = Ui.box(Color("#fff6dd") if hover else Color("#fbf3e2ee"),
-			Pal.GOLD if hover else (Color(Pal.GOLD, 0.8) if dragging else Pal.INK), 0.32 if hover or dragging else 0.16, 0.9, 0.22)
-	s.content_margin_left = Pal.em(0.7)
-	s.content_margin_right = Pal.em(0.7)
-	s.content_margin_top = Pal.em(0.55)
-	s.content_margin_bottom = Pal.em(0.7)
-	return s
 
 
 func _report(result: Dictionary) -> void:
@@ -689,6 +1048,9 @@ func _show_dish(recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) 
 	b.show()
 	b.reset_size()
 	var board: Rect2 = %Board.get_global_rect()
+	var si := duel.last_served_station if duel else -1
+	if si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
+		board = _cols[si].get_global_rect()
 	var p := Vector2(board.get_center().x - b.size.x / 2.0, board.position.y - 12.0 - b.size.y)
 	b.position = p
 	b.pivot_offset = b.size / 2.0

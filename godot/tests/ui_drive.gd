@@ -19,8 +19,13 @@ func _initialize() -> void:
 	_crop("1a_cookbook", Rect2(0.2, 0.1, 0.6, 0.6))
 	var ui = main.get_node("DuelUI")
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
-	await _wait(0.8)
+	await _wait(1.0)
 	_check("duel started after clicking the book button", main.duel != null)
+	_shot("2_intro_countdown")
+	await _wait(1.3)
+	_shot("2_intro_fight")
+	await _wait(2.2)
+	_check("intro announcer finished", not ui._announcer.visible)
 	if main.duel == null:
 		return _end()
 	var duel: Duel = main.duel
@@ -37,18 +42,22 @@ func _initialize() -> void:
 	_shot("3_hover")
 	_crop("3a_hover", Rect2(0.25, 0.45, 0.5, 0.55))
 
-	# Drag the first playable ingredient onto the Prep Board.
+	# Drag the first playable ingredient onto station 2.
 	var ing: CardView = null
 	for v: CardView in ui._views:
 		if v.card.def.is_ingredient() and duel.can_play(v.card.uid).ok:
 			ing = v
 			break
 	if ing:
-		var plate_before := duel.plate.size()
-		var board: Control = ui.get_node("%Board")
-		await _drag(_card_point(ing), board.get_global_rect().get_center(), "4_dragging_ingredient")
+		var before := duel.stack(1).size()
+		await _drag(_card_point(ing), ui._cols[1].get_global_rect().get_center(), "4_dragging_ingredient")
 		await _wait(0.5)
-		_check("ingredient dragged onto the board lands on the Plate", duel.plate.size() == plate_before + 1)
+		_check("ingredient dragged onto station 2 lands there", duel.stack(1).size() == before + 1)
+		# Move it to station 3 by dragging the top card.
+		var top: Rect2 = ui._top_card_rect(1)
+		await _drag(top.get_center(), ui._cols[2].get_global_rect().get_center(), "4b_moving_top_card")
+		await _wait(0.4)
+		_check("top card dragged to station 3 moves there", duel.stack(2).size() == 1 and duel.moved_this_turn)
 	# Drag a technique up into the play zone.
 	var tech: CardView = null
 	for v: CardView in ui._views:
@@ -67,8 +76,14 @@ func _initialize() -> void:
 		await _wait(0.2)
 		_check("plain click does not play a card", duel.hand.size() == n)
 	# Serve
-	if duel.can_serve().ok:
-		await _click(ui.get_node("%ServeButton").get_global_rect().get_center())
+	# Fill station 1 with a known dish to show the ticket, then serve it with its button.
+	duel.stations[0] = _inst(duel, ["bread", "beef", "cheese"])
+	duel.changed.emit()
+	await _wait(0.3)
+	_shot("5b_stations")
+	_crop("5c_stations", Rect2(0.0, 0.15, 0.5, 0.75))
+	if duel.can_serve(2).ok:
+		await _click(_serve_button(ui, 2).get_global_rect().get_center())
 		await _wait(0.35)
 		_shot("6_served")
 		_crop("6a_served", Rect2(0.0, 0.1, 0.75, 0.45))
@@ -85,11 +100,19 @@ func _initialize() -> void:
 	await _wait(0.5)
 	_shot("8_cutin")
 	await _wait(1.4)
-	# Win screen
+	# Emote
+	ui._emote.pop("smug")
+	await _wait(0.4)
+	_crop("8b_emote", Rect2(0.45, 0.0, 0.4, 0.4))
+	# Win: emote Sad, FINISHED, YOU WINS!, then the overlay
 	duel._lose_confidence("enemy", 999, "pressure")
 	duel.changed.emit()
-	await _wait(0.5)
-	_check("victory overlay shows", ui.get_node("%Overlay").visible)
+	await _wait(1.0)
+	_shot("9a_finished")
+	await _wait(1.2)
+	_shot("9b_you_wins")
+	await _wait(2.2)
+	_check("victory overlay shows after the announcer", ui.get_node("%Overlay").visible)
 	_shot("9_victory")
 	_end()
 
@@ -103,6 +126,20 @@ func _check(label: String, ok: bool) -> void:
 	if not ok:
 		failures += 1
 	print("%s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _inst(duel: Duel, ids: Array) -> Array[CardInstance]:
+	var out: Array[CardInstance] = []
+	for i in ids.size():
+		out.append(CardInstance.new(90000 + i, GameDB.card(ids[i])))
+	return out
+
+
+func _serve_button(ui: Node, station: int) -> Button:
+	for b in ui._cols[station].find_children("*", "Button", true, false):
+		if (b as Button).text.begins_with("Serve"):
+			return b
+	return null
 
 
 func _card_point(v: CardView) -> Vector2:
