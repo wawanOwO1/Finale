@@ -15,6 +15,8 @@ const MAX_STEPS := 12
 const LETHAL := 1000.0
 ## Pressure on a ready station at which the rival looks Confident (mood, GRAND_DESIGN §3.4).
 const CONFIDENT_AT := 10
+## Scores this close count as a tie, broken by the kitchen's own ai_rng stream (GRAND_DESIGN §4.3).
+const TIE := 0.05
 
 
 ## Best next action for `side`:
@@ -23,18 +25,18 @@ const CONFIDENT_AT := 10
 static func choose(d: Duel, side := "enemy", prof: AiProfile = null) -> Dictionary:
 	var p := prof if prof else profile(d)
 	var k := d.kitchen(side)
-	var best := {kind = "end", score = p.end_threshold}
+	var pick := {best = {kind = "end", score = p.end_threshold}, ties = 1, rng = k.ai_rng}
 	for c in k.hand:
 		if c.def.is_ingredient():
 			for s in Duel.STATIONS:
 				if d.can_play(c.uid, s, side).ok:
-					best = _better(best, {kind = "place", uid = c.uid, station = s, score = _place_score(d, c, s, side, p)})
+					_consider(pick, {kind = "place", uid = c.uid, station = s, score = _place_score(d, c, s, side, p)})
 		elif d.can_play(c.uid, -1, side).ok:
-			best = _better(best, {kind = "technique", uid = c.uid, score = _technique_score(d, c, side, p)})
+			_consider(pick, {kind = "technique", uid = c.uid, score = _technique_score(d, c, side, p)})
 	for s in Duel.STATIONS:
 		if d.can_serve(s, side).ok:
-			best = _better(best, {kind = "serve", station = s, score = _serve_score(d, s, side, p)})
-	return best
+			_consider(pick, {kind = "serve", station = s, score = _serve_score(d, s, side, p)})
+	return pick.best
 
 
 ## Mood shown over the rival's head on Apis's turn (replaces the old intent, GRAND_DESIGN §3.4):
@@ -235,5 +237,14 @@ static func _fillable(rest: PackedStringArray, hand: Array[CardInstance], used: 
 	return n
 
 
-static func _better(a: Dictionary, b: Dictionary) -> Dictionary:
-	return b if b.score > a.score else a
+## Keeps the best action seen so far. Ties are a reservoir pick (each tied action equally
+## likely) so a rival does not always fill the leftmost station first.
+static func _consider(pick: Dictionary, b: Dictionary) -> void:
+	var best: Dictionary = pick.best
+	if b.score > best.score + TIE:
+		pick.best = b
+		pick.ties = 1
+	elif b.score >= best.score - TIE and pick.rng:
+		pick.ties += 1
+		if pick.rng.index(pick.ties) == 0:
+			pick.best = b

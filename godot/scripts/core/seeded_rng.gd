@@ -36,3 +36,17 @@ static func _imul(a: int, b: int) -> int:
 	a &= MASK
 	b &= MASK
 	return (a * (b & 0xFFFF) + (((a * (b >> 16)) & 0xFFFF) << 16)) & MASK
+
+
+## Integer in [0, n).
+func index(n: int) -> int:
+	return floori(next() * n)
+
+
+## An independent stream from one seed (GRAND_DESIGN §4.3): the same seed and name always give
+## the same stream, and different names never share numbers. FNV-1a over the name as the salt.
+static func stream(rng_seed: int, stream_name: String) -> SeededRng:
+	var h := 0x811c9dc5
+	for b in stream_name.to_utf8_buffer():
+		h = _imul(h ^ b, 0x01000193)
+	return SeededRng.new(rng_seed ^ h)

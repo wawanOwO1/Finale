@@ -36,6 +36,11 @@ var moved_this_turn := false
 ## Shuffles this side's draw pile. Each side has its own stream, so what one side does never
 ## changes what the other draws (GRAND_DESIGN §4.3).
 var rng: SeededRng
+## Breaks ties between equally good RivalAI actions. Its own stream, so AI choices never
+## shift anyone's shuffle.
+var ai_rng: SeededRng
+## Mise en Place already helped this turn (max once per turn, GRAND_DESIGN §4.2).
+var mise_used := false
 
 
 func _init(side_: String, fighter_: Duel.Fighter, rng_: SeededRng) -> void:

@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_rival_turn_steps()
 	_symmetric_kitchen()
 	_rival_ai()
+	_rng()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -547,3 +548,99 @@ func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
 	check("smart Apis vs %s: every duel ends" % label.trim_prefix("starter vs "), ended)
 	print("      smart bot %s: %d/%d wins, avg %.1f turns, avg Confidence left on a win %.0f/60" % [
 			label, wins, n, float(turns_total) / n, float(conf_left) / maxi(1, wins)])
+
+
+## Phase D (GRAND_DESIGN §4): independent streams, anti-clump shuffle, Mise en Place, AI ties.
+func _rng() -> void:
+	var a := SeededRng.stream(7, "offers")
+	var b := SeededRng.stream(7, "offers")
+	var c := SeededRng.stream(7, "ai_enemy")
+	var same := true
+	var differs := false
+	for _i in 20:
+		var x := a.next()
+		same = same and is_equal_approx(x, b.next())
+		differs = differs or not is_equal_approx(x, c.next())
+	check("a named stream repeats from its seed", same)
+	check("differently named streams differ", differs)
+
+	# Anti-clump: a technique-heavy deck opens with 4+ Techniques on top far less often.
+	var heavy: Array[CardDef] = []
+	for id in ["quickChop", "quickChop", "quickChop", "stareDown", "stareDown", "quickChop", "egg", "bread", "butter", "tomato"]:
+		heavy.append(GameDB.card(id))
+	var raw := 0
+	var shaped := 0
+	for s in 400:
+		var pile: Array[CardInstance] = []
+		for def in heavy:
+			pile.append(CardInstance.new(0, def))
+		SeededRng.new(s).shuffle(pile)
+		if Duel._clumped(pile):
+			raw += 1
+		var d := Duel.new(heavy, dummy, basics, {seed = s})
+		if Duel._clumped(d.hand) and not d.kitchen("player").mise_used:
+			shaped += 1
+	check("anti-clump shuffle cuts Technique clumps", shaped * 4 < raw, "raw %d, shaped %d" % [raw, shaped])
+	print("      opening clumps in 400 shuffles: raw %d, anti-clump %d" % [raw, shaped])
+
+	# Mise en Place: a hand of only Techniques trades one for the top ingredient, once, visibly.
+	var dry: Array[CardDef] = []
+	for id in ["quickChop", "quickChop", "quickChop", "quickChop", "stareDown", "stareDown", "egg"]:
+		dry.append(GameDB.card(id))
+	var helped := 0
+	var always_ingredient := true
+	var conserved := true
+	for s in 60:
+		var d := Duel.new(dry, dummy, basics, {seed = s})
+		var seen := [0]
+		d.mise_en_place.connect(func(_side: String, _dr: CardInstance, _gb: CardInstance) -> void: seen[0] += 1)
+		for _t in 3:
+			if d.kitchen("player").mise_used:
+				helped += 1
+			var has_ing := false
+			for card in d.hand:
+				has_ing = has_ing or card.def.is_ingredient()
+			always_ingredient = always_ingredient and has_ing
+			conserved = conserved and d.kitchen("player").card_total() == 7
+			d.end_turn()
+			d.run_enemy_turn()
+	check("Mise en Place always leaves an ingredient to place", always_ingredient)
+	check("Mise en Place sometimes has to step in", helped > 0, str(helped))
+	check("Mise en Place keeps every card", conserved)
+
+	var rival := GameDB.enemy("tony").duplicate()
+	rival.deck = DeckDef.new()
+	rival.deck.cards.assign(dry)
+	var rd := Duel.new(GameDB.deck("starter"), rival, basics, {seed = 4})
+	var rival_mise := 0
+	for _t in 4:
+		rd.end_turn()
+		rd.begin_enemy_turn()
+		if rd.kitchen("enemy").mise_used:
+			rival_mise += 1
+		rd.run_enemy_turn()
+	check("the rival gets the same Mise en Place", rival_mise > 0, str(rival_mise))
+
+	# AI tie-breaks use their own stream: burning it changes nothing Apis draws.
+	var hands: Array = []
+	for burn in [0, 25]:
+		var d := Duel.new(GameDB.deck("starter"), GameDB.enemy("tony"), basics, {seed = 11})
+		for _i in burn:
+			d.kitchen("enemy").ai_rng.next()
+		d.end_turn()
+		d.run_enemy_turn()
+		var pile := _ids(d.hand)
+		pile.append_array(_ids(d.draw_pile))
+		hands.append(pile)
+	check("AI tie-breaks never shift Apis's draws", hands[0] == hands[1], str(hands))
+
+	# Equal options are spread out: the rival's first card does not always go to station 1.
+	var stations := {}
+	for s in 30:
+		var d := Duel.new(GameDB.deck("starter"), GameDB.enemy("tony"), basics, {seed = s})
+		d.end_turn()
+		d.begin_enemy_turn()
+		var step := d.enemy_step()
+		if step.kind == "place":
+			stations[step.station] = true
+	check("tied placements vary between stations", stations.size() > 1, str(stations.keys()))

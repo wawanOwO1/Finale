@@ -27,6 +27,9 @@ signal signature_served(side: String, dish: String)
 signal dish_revealed(side: String, recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool)
 ## winner: "player" | "enemy"
 signal duel_ended(winner: String)
+## Mise en Place (GRAND_DESIGN §4.2): a hand with nothing to place traded `given_back` (a
+## Technique, back into the draw pile) for `drawn` (the top ingredient of the draw pile).
+signal mise_en_place(side: String, drawn: CardInstance, given_back: CardInstance)
 signal changed
 
 const MAX_HEAT := 3
@@ -40,6 +43,11 @@ const MAX_HYPE := 100
 const PERFECT_ORDER_MULT := 1.5
 ## Salt for the rival's shuffle stream, derived from the duel seed.
 const ENEMY_RNG_SALT := 0x5bd1e995
+## Anti-clump shuffle (GRAND_DESIGN §4.2): this many Techniques among the top CLUMP_WINDOW
+## cards of a fresh shuffle counts as a clump and is reshuffled, at most CLUMP_RETRIES times.
+const CLUMP_TECHNIQUES := 4
+const CLUMP_WINDOW := 5
+const CLUMP_RETRIES := 3
 
 ## Signature Dish (GDD §4.5): appears in hand when Hype is full, once per duel.
 static var SIGNATURE_CARD: CardDef = _make_signature_card()
@@ -67,6 +75,9 @@ var enemy_def: EnemyDef
 ## side -> Kitchen
 var kitchens := {}
 
+## The duel's seed. Every RNG stream (shuffles, AI tie-breaks, later the modifier offers) is
+## derived from it, so one seed reproduces the whole duel (GRAND_DESIGN §4.3).
+var duel_seed := 0
 var turn := 0
 ## "player" | "enemy" | "won" | "lost"
 var phase := "player"
@@ -125,8 +136,11 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	player = Fighter.new(opts.get("confidence", max_conf), max_conf)
 	enemy_def = enemy_def_
 	enemy = Fighter.new(enemy_def.confidence, enemy_def.confidence)
+	duel_seed = rng_seed
 	kitchens.player = Kitchen.new("player", player, SeededRng.new(rng_seed))
 	kitchens.enemy = Kitchen.new("enemy", enemy, SeededRng.new(rng_seed ^ ENEMY_RNG_SALT))
+	kitchens.player.ai_rng = SeededRng.stream(rng_seed, "ai_player")
+	kitchens.enemy.ai_rng = SeededRng.stream(rng_seed, "ai_enemy")
 	kitchens.player.recipes = recipes_
 	var enemy_recipes: Array[RecipeDef] = []
 	var enemy_deck: Array[CardDef] = []
@@ -551,6 +565,8 @@ func _start_turn(side: String) -> void:
 	if inspired > 0:
 		_add_status(side, "inspired", -inspired)
 	_draw(k.hand_size + inspired, side)
+	k.mise_used = false
+	_mise_en_place(side)
 	if side == "player":
 		turn_started.emit(turn)
 
@@ -679,9 +695,62 @@ func _draw(n: int, side: String) -> void:
 			if k.discard.is_empty():
 				return
 			k.draw_pile = k.discard
-			k.rng.shuffle(k.draw_pile)
 			k.discard = []
+			_shuffle(k)
 		k.hand.append(k.draw_pile.pop_back())
+
+
+## Fisher–Yates, then reshuffle a Technique clump on top (the draw end) a few times before
+## accepting it. Light pseudo-random: it removes the worst streaks, not the luck.
+func _shuffle(k: Kitchen) -> void:
+	for _try in CLUMP_RETRIES + 1:
+		k.rng.shuffle(k.draw_pile)
+		if not _clumped(k.draw_pile):
+			return
+
+
+static func _clumped(pile: Array[CardInstance]) -> bool:
+	var n := 0
+	for i in mini(CLUMP_WINDOW, pile.size()):
+		if not pile[pile.size() - 1 - i].def.is_ingredient():
+			n += 1
+	return n >= CLUMP_TECHNIQUES
+
+
+## Bad-luck protection after the start-of-turn draw: a hand with no ingredient that can be
+## placed swaps one Technique for the top ingredient of the draw pile. Once per turn, for both
+## sides, and announced, so it is never hidden help.
+func _mise_en_place(side: String) -> void:
+	var k := kitchen(side)
+	if k.mise_used:
+		return
+	var technique: CardInstance = null
+	for c in k.hand:
+		if c.def.is_ingredient() and _placeable(c, k):
+			return
+		if technique == null and not c.def.is_ingredient() and c.def.special != "signature":
+			technique = c
+	if technique == null:
+		return
+	for i in range(k.draw_pile.size() - 1, -1, -1):
+		var c := k.draw_pile[i]
+		if c.def.is_ingredient() and _placeable(c, k):
+			k.draw_pile[i] = technique
+			k.hand[k.hand.find(technique)] = c
+			k.mise_used = true
+			_say("Mise en place! %s preps %s." % [chef_name(side), c.def.name])
+			mise_en_place.emit(side, c, technique)
+			return
+
+
+## An ingredient this kitchen could put down this turn (affordable, a station has room).
+static func _placeable(c: CardInstance, k: Kitchen) -> bool:
+	if c.def.cost > k.fighter.heat:
+		return false
+	for s in STATIONS:
+		if k.stack(s).size() < STATION_SIZE:
+			return true
+	return false
 
 
 # ---------------------------------------------------------------- helpers
@@ -720,7 +789,7 @@ func _fill_deck(side: String, deck: Array[CardDef]) -> void:
 	var k := kitchen(side)
 	for def in deck:
 		k.draw_pile.append(_instance(def))
-	k.rng.shuffle(k.draw_pile)
+	_shuffle(k)
 
 
 func _instance(def: CardDef) -> CardInstance:

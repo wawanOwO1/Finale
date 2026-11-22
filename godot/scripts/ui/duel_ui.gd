@@ -128,6 +128,7 @@ func bind(d: Duel) -> void:
 	d.changed.connect(_refresh)
 	d.signature_served.connect(_play_cutin)
 	d.dish_revealed.connect(_show_dish)
+	d.mise_en_place.connect(func(side: String, _drawn: CardInstance, _given: CardInstance) -> void: show_mise(side))
 	d.confidence_lost.connect(func(target: String, amount: int, source: String) -> void:
 		_float(_anchor(target), "-%d" % amount, Pal.ORANGE if source == "spicy" else Pal.RED, 2.3))
 	d.pressure_dealt.connect(func(target: String, _amount: int, blocked: int) -> void:
@@ -1251,6 +1252,13 @@ func _toast(text: String) -> void:
 
 
 ## Floating number over a chef (damage, block, status). Same timing as the CSS float-up.
+## Mise en Place helped this side's opening hand (GRAND_DESIGN §4.2): shown, never hidden.
+## Over Apis's stations, or over the rival's face-down stations (the swapped card stays secret).
+func show_mise(side: String) -> void:
+	var at: Vector2 = anchors.rival_stations if side == "enemy" else anchors.board
+	_float(at + Vector2(0, -Pal.em(1.0)), "Mise en place!", Pal.GOLD, 1.3, "inspired", 0.1)
+
+
 func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name := "", delay := 0.0) -> void:
 	var row := Ui.hbox(0.15)
 	if icon_name != "":

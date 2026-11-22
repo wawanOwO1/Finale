@@ -222,11 +222,11 @@ Mood samar: pemain tahu "akan ada serangan besar", tapi tidak tahu berapa dan da
 - ✅ Signature Dish hanya untuk Apis (GDD §4.5); Hype rival hanya meter penonton.
 - ✅ Data: Tony (`greedy`, Heat 2, tangan 4, Basics), Rosa (`trickster`, Heat 3, tangan 4, Basics + Spice).
 - Balancing awal (bot pintar, deck starter): Tony 98% menang, ±2.8 giliran, sisa Confidence ±44/60. Rosa 85% menang, ±3.5 giliran, sisa ±36/60.
-- ⏳ Belum: pindah/clear station oleh AI, gimmick Élodie/Bruno (rival-nya belum ada di data), profil `showman`/`patient`/`boss`, tie-break pakai stream RNG terpisah (fase D).
+- ⏳ Belum: pindah/clear station oleh AI, gimmick Élodie/Bruno (rival-nya belum ada di data), profil `showman`/`patient`/`boss`. Tie-break RNG: ✅ fase D (§4.5).
 
 ---
 
-## 4. RNG
+## 4. RNG — ✅ inti selesai 22 Nov (fase D), lihat §4.5
 
 ### 4.1 Peta
 
@@ -264,6 +264,14 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
 - Rival memakai deck, shuffle, dan aturan pity yang sama.
 - Rival tidak melihat tangan dan isi station pemain.
 - Draw rival tidak dicurangi berdasarkan kondisi pemain.
+
+### 4.5 Status implementasi (fase D)
+- ✅ `SeededRng.stream(seed, name)`: stream bernama dari satu `Duel.duel_seed` (FNV-1a nama sebagai salt). Shuffle pemain/rival tetap `seed` / `seed ^ ENEMY_RNG_SALT`; tie-break AI `ai_player` / `ai_enemy` di `Kitchen.ai_rng`. Stream `offers` siap dipakai fase E.
+- ✅ Anti-clump (`Duel._shuffle`): 4+ Technique di 5 kartu teratas → shuffle ulang, maks 3×. Berlaku untuk shuffle awal dan reshuffle discard. Deck berat-Technique: clump pembuka turun dari 95/400 ke 2/400.
+- ✅ Mise en Place (`Duel._mise_en_place`): setelah draw awal giliran, tangan tanpa bahan yang bisa ditaruh → 1 Technique ditukar dengan bahan teratas draw pile (Technique masuk ke posisi itu, jumlah kartu tetap). Maks 1× per giliran, pemain + rival, signal `mise_en_place`. HUD: "Mise en place!" melayang di atas station (rival: di atas station tertutupnya; kartunya tetap rahasia).
+- ✅ Tie-break AI (`RivalAI._consider`): skor dalam 0.05 = seri, dipilih acak merata dari `ai_rng`. Rival tidak lagi selalu mengisi station 1 dulu; test memastikan stream ini tidak menggeser draw Apis.
+- Konstanta di `duel.gd` (`CLUMP_*`), bukan `@export`: ini aturan inti (pure logic), bukan tuning per scene.
+- ⏳ Pity rarity penawaran modifier → fase E.
 
 ---
 

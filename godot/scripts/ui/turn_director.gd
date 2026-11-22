@@ -49,6 +49,9 @@ func is_fast() -> bool:
 ## Opening banner after the 3 · 2 · 1 FIGHT! intro (hand is already dealt).
 func first_turn() -> void:
 	await ui.announcer().turn_banner("YOUR TURN", Pal.GOLD, "TURN %d" % ui.duel.turn, false)
+	# The opening hand was dealt before the HUD listened, so replay its Mise en Place here.
+	if ui.duel.kitchen("player").mise_used:
+		ui.show_mise("player")
 
 
 ## End Turn was accepted (duel.phase == "enemy"): play the whole rival turn, then hand back.
