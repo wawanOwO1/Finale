@@ -96,6 +96,8 @@ Warna tag bahan tetap seperti `Pal.TAG` (PROTEIN oranye, VEGGIE hijau, dst.) dan
 
 ## 4. Layout HUD (wireframe, akan diiterasi di canvas)
 
+> Canvas yang bisa diedit: [Finale HUD Layout](https://claude.ai/artifact/2LPfQEPSEpKToxQ2iBWAqF). Isinya Duel HUD, HUD Kit, Station Stack, Emote, dan 4 layar announcer. Canvas itu jadi acuan utama, wireframe teks di bawah hanya ringkasan.
+
 Grid art 640×360. Angka = posisi kira-kira dalam px art.
 
 ```
@@ -163,7 +165,7 @@ Tiap emote adalah sprite 24×24 (2–4 frame). Satu set dipakai semua chef; chef
 > Ini perubahan **gameplay**, bukan hanya visual. Menggantikan Plate 5 slot di GDD §4.2–4.3.
 
 ### 6.1 Aturan
-- Ada **3 Station** (kolom) di meja. Tiap station menumpuk bahan **dari bawah ke atas**, maksimal **6** (7 dengan *Bigger Plate*).
+- Ada **3 Station** (kolom) di meja. Tiap station menumpuk bahan **seperti solitaire**: bahan pertama di paling atas kolom, tiap bahan baru menindih ke bawah. Kartu lama hanya terlihat pita nama + ikon tag, kartu terbaru terbuka penuh (bingkai emas = bisa diambil). Maksimal **6** (7 dengan *Bigger Plate*).
 - Bahan dari tangan di-drag ke **atas** stack mana pun. Hanya kartu teratas yang bisa disentuh (seperti solitaire).
 - Stack **bertahan antar giliran**, sama seperti Plate sekarang. Pemain bisa menyiapkan 2–3 hidangan sekaligus.
 - **Serve** memilih 1 station (1 Heat, sekali per giliran). Station itu kosong lagi.
@@ -171,7 +173,7 @@ Tiap emote adalah sprite 24×24 (2–4 frame). Satu set dipakai semua chef; chef
 - **Clear station**: buang seluruh stack ke discard, gratis, mengakhiri kesempatan pindah giliran itu.
 
 ### 6.2 Pencocokan
-Resep punya **urutan langkah**. Station dibaca dari bawah ke atas.
+Resep punya **urutan langkah**. Station dibaca dari kartu pertama (atas kolom) ke kartu terbaru (bawah kolom). Di tabel §6.4, "bawah → atas" berarti urutan penaruhan ini.
 
 | Hasil | Syarat | Efek |
 |---|---|---|
@@ -180,14 +182,14 @@ Resep punya **urutan langkah**. Station dibaca dari bawah ke atas.
 | **Garnish** | Bahan tambahan **di atas** resep yang sudah lengkap | +1 Quality per bahan, maks +2 |
 | **Improvised** | Tidak cocok resep apa pun | 2 × jumlah bahan Pressure (aturan lama) |
 
-> Alternatif yang lebih keras: urutan **wajib** (tanpa "Cooked"). Lebih "real", tapi lebih sering gagal. Aku sarankan versi di atas dulu, diputuskan setelah playtest.
+> **Diputuskan 22 Nov:** aturan **lunak** (Perfect/Cooked) dipakai. Urutan wajib tidak dipakai.
 
 ### 6.3 Order Ticket (ref 7)
 - Begitu kartu pertama masuk station, tiket di atasnya menampilkan **resep paling mungkin**: ikon hidangan + baris ikon bahan sesuai urutan + ikon metode masak (wajan, panggang, rebus).
 - Bahan yang sudah ada = ikon terang + centang. Langkah berikutnya = berkedip.
 - Kalau stack keluar jalur, tiket berubah jadi "???" (Improvised) dengan warna abu.
 - Saat resep lengkap: tiket **"stamp" PERFECT!/COOKED** dengan animasi cap, sudut tiket emas.
-- Catatan: GDD sekarang menyebut "Recipe Book ditutup saat duel, tanpa hint resep". Tiket ini membuka hint lagi. Perlu diputuskan (§9).
+- **Diputuskan 22 Nov:** tiket **boleh memberi hint** resep. Ini menggantikan aturan GDD "Recipe Book ditutup saat duel, tanpa hint resep".
 
 ### 6.4 Urutan resep (draft, dunia nyata disederhanakan)
 Kunci: `TAG` = bahan apa pun bertag itu, *Nama* = bahan kunci.
@@ -248,13 +250,13 @@ Konvensi file: `godot/assets/pixel/<kategori>/<nama>.png`, tanpa filter, import 
 
 ---
 
-## 9. Keputusan yang perlu kamu ambil
+## 9. Keputusan
 
-1. **Canvas untuk iterasi layout:** Figma (bisa aku tulis langsung lewat Figma MCP) atau halaman HTML editable di sini (drag-resize kotak, simpan posisi).
-2. **Aturan urutan:** versi lunak (Perfect/Cooked) atau keras (wajib urut)?
-3. **Hint resep saat duel:** Order Ticket menampilkan resep (lebih ramah) atau tetap tertutup sesuai GDD sekarang?
-4. **Jumlah station:** 3 (usulan) atau 2?
-5. **Nama di layar menang:** "APIS WINS!" atau nama yang diketik pemain?
+1. ~~Canvas~~ → **HTML canvas di Claude** ([Finale HUD Layout](https://claude.ai/artifact/2LPfQEPSEpKToxQ2iBWAqF)).
+2. ~~Aturan urutan~~ → **lunak** (Perfect ×1.5 / Cooked ×1.0).
+3. ~~Hint resep~~ → **Order Ticket boleh memberi hint.**
+4. ~~Jumlah station~~ → **3**, tampil sebagai tumpukan solitaire.
+5. **Masih terbuka · nama di layar menang:** "APIS WINS!" atau nama yang diketik pemain?
 
 ---
 
