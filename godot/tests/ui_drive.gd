@@ -13,18 +13,31 @@ func _initialize() -> void:
 	out_dir = args[0] if args.size() > 0 else OS.get_user_data_dir()
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	main.dev_deck = true
+	# Fresh Almanac each run, never the player's own save.
+	var keeper: AlmanacKeeper = main.get_node("AlmanacKeeper")
+	keeper.save_path = out_dir.path_join("almanac_test.save")
+	DirAccess.remove_absolute(keeper.save_path)
 	root.add_child(main)
 	await _wait(0.6)
 	_shot("1_cookbook")
 	_crop("1a_cookbook", Rect2(0.2, 0.1, 0.6, 0.6))
 	var ui = main.get_node("DuelUI")
+	# Almanac from the Recipe Book (GRAND_DESIGN §6.4): always opens before the duel.
+	await _click(ui.get_node("%BookAlmanac").get_global_rect().get_center())
+	await _wait(0.3)
+	_check("Almanac opens from the Recipe Book", ui.get_node("%Almanac").visible and paused)
+	_check("your deck is already in it", keeper.almanac.knows_card("bread") and keeper.almanac.knows_recipe("toast"))
+	_shot("1b_almanac")
+	_key(KEY_TAB)
+	await _wait(0.2)
+	_check("Tab closes it and unpauses", not ui.get_node("%Almanac").visible and not paused)
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
 	await _wait(1.0)
 	_check("duel started after clicking the book button", main.duel != null)
 	_shot("2_intro_countdown")
 	await _wait(1.3)
 	_shot("2_intro_fight")
-	await _wait(2.2)
+	await _wait(3.4)
 	_check("intro announcer finished", not ui._announcer.visible)
 	if main.duel == null:
 		return _end()
@@ -89,14 +102,113 @@ func _initialize() -> void:
 		_crop("6a_served", Rect2(0.0, 0.1, 0.75, 0.45))
 		_check("serve button serves", duel.served_this_turn)
 	await _wait(0.6)
+	# Turn sequence (GRAND_DESIGN §1): RIVAL'S TURN banner → paced steps → YOUR TURN banner.
 	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
-	await _wait(0.6)
+	await _wait(0.4)
+	_check("end turn hands over to the rival", duel.phase == "enemy" and duel.turn == 1)
+	_check("input is locked on the rival turn", ui._locked() and ui.get_node("%EndTurn").disabled)
+	_shot("7_rival_banner")
+	await _wait(1.3)
+	_shot("7b_rival_acting")
+	var t0 := Time.get_ticks_msec()
+	while duel.phase == "enemy" and Time.get_ticks_msec() - t0 < 12000:
+		await _wait(0.1)
+	_shot("7c_your_turn_banner")
+	var normal_ms := Time.get_ticks_msec() - t0 + 1700
+	_check("rival turn is paced (2-8 s): %d ms" % normal_ms, normal_ms > 2000 and normal_ms < 8000)
+	await _wait(1.6)
 	_check("end turn button advances the turn", duel.turn == 2)
+	_check("input unlocks on the player's turn", not ui._locked())
+	# Drafting rival (GRAND_DESIGN §3.5): face-down stations, never a card face.
+	var rk: Control = ui.get_node("%RivalKitchen")
+	_check("rival kitchen shows for a drafting rival", rk.visible and duel.drafting())
+	_check("rival cards are never drawn face up", rk.find_children("*", "CardView", true, false).is_empty())
+	_crop("7d_rival_kitchen", Rect2(0.55, 0.15, 0.4, 0.45))
+	# Fast-forward: hold Space through a whole rival turn.
+	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
+	_space(true)
+	var t1 := Time.get_ticks_msec()
+	await _wait(0.3)
+	_check("holding Space speeds the rival up", Engine.time_scale > 1.0)
+	while duel.phase == "enemy" and Time.get_ticks_msec() - t1 < 12000:
+		await _wait(0.05)
+	_space(false)
+	var fast_ms := Time.get_ticks_msec() - t1
+	_check("fast-forward is quicker: %d vs %d ms" % [fast_ms, normal_ms], fast_ms < normal_ms * 0.7)
+	await _wait(1.6)
+	_check("time scale back to normal", Engine.time_scale == 1.0)
 	_shot("7_turn2")
 	_crop("7a_player_hud", Rect2(0, 0.72, 0.4, 0.28))
 	_crop("7b_rival", Rect2(0.75, 0.08, 0.25, 0.32))
+	# Chef's Flow (GRAND_DESIGN §5): one Perfect Serve short, then a Perfect Toast opens the pick.
+	var pk := duel.kitchen("player")
+	pk.flow = pk.flow_threshold() - 1
+	duel.stations[0] = _inst(duel, ["bread", "butter"])
+	duel.changed.emit()
+	await _wait(0.3)
+	await _click(_serve_button(ui, 0).get_global_rect().get_center())
+	await _wait(1.0)
+	_check("the pick waits for the dish reveal", not ui.get_node("%FlowPick").visible)
+	await _wait(0.9)
+	var pick: Control = ui.get_node("%FlowPick")
+	var cards := ui.get_node("%FlowChoices").get_children()
+	_check("Chef's Flow opens a pick of 3", pick.visible and cards.size() == 3)
+	_check("input is locked while picking", ui._locked() and not duel.end_turn().ok)
+	_shot("7e_flow_pick")
+	var chosen: String = pk.offer[1].id
+	await _click((cards[1] as Control).get_global_rect().get_center())
+	await _wait(0.3)
+	_check("clicking a card takes that modifier", pk.mod(chosen) == 1 and not pick.visible and not ui._locked())
+	_check("the HUD shows the modifier", ui.get_node("%PlayerFlow").get_child_count() >= 2)
+	await _wait(1.2)
+	_crop("7f_player_flow", Rect2(0, 0.62, 0.4, 0.38))
+	# Almanac mid-duel (GRAND_DESIGN §6.4): the HUD book button pauses the duel.
+	var alm: Control = ui.get_node("%Almanac")
+	await _click(ui.get_node("%AlmanacButton").get_global_rect().get_center())
+	await _wait(0.3)
+	_check("HUD book button opens the Almanac and pauses", alm.visible and paused)
+	_check("input is locked while it is open", ui._locked())
+	await _click(ui.get_node("%AlmanacTabs/Recipes").get_global_rect().get_center())
+	await _wait(0.2)
+	await _click(ui.get_node("%FinderChips/SPICE").get_global_rect().get_center())
+	await _wait(0.2)
+	var known: Array[RecipeDef] = []
+	for r: RecipeDef in GameDB.all("recipes"):
+		if keeper.almanac.knows_recipe(r.id):
+			known.append(r)
+	var rows := ui.get_node("%AlmanacList").get_children().filter(func(n: Node) -> bool: return n.has_meta("key"))
+	var want := Almanac.find(known, ["SPICE"]).size()
+	_check("finder chip filters the recipes: %d rows, want %d" % [rows.size(), want], want > 0 and rows.size() == want)
+	_shot("7g_almanac_finder")
+	await _click(ui.get_node("%AlmanacTabs/Rivals").get_global_rect().get_center())
+	await _wait(0.2)
+	var tile: Control = ui.get_node("%AlmanacList").find_child("tony", true, false)
+	if tile:
+		await _click(tile.get_global_rect().get_center())
+		await _wait(0.2)
+	var texts := ui.get_node("%DetailBox").find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	_check("rival tile shows Tony in the detail", texts.has("Tony"))
+	_shot("7h_almanac_rival")
+	await _click(ui.get_node("%AlmanacClose").get_global_rect().get_center())
+	await _wait(0.2)
+	_check("Close unpauses and unlocks", not alm.visible and not paused and not ui._locked())
+	# On the rival's turn Tab only queues it: it opens when the player's turn starts.
+	await _click(ui.get_node("%EndTurn").get_global_rect().get_center())
+	await _wait(0.4)
+	_key(KEY_TAB)
+	await _wait(0.2)
+	_check("Tab on the rival turn waits", duel.phase == "enemy" and not alm.visible and ui._almanac_queued)
+	var t2 := Time.get_ticks_msec()
+	while not alm.visible and Time.get_ticks_msec() - t2 < 14000:
+		await _wait(0.1)
+	if not (alm.visible and paused):
+		print("  diag: visible=%s paused=%s " % [alm.visible, paused] + "phase=%s busy=%s running=%s announcer=%s drag=%s sdrag=%s over=%s queued=%s flow=%s" % [duel.phase, ui._busy, ui.director.running, ui._announcer.visible, ui._drag, ui._sdrag, duel.over(), ui._almanac_queued, ui.get_node("%FlowPick").visible])
+	_check("queued Almanac opens on the player's turn", alm.visible and paused and duel.phase == "player")
+	_key(KEY_ESCAPE)
+	await _wait(0.2)
+	_check("Esc closes it", not alm.visible and not paused)
 	# Signature Dish cut-in
-	ui._play_cutin("Omelette")
+	ui._play_cutin("player", "Omelette")
 	await _wait(0.5)
 	_shot("8_cutin")
 	await _wait(1.4)
@@ -197,3 +309,20 @@ func _crop(name: String, f: Rect2) -> void:
 	var sz := Vector2(img.get_size())
 	var r := Rect2i(Vector2i(f.position * sz), Vector2i(f.size * sz))
 	img.get_region(r).save_png(out_dir.path_join(name + ".png"))
+
+
+func _space(down: bool) -> void:
+	var e := InputEventKey.new()
+	e.keycode = KEY_SPACE
+	e.physical_keycode = KEY_SPACE
+	e.pressed = down
+	Input.parse_input_event(e)
+
+
+func _key(code: Key) -> void:
+	for down in [true, false]:
+		var e := InputEventKey.new()
+		e.keycode = code
+		e.physical_keycode = code
+		e.pressed = down
+		root.push_input(e)

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "mise_master"
+name = "Mise Master"
+rarity = 1
+icon = "inspired"
+text = "Mise en Place also helps when your hand has only 1 ingredient."
+stackable = false
+amount = 1.0
+tag = ""

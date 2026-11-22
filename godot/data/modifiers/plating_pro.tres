@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "plating_pro"
+name = "Plating Pro"
+rarity = 1
+icon = "crown"
+text = "Garnish gives xX Quality."
+stackable = false
+amount = 2.0
+tag = ""

@@ -32,7 +32,7 @@ Alur match: 3 · 2 · 1 → ROUND N / FIGHT! di awal, FINISHED → YOU WINS! ata
 Lawan memunculkan emote di samping kepala (`scripts/ui/emote_bubble.gd`): Smug saat Confidence-mu ≤30%,
 Shocked saat kena ≥15, Angry saat lawan ≤25%, Sad saat lawan kalah, Confident saat intent ≥10.
 
-Shortcut in-game: **E** = End Turn, **S** = Serve station terbaik, **P** = filter pixel, **F11** = fullscreen.
+Shortcut in-game: **E** = End Turn, **tahan klik / Space** saat giliran rival = percepat ×3, **S** = Serve station terbaik, **P** = filter pixel, **F11** = fullscreen.
 
 Resolusi desain 1920x1080 (stretch `canvas_items` + `expand`), tapi window dibuka **1600x900**
 (`window_*_override`) supaya window + title bar muat di layar 1080p. UI mengikuti ukuran window

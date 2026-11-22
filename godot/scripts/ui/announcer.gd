@@ -1,8 +1,9 @@
 class_name Announcer
 extends Control
 ## Match flow text (ART_DIRECTION §7, ref 6): 3 · 2 · 1 → ROUND N / FIGHT! at the start,
-## FINISHED → YOU WINS! or LOSER at the end. Full-screen; blocks clicks while it plays.
-##   await announcer.intro(2)      await announcer.result(true)
+## FINISHED → YOU WINS! or LOSER at the end, and the turn banners in between.
+## Full-screen; blocks clicks while it plays.
+##   await announcer.intro(2)      await announcer.result(true)      await announcer.turn_banner(…)
 
 const WIN_TEXT := "YOU WINS!"
 const LOSE_TEXT := "LOSER"
@@ -50,6 +51,16 @@ func result(won: bool) -> void:
 		await _slam(WIN_TEXT, Pal.GOLD, 1.6, Pal.RED_DARK, true)
 	else:
 		await _fall_letters(LOSE_TEXT)
+	await _close()
+
+
+## Turn hand-over banner (GRAND_DESIGN §1.2 P1 / E1): "YOUR TURN" or "TONY'S TURN", ~1.1 s.
+func turn_banner(text: String, color: Color, kicker := "", sfx := true) -> void:
+	_open()
+	_kicker.text = kicker
+	if sfx:
+		_sfx("turn")
+	await _slam(text, color, 0.55, Pal.INK, true)
 	await _close()
 
 

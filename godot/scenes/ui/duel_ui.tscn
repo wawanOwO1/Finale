@@ -9,6 +9,8 @@
 [ext_resource type="Script" path="res://scripts/ui/hud/seg_bar.gd" id="seg_bar"]
 [ext_resource type="Script" path="res://scripts/ui/hud/hp_bar.gd" id="hp_bar_script"]
 [ext_resource type="Script" path="res://scripts/ui/hud/diamond_badge.gd" id="diamond"]
+[ext_resource type="Texture2D" path="res://assets/icons/book.svg" id="8"]
+[ext_resource type="Script" path="res://scripts/ui/almanac_view.gd" id="9"]
 
 [sub_resource type="StyleBoxFlat" id="hud_panel"]
 content_margin_left = 18.0
@@ -99,6 +101,17 @@ border_width_right = 5
 border_width_bottom = 5
 border_color = Color(0.165, 0.102, 0.063, 1)
 anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="book_rule"]
+content_margin_left = 15.0
+content_margin_top = 10.0
+content_margin_right = 15.0
+content_margin_bottom = 10.0
+bg_color = Color(0.953, 0.89, 0.769, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="pile"]
 content_margin_left = 9.0
@@ -297,6 +310,48 @@ texture = ExtResource("3")
 expand_mode = 1
 stretch_mode = 5
 
+[node name="AlmanacButton" type="Button" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -156.0
+offset_top = 12.0
+offset_right = -96.0
+offset_bottom = 72.0
+grow_horizontal = 0
+
+[node name="AlmanacIcon" type="TextureRect" parent="Root/AlmanacButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 9.0
+offset_top = 8.0
+offset_right = -9.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("8")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AlmanacDot" type="ColorRect" parent="Root/AlmanacButton"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -9.0
+offset_top = -4.0
+offset_right = 3.0
+offset_bottom = 8.0
+grow_horizontal = 0
+mouse_filter = 2
+color = Color(0.847, 0.204, 0.173, 1)
+
 [node name="Rival" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(420, 0)
@@ -395,6 +450,63 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 alignment = 1
+
+[node name="EnemyFlow" type="HBoxContainer" parent="Root/Rival/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+alignment = 1
+
+[node name="RivalKitchen" type="PanelContainer" parent="Root"]
+visible = false
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 1200.0
+offset_top = 380.0
+offset_right = 1400.0
+offset_bottom = 480.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("hud_panel_tight")
+script = ExtResource("hud_panel")
+tab_text = "RIVAL KITCHEN"
+tab_x = 20.0
+tab_height = 34.0
+tab_font_size = 16
+
+[node name="VBox" type="VBoxContainer" parent="Root/RivalKitchen"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="RivalStations" type="HBoxContainer" parent="Root/RivalKitchen/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="RivalInfo" type="HBoxContainer" parent="Root/RivalKitchen/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="RivalHand" type="Label" parent="Root/RivalKitchen/VBox/RivalInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_font_sizes/font_size = 13
+text = "Hand 4"
+
+[node name="RivalHeat" type="Label" parent="Root/RivalKitchen/VBox/RivalInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.439, 0.165, 1)
+theme_override_font_sizes/font_size = 13
+text = "Heat 2/2"
 
 [node name="Board" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
@@ -511,6 +623,12 @@ theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
 theme_override_font_sizes/font_size = 20
 text = "HEAT 3/3"
 vertical_alignment = 1
+
+[node name="PlayerFlow" type="HBoxContainer" parent="Root/PlayerHud/Row/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
 
 [node name="PlayerStatuses" type="HBoxContainer" parent="Root/PlayerHud/Row/Info"]
 unique_name_in_owner = true
@@ -657,6 +775,30 @@ offset_bottom = -62.0
 grow_horizontal = 0
 grow_vertical = 0
 text = "End Turn"
+
+[node name="SpeedHint" type="Label" parent="Root"]
+visible = false
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -96.0
+offset_right = 300.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_colors/font_outline_color = Color(0.231, 0.141, 0.078, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 20
+text = "Hold click or Space to speed up  >>"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Floaters" type="Control" parent="Root"]
 z_index = 90
@@ -954,11 +1096,21 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="StartButton" type="Button" parent="Root/Cookbook/Center/Column"]
+[node name="Buttons" type="HBoxContainer" parent="Root/Cookbook/Center/Column"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 24
+
+[node name="BookAlmanac" type="Button" parent="Root/Cookbook/Center/Column/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 92)
+layout_mode = 2
+text = "ALMANAC (TAB)"
+
+[node name="StartButton" type="Button" parent="Root/Cookbook/Center/Column/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(640, 92)
 layout_mode = 2
-size_flags_horizontal = 4
 text = "CLOSE THE BOOK AND DUEL"
 
 [node name="Overlay" type="Control" parent="Root"]
@@ -1019,6 +1171,220 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 text = "Duel again"
+
+[node name="FlowPick" type="Control" parent="Root"]
+z_index = 140
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Root/FlowPick"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.165, 0.102, 0.047, 0.8)
+
+[node name="Center" type="CenterContainer" parent="Root/FlowPick"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FlowBox" type="VBoxContainer" parent="Root/FlowPick/Center"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="FlowKicker" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.714, 0.196, 1)
+theme_override_font_sizes/font_size = 22
+text = "CHEF'S FLOW!"
+horizontal_alignment = 1
+
+[node name="FlowTitle" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_font_sizes/font_size = 40
+text = "Pick a modifier"
+horizontal_alignment = 1
+
+[node name="FlowSub" type="Label" parent="Root/FlowPick/Center/FlowBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 0.8)
+theme_override_font_sizes/font_size = 15
+text = "It lasts the rest of this duel. Picking one you have adds a stack."
+horizontal_alignment = 1
+
+[node name="FlowChoices" type="HBoxContainer" parent="Root/FlowPick/Center/FlowBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="Almanac" type="Control" parent="Root"]
+process_mode = 3
+z_index = 160
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("9")
+
+[node name="Dim" type="ColorRect" parent="Root/Almanac"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.165, 0.102, 0.047, 0.85)
+
+[node name="Center" type="CenterContainer" parent="Root/Almanac"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AlmanacBox" type="PanelContainer" parent="Root/Almanac/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1280, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("modal_box")
+
+[node name="VBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Head" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 13
+
+[node name="BookIcon" type="TextureRect" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+self_modulate = Color(0.847, 0.204, 0.173, 1)
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("8")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Titles" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="AlmanacTitle" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Almanac"
+
+[node name="AlmanacSub" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+text = "Everything you have found so far. The duel is paused. Tab or Esc closes it."
+
+[node name="AlmanacProgress" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+text = "Found 0 / 0"
+
+[node name="AlmanacClose" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+text = "Close"
+
+[node name="AlmanacTabs" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Ingredients" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Ingredients"
+
+[node name="Techniques" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Techniques"
+
+[node name="Recipes" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Recipes"
+
+[node name="Rivals" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Rivals"
+
+[node name="Keywords" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+text = "Keywords"
+
+[node name="AlmanacFinder" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FinderHint" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+theme_override_font_sizes/font_size = 15
+text = "Pick up to 3 tags or ingredients to find the recipes that use them."
+
+[node name="FinderChips" type="HFlowContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="Body" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Scroll" type="ScrollContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
+custom_minimum_size = Vector2(0, 520)
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0
+
+[node name="AlmanacList" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="AlmanacDetail" type="PanelContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("book_rule")
+
+[node name="DetailBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/AlmanacDetail"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
 
 [node name="Tooltip" type="Control" parent="Root"]
 z_index = 200

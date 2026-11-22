@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "crowd_favorite"
+name = "Crowd Favorite"
+rarity = 0
+icon = "hype"
+text = "+X Hype on every Serve."
+stackable = true
+amount = 10.0
+tag = ""

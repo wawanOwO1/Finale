@@ -31,8 +31,16 @@ void fragment() {
 """
 
 var duel: Duel
+## Paces the turn loop and the rival's steps (GRAND_DESIGN §1). The TurnDirector node in main.tscn;
+## main.gd hands it over.
+var director: TurnDirector
+## Set by main.gd: the discoveries the Almanac window shows (GRAND_DESIGN §6).
+var almanac_keeper: AlmanacKeeper
+## Tab was pressed on the rival turn: open the Almanac as soon as it is the player's turn.
+var _almanac_queued := false
 ## Screen positions of the 3D anchors, pushed every frame by main.gd.
-var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400)}
+var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400),
+		rival_stations = Vector2(1300, 420)}
 
 var _views: Array[CardView] = []
 var _prev_hand := {}
@@ -66,11 +74,14 @@ var _mouse := Vector2(-1000, -1000)
 
 
 func _ready() -> void:
-	%EndTurn.pressed.connect(func() -> void: if duel: duel.end_turn())
+	%EndTurn.pressed.connect(_end_turn)
 	%RestartButton.pressed.connect(func() -> void: restart_requested.emit())
 	%PixelButton.pressed.connect(func() -> void: pixel_toggled.emit())
+	%AlmanacButton.pressed.connect(toggle_almanac)
+	%BookAlmanac.pressed.connect(toggle_almanac)
+	%Almanac.closed.connect(_refresh_almanac_dot)
 	_build_static()
-	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip]:
+	for n in [%Cookbook, %Overlay, %Toast, %DishBanner, %CutIn, %PlayZone, %Tooltip, %FlowPick]:
 		n.hide()
 	# Rival emote follows the head; announcer covers everything but the tooltip.
 	_emote_holder = Control.new()
@@ -96,6 +107,7 @@ func show_cookbook(recipes: Array[RecipeDef]) -> void:
 	_show_book_page(0)
 	%Cookbook.show()
 	_pop_in(%BookBox)
+	_refresh_almanac_dot()
 	await %StartButton.pressed
 	%Cookbook.hide()
 func bind(d: Duel) -> void:
@@ -107,13 +119,17 @@ func bind(d: Duel) -> void:
 	_sdrag = {}
 	_emote.clear()
 	d.confidence_lost.connect(_emote_on_hit)
-	d.signature_served.connect(func(_dish: String) -> void: _emote.pop("shocked"))
+	d.signature_served.connect(func(side: String, _dish: String) -> void: if side == "player": _emote.pop("shocked"))
 	d.turn_started.connect(func(_turn: int) -> void: _emote_on_intent())
 	d.duel_ended.connect(_on_duel_ended)
 	%VenueSub.text = "vs %s" % d.enemy_def.name
 	d.changed.connect(_refresh)
 	d.signature_served.connect(_play_cutin)
 	d.dish_revealed.connect(_show_dish)
+	d.mise_en_place.connect(func(side: String, _drawn: CardInstance, _given: CardInstance) -> void: show_mise(side))
+	d.flow_offer.connect(_on_flow_offer)
+	d.modifier_gained.connect(_on_modifier_gained)
+	%FlowPick.hide()
 	d.confidence_lost.connect(func(target: String, amount: int, source: String) -> void:
 		_float(_anchor(target), "-%d" % amount, Pal.ORANGE if source == "spicy" else Pal.RED, 2.3))
 	d.pressure_dealt.connect(func(target: String, _amount: int, blocked: int) -> void:
@@ -134,8 +150,73 @@ func _intro() -> void:
 	_busy = true
 	_hide_tip()
 	await _announcer.intro(round_number)
+	await director.first_turn()
 	_busy = false
 	_emote_on_intent()
+
+
+## End Turn (button or E): the Turn Director plays the rival's turn and hands it back.
+func _end_turn() -> void:
+	if _locked():
+		return
+	var r := duel.end_turn()
+	if not r.ok:
+		_reject(r.reason)
+		return
+	_hide_tip()
+	director.rival_turn()
+
+
+func announcer() -> Announcer:
+	return _announcer
+
+
+## "Hold click or Space to speed up" (SpeedHint in duel_ui.tscn), shown on the rival turn.
+func speed_hint() -> Label:
+	return %SpeedHint
+
+
+## Locks card/station input (rival turn, banners). The result sequence also sets it.
+func set_busy(on: bool) -> void:
+	_busy = on
+	if on:
+		_hide_tip()
+
+
+## E3: the rival "thinks" for a moment before each step.
+func rival_think(seconds: float) -> void:
+	_emote.pop("think")
+	await get_tree().create_timer(seconds).timeout
+
+
+## A rival step was applied (GRAND_DESIGN §1.3). Numbers, statuses and the dish reveal float up
+## from the duel's own signals; this adds what the step itself looks like, never the card face.
+func rival_act(action: Dictionary) -> void:
+	if _emote.kind == "think":
+		_emote.clear()
+	match action.get("kind", ""):
+		"place":
+			# The new face-down card drops onto its station.
+			var col := %RivalStations.get_child(action.station) as Control if action.station < %RivalStations.get_child_count() else null
+			var back := col.get_child(col.get_child_count() - 1) as Control if col and col.get_child_count() > 0 else null
+			if back:
+				back.pivot_offset = back.size / 2.0
+				back.position.y -= Pal.em(1.2)
+				back.scale = Vector2.ONE * 1.3
+				var tw := create_tween().set_parallel()
+				tw.tween_property(back, "position:y", back.position.y + Pal.em(1.2), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw.tween_property(back, "scale", Vector2.ONE, 0.22)
+		"technique":
+			_float(anchors.rival + Vector2(0, -Pal.em(1.5)), "Technique!", Pal.CREAM, 1.0, "technique")
+		"serve":
+			pass
+		_:
+			# Old intent-pattern rival: its intent badge pulses.
+			var intent: Control = %Intent
+			intent.pivot_offset = intent.size / 2.0
+			var tw := create_tween()
+			tw.tween_property(intent, "scale", Vector2.ONE * 1.25, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(intent, "scale", Vector2.ONE, 0.15)
 
 
 func _on_duel_ended(winner: String) -> void:
@@ -156,7 +237,7 @@ func _on_duel_ended(winner: String) -> void:
 
 ## Rival emotes (ART_DIRECTION §5): smug when Apis is low, shocked by a big hit, angry when beaten down.
 func _emote_on_hit(target: String, amount: int, _source: String) -> void:
-	if duel == null or duel.phase != "player":
+	if duel == null or duel.over():
 		return
 	if target == "player":
 		var low := duel.player.confidence <= duel.player.max_confidence * 0.3
@@ -170,15 +251,22 @@ func _emote_on_hit(target: String, amount: int, _source: String) -> void:
 		_angry_shown = true
 		var wait := 1.7 if _emote.visible else 0.05
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
-			if duel and duel.phase == "player":
+			if duel and not duel.over():
 				_emote.pop("angry", true))
 
 
+## On Apis's turn the rival shows a mood instead of an intent (GRAND_DESIGN §3.4): vague on
+## purpose. A drafting rival: Confident = a big dish is ready on its counter, Wary = it is low.
 func _emote_on_intent() -> void:
 	if duel == null or duel.phase != "player" or _announcer.visible:
 		return
+	if duel.drafting():
+		var m := RivalAI.mood(duel)
+		if m != "":
+			_emote.pop(m)
+		return
 	var it := duel.intent()
-	if it.has_attack() and duel.pressure_from("enemy", it.attack) >= 10:
+	if it and it.has_attack() and duel.pressure_from("enemy", it.attack) >= 10:
 		_emote.pop("confident")
 
 
@@ -193,6 +281,12 @@ func _build_static() -> void:
 	# Top bar
 	_tip(%Hype, "Hype", Keywords.BASE.Hype.text, "hype")
 	_tip(%PixelButton, "Pixel filter", "Toggle the low-res pixel look. Shortcut: P.", "pixel")
+	Ui.style_button(%AlmanacButton, Pal.HUD_PANEL, Pal.CREAM, 1.0, 0.3, 0.3)
+	_square_button(%AlmanacButton, Pal.HUD_PANEL)
+	%AlmanacButton.get_node("AlmanacIcon").self_modulate = Pal.CREAM
+	_tip(%AlmanacButton, "Almanac", "Everything you have discovered: ingredients, techniques, recipes and rivals. Pauses the duel. Shortcut: Tab.", "book")
+	Ui.style_button(%BookAlmanac, Pal.PAPER, Pal.INK, 1.4, 1.2, 0.5)
+	_square_button(%BookAlmanac, Pal.PAPER)
 	set_pixel_on(false)
 	_tip(%PlayerHp, "Confidence", Keywords.BASE.Confidence.text + "\nBlue cap: Composure.", "confidence")
 	_tip(%RivalHp, "Confidence", Keywords.BASE.Confidence.text + "\nBlue cap: Composure.", "confidence")
@@ -244,13 +338,19 @@ func _square_button(b: Button, bg: Color) -> void:
 func _refresh() -> void:
 	if duel == null:
 		return
+	_refresh_almanac_dot()
 	var d := duel
+	# live = the player can act. During the rival turn the intent stays up (it is being played).
 	var live := d.phase == "player"
 
 	# Rival panel (top-right)
-	%Intent.visible = live
-	if live:
+	# Old pattern rivals show their intent; a drafting rival shows face-down stations instead.
+	%Intent.visible = not d.over() and not d.drafting()
+	if %Intent.visible:
 		_fill_intent(d.intent())
+	%RivalKitchen.visible = d.drafting()
+	if d.drafting():
+		_refresh_rival_kitchen()
 	%RivalName.text = d.enemy_def.name
 	%RivalTitle.text = d.enemy_def.title
 	%RivalHp.ratio = float(d.enemy.confidence) / d.enemy.max_confidence
@@ -258,6 +358,8 @@ func _refresh() -> void:
 	%RivalHp.text = "%d/%d" % [d.enemy.confidence, d.enemy.max_confidence]
 	%RoundLabel.text = "ROUND %d" % round_number
 	_fill_statuses(%EnemyStatuses, d.enemy)
+	%EnemyFlow.visible = d.drafting()
+	_fill_flow(%EnemyFlow, "enemy")
 
 	# Player
 	%PlayerHp.ratio = float(d.player.confidence) / d.player.max_confidence
@@ -268,6 +370,7 @@ func _refresh() -> void:
 		pips[i].self_modulate = Pal.ORANGE if i < d.player.heat else Pal.HUD_EMPTY
 	%HeatText.text = "HEAT %d/%d" % [d.player.heat, Duel.MAX_HEAT]
 	_fill_statuses(%PlayerStatuses, d.player)
+	_fill_flow(%PlayerFlow, "player")
 	%DrawCount.text = str(d.draw_pile.size())
 	%DiscardCount.text = str(d.discard.size())
 
@@ -289,8 +392,8 @@ func _refresh() -> void:
 		_smug_armed = true
 
 	# End of duel (after the FINISHED announcer)
-	%Overlay.visible = not live and _result_done
-	if not live and _result_done:
+	%Overlay.visible = d.over() and _result_done
+	if d.over() and _result_done:
 		var won := d.phase == "won"
 		%ResultTitle.text = "Victory" if won else "Defeat"
 		%ResultTitle.add_theme_color_override("font_color", Pal.RED if won else Pal.INK_SOFT)
@@ -354,10 +457,46 @@ const CARD_W_EM := 7.4
 const CARD_H_EM := 6.4
 ## Visible strip of a covered card (name + tag icon).
 const BAND_EM := 1.75
+## Rival face-down stations (card backs fanned down like the player's stacks).
+const RIVAL_BACK_W_EM := 2.2
+const RIVAL_BACK_H_EM := 2.9
+const RIVAL_BACK_STEP_EM := 0.55
 ## Light tag colors get ink text, dark ones cream.
 const DARK_TAGS: PackedStringArray = ["VEGGIE", "SPICE", "SAUCE"]
 ## Recipe Book chapter ribbon colors (Recipe Book v2 board).
 const BOOK_COLORS := {basics = Color("#3f7fae"), grill = Color("#d9a42a"), spice = Color("#d8342c"), comfort = Color("#2f8a86")}
+
+
+## The rival's side, face down (GRAND_DESIGN §3.5): how many cards sit on each station and in
+## its hand, and its Heat. Never which cards: the dish shows only when it is served.
+func _refresh_rival_kitchen() -> void:
+	var k := duel.kitchen("enemy")
+	for c in %RivalStations.get_children():
+		%RivalStations.remove_child(c)
+		c.queue_free()
+	for i in Duel.STATIONS:
+		var n := k.stack(i).size()
+		var col := Control.new()
+		col.custom_minimum_size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM) + Pal.em(RIVAL_BACK_STEP_EM) * maxi(n - 1, 0))
+		if n == 0:
+			col.add_child(_rival_back(Color(Pal.INK, 0.08), Color(Pal.INK, 0.35), 0))
+		for j in n:
+			col.add_child(_rival_back(Pal.RED_DARK, Pal.INK, j))
+		_tip(col, "%s's station %d" % [duel.enemy_def.name, i + 1],
+				"%d card%s, face down. You see the dish only when it is served." % [n, "" if n == 1 else "s"], "serve")
+		%RivalStations.add_child(col)
+	%RivalHand.text = "Hand %d" % k.hand.size()
+	%RivalHeat.text = "Heat %d/%d" % [duel.enemy.heat, k.max_heat]
+	%RivalKitchen.reset_size()
+
+
+func _rival_back(bg: Color, border: Color, index: int) -> Panel:
+	var p := Panel.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", Ui.box(bg, border, 0.12, 0.3, 0.0))
+	p.position = Vector2(0, Pal.em(RIVAL_BACK_STEP_EM) * index)
+	p.size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM))
+	return p
 
 
 func _refresh_stations() -> void:
@@ -635,7 +774,7 @@ func _best_station() -> int:
 
 ## Input is ignored while the announcer or a drag animation runs.
 func _locked() -> bool:
-	return duel == null or _busy or %Cookbook.visible or _announcer.visible
+	return duel == null or _busy or %Cookbook.visible or _announcer.visible or %FlowPick.visible or %Almanac.visible
 
 
 func _pulse(node: CanvasItem, on: bool, current: Tween) -> Tween:
@@ -697,16 +836,19 @@ func _layout_hand() -> void:
 func _process(_delta: float) -> void:
 	# HUD v2 panels are fixed in the scene; only the emote bubble follows the rival's head.
 	# The Stations panel grows downward with its stacks (solitaire).
+	%RivalKitchen.position = anchors.rival_stations - %RivalKitchen.size / 2.0
 	%Board.reset_size()
 	%Rival.reset_size()
 	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
 	_update_hover()
+	if _almanac_queued and not _almanac_blocked():
+		open_almanac()
 
 
 ## Hover is polled (not mouse_entered) so a lifted card does not flicker at its bottom edge.
 func _update_hover() -> void:
 	var target: CardView = null
-	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible:
+	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible and not %FlowPick.visible and not %Almanac.visible:
 		var m: Vector2 = _mouse
 		var w := Pal.em(8.4)
 		var h := Pal.em(11.8)
@@ -736,8 +878,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key and key.pressed and not key.echo:
 		match key.keycode:
 			KEY_E:
-				if not _locked():
-					duel.end_turn()
+				_end_turn()
 			KEY_S:
 				if not _locked():
 					var best := _best_station()
@@ -761,6 +902,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and not key.echo and key.keycode == KEY_TAB:
+		get_viewport().set_input_as_handled()
+		toggle_almanac()
+		return
 	if event is InputEventMouse:
 		_mouse = (%Root as Control).make_input_local(event).position
 	if _station_drag_input(event):
@@ -1022,6 +1168,13 @@ func _toast(text: String) -> void:
 
 
 ## Floating number over a chef (damage, block, status). Same timing as the CSS float-up.
+## Mise en Place helped this side's opening hand (GRAND_DESIGN §4.2): shown, never hidden.
+## Over Apis's stations, or over the rival's face-down stations (the swapped card stays secret).
+func show_mise(side: String) -> void:
+	var at: Vector2 = anchors.rival_stations if side == "enemy" else anchors.board
+	_float(at + Vector2(0, -Pal.em(1.0)), "Mise en place!", Pal.GOLD, 1.3, "inspired", 0.1)
+
+
 func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name := "", delay := 0.0) -> void:
 	var row := Ui.hbox(0.15)
 	if icon_name != "":
@@ -1045,8 +1198,14 @@ func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name :
 	tw.tween_callback(row.queue_free)
 
 
-func _show_dish(recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) -> void:
-	%DishKicker.text = "DISH SERVED" if recipe else "NO RECIPE MATCHED"
+## Dish reveal over the served station: Apis's station, or the rival's face-down stations
+## (the rival's dish is revealed only now, as it hits; GRAND_DESIGN §1.3).
+func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) -> void:
+	var rival := side == "enemy"
+	if rival:
+		%DishKicker.text = ("%s SERVES" % duel.enemy_def.name.to_upper()) if recipe else "%s IMPROVISES" % duel.enemy_def.name.to_upper()
+	else:
+		%DishKicker.text = "DISH SERVED" if recipe else "NO RECIPE MATCHED"
 	%DishName.text = recipe.name if recipe else "Improvised Dish"
 	for c in %DishTags.get_children():
 		c.queue_free()
@@ -1064,7 +1223,9 @@ func _show_dish(recipe: RecipeDef, perfect: bool, signature: bool, burnt: bool) 
 	b.reset_size()
 	var board: Rect2 = %Board.get_global_rect()
 	var si := duel.last_served_station if duel else -1
-	if si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
+	if rival:
+		board = %RivalKitchen.get_global_rect()
+	elif si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
 		board = _cols[si].get_global_rect()
 	var p := Vector2(board.get_center().x - b.size.x / 2.0, board.position.y - 12.0 - b.size.y)
 	b.position = p
@@ -1092,7 +1253,10 @@ func _dish_tag(icon_name: String, text: String, bg: Color, fg: Color) -> Control
 
 
 ## Signature Dish cut-in (GDD §4.5): spinning rays, slammed ink banner, fade out.
-func _play_cutin(dish: String) -> void:
+## Apis only: the Signature Dish is the MC's move (GDD §4.5).
+func _play_cutin(side: String, dish: String) -> void:
+	if side != "player":
+		return
 	%CutInDish.text = dish
 	var c: Control = %CutIn
 	c.show()
@@ -1210,3 +1374,170 @@ func _book_step(req: String) -> Control:
 	p.custom_minimum_size = Vector2(Pal.em(13), Pal.em(2.9))
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	return p
+
+
+# ================================================================ Chef's Flow (GRAND_DESIGN §5)
+
+## Seconds after a Serve before the pick overlay opens (the dish reveal plays first).
+const FLOW_PICK_DELAY := 1.2
+const FLOW_CARD_W_EM := 12.5
+const FLOW_CARD_H_EM := 15.0
+
+
+## "FLOW ●●○" toward the next modifier, then one chip per modifier owned (tooltip = what it does).
+func _fill_flow(box: HBoxContainer, side: String) -> void:
+	for c in box.get_children():
+		c.queue_free()
+	var k := duel.kitchen(side)
+	var meter := Ui.hbox(0.2)
+	meter.add_child(Ui.label("FLOW", 0.7, Pal.INK_SOFT))
+	for i in k.flow_threshold():
+		var pip := Panel.new()
+		pip.custom_minimum_size = Vector2.ONE * Pal.em(0.7)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.add_theme_stylebox_override("panel", Ui.box(Pal.GOLD if i < k.flow else Pal.PAPER, Pal.INK, 0.1, 1.0, 0.0))
+		meter.add_child(pip)
+	_tip(meter, "Chef's Flow %d/%d" % [k.flow, k.flow_threshold()],
+			"Each Perfect Order Serve fills 1. Full: pick 1 of 3 modifiers for the rest of the duel.", "check")
+	box.add_child(meter)
+	for id: String in k.modifiers:
+		var m := GameDB.modifier(id)
+		var n: int = k.modifiers[id]
+		var row := Ui.hbox(0.1)
+		row.add_child(Ui.icon(m.icon, Pal.GOLD if m.is_rare() else Pal.ORANGE, 1.1))
+		if n > 1:
+			row.add_child(Ui.label(str(n), 0.8))
+		var chip := Ui.panel(Ui.pad(Ui.box(Pal.CREAM, Pal.INK, 0.13, 0.45, 0.0), 0.3, 0.1), row)
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		_tip(chip, m.name + (" x%d" % n if n > 1 else ""), m.describe(n), m.icon)
+		box.add_child(chip)
+
+
+func _on_flow_offer(side: String, choices: Array[ModifierDef]) -> void:
+	if side != "player":
+		return
+	var d := duel
+	await get_tree().create_timer(FLOW_PICK_DELAY).timeout
+	# Still this duel's open offer (not restarted, not already picked).
+	if d != duel or d.kitchen("player").offer != choices:
+		return
+	show_flow_pick(choices)
+
+
+## The pick-1-of-3 overlay (FlowPick in duel_ui.tscn). Input is locked until a card is picked.
+func show_flow_pick(choices: Array[ModifierDef]) -> void:
+	_hide_tip()
+	for c in %FlowChoices.get_children():
+		c.queue_free()
+	var k := duel.kitchen("player")
+	%FlowTitle.text = "Pick a modifier"
+	for m in choices:
+		%FlowChoices.add_child(_flow_card(m, k.mod(m.id)))
+	%FlowPick.show()
+	_pop_in(%FlowBox)
+	var i := 0
+	for card: Control in %FlowChoices.get_children():
+		card.pivot_offset = Vector2(Pal.em(FLOW_CARD_W_EM), Pal.em(FLOW_CARD_H_EM)) / 2.0
+		card.scale = Vector2.ONE * 0.7
+		card.modulate.a = 0.0
+		var tw := create_tween().set_parallel()
+		tw.tween_property(card, "scale", Vector2.ONE, 0.25).set_delay(0.08 * i).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(card, "modulate:a", 1.0, 0.15).set_delay(0.08 * i)
+		i += 1
+
+
+func _flow_card(m: ModifierDef, owned: int) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(Pal.em(FLOW_CARD_W_EM), Pal.em(FLOW_CARD_H_EM))
+	Ui.style_button(b, Pal.CREAM, Pal.INK, 1.0, 0.8, 0.8)
+	if m.is_rare():
+		for st in ["normal", "hover", "pressed", "hover_pressed"]:
+			var sb := b.get_theme_stylebox(st).duplicate() as StyleBoxFlat
+			sb.border_color = Pal.GOLD
+			b.add_theme_stylebox_override(st, sb)
+	b.name = "Pick_" + m.id
+	var col := Ui.vbox(0.45)
+	Ui.fill(col)
+	col.offset_left = Pal.em(0.8)
+	col.offset_right = -Pal.em(0.8)
+	col.offset_top = Pal.em(0.8)
+	col.offset_bottom = -Pal.em(0.8)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(Ui.label("RARE" if m.is_rare() else "COMMON", 0.7, Pal.GOLD.darkened(0.25) if m.is_rare() else Pal.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	var ic := Ui.icon(m.icon, Pal.GOLD if m.is_rare() else Pal.ORANGE, 3.2)
+	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(ic)
+	col.add_child(Ui.label(m.name, 1.25, Pal.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	var text := Ui.label(m.describe(owned + 1), 0.85, Pal.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(text)
+	if owned > 0:
+		col.add_child(Ui.label("Stack %d → %d" % [owned, owned + 1], 0.8, Pal.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+	for n in col.find_children("*", "Control", true, false):
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(col)
+	b.pressed.connect(_pick_flow.bind(m.id))
+	return b
+
+
+func _pick_flow(id: String) -> void:
+	if duel == null or not %FlowPick.visible:
+		return
+	if not duel.pick_modifier(id).ok:
+		return
+	%FlowPick.hide()
+	_refresh()
+
+
+## A modifier was taken: Apis's floats up from the HUD; the rival's is announced by the
+## Turn Director (TONY GOT / HOT PAN!) and floats over the rival.
+func _on_modifier_gained(side: String, m: ModifierDef, stacks: int) -> void:
+	var label := m.name + (" x%d" % stacks if stacks > 1 else "")
+	var at: Vector2 = anchors.rival if side == "enemy" else anchors.player
+	_float(at + Vector2(0, -Pal.em(1.0)), label, Pal.GOLD, 1.3, m.icon, 0.1 if side == "player" else 0.9)
+
+
+# ================================================================ Almanac (GRAND_DESIGN §6)
+
+## Almanac button / Tab: open (pauses the game) or close. On the rival's turn it waits for
+## the player's turn instead of stopping the rival halfway through.
+func toggle_almanac() -> void:
+	if %Almanac.visible:
+		%Almanac.close()
+		return
+	if almanac_keeper == null:
+		return
+	if _almanac_blocked():
+		_almanac_queued = not _almanac_queued
+		if _almanac_queued:
+			_toast("The Almanac opens on your turn.")
+		return
+	open_almanac()
+
+
+func open_almanac() -> void:
+	_almanac_queued = false
+	_hide_tip()
+	if _hover:
+		_hover.set_hovered(false)
+		_hover = null
+	%Almanac.open(almanac_keeper.almanac)
+
+
+## Only on a calm moment: the Recipe Book, the result screen, or the player's own turn with
+## nothing animating or being dragged.
+func _almanac_blocked() -> bool:
+	if %Cookbook.visible or duel == null:
+		return false
+	if _announcer.visible or (director and director.running):
+		return true
+	if duel.over():
+		return false
+	return duel.phase != "player" or _busy or not _drag.is_empty() or not _sdrag.is_empty()
+
+
+## Red dot on the Almanac button while something new is waiting in it.
+func _refresh_almanac_dot() -> void:
+	%AlmanacDot.visible = almanac_keeper != null and not almanac_keeper.almanac.unseen.is_empty()

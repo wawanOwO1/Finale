@@ -35,7 +35,7 @@ func _initialize() -> void:
 		_check("serve -> pot", _playing(audio, "pot"))
 		await create_timer(0.3).timeout
 		_check("serve -> bell", _playing(audio, "bell"))
-	duel.end_turn()
+	duel.end_turn(); duel.run_enemy_turn()
 	_check("new turn -> turn change", _playing(audio, "turn"))
 	duel.duel_ended.emit("player")
 	_check("win -> victory music", audio._music_key == "victory")

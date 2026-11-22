@@ -89,6 +89,8 @@ Tidak ada meta-progression di versi jam (lihat §11).
 - Ini "money shot" untuk GIF, trailer, dan kesan juri.
 
 ### 4.6 Lawan
+> **Diganti 22 Nov 2026:** rival kini drafting dengan aturan yang sama dengan pemain (kartu tertutup), tanpa Intent. Lihat [GRAND_DESIGN.md](GRAND_DESIGN.md) untuk turn sequence, Rival AI, RNG, Chef's Flow, dan Almanac. Isi di bawah ini dipertahankan sebagai riwayat.
+
 - Selalu **1 lawan 1**. Lawan punya Confidence, Composure, dan **Intent** yang terlihat:
   - 🔪 *Prepping*: akan memberi X Pressure
   - 🛡️ *Composed*: menambah Composure

@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/data/intent_def.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/data/ai_profile.gd" id="3"]
+[ext_resource type="Resource" path="res://data/decks/tony.tres" id="4"]
 
 [sub_resource type="Resource" id="sub_1"]
 script = ExtResource("1")
@@ -24,10 +26,24 @@ script = ExtResource("1")
 label = "Composed"
 block = 8
 
+[sub_resource type="Resource" id="ai"]
+script = ExtResource("3")
+id = "greedy"
+w_attack = 1.0
+w_defend = 0.3
+w_patience = 0.0
+w_debuff = 0.4
+
 [resource]
 script = ExtResource("2")
 id = "tony"
 name = "Tony"
 title = "Street Noodle Cook"
+gimmick = "Greedy: serves the moment any recipe fits and rarely blocks. Cooks from Basics with 2 Heat and 4 cards a turn."
 confidence = 30
+deck = ExtResource("4")
+books = PackedStringArray("basics")
+max_heat = 2
+hand_size = 4
+ai = SubResource("ai")
 pattern = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2"), SubResource("sub_3"), SubResource("sub_4")])
