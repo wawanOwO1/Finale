@@ -53,6 +53,13 @@ var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = 
 @export var hand_sink_em := 0.8
 ## Moves the hand right of center (em) so it clears the player panel and draw pile.
 @export var hand_offset_em := 6.5
+@export_group("Stations")
+## Size of the player's Stations panel (1 = as laid out in the scene).
+@export_range(0.5, 2.0, 0.05) var board_scale := 1.2
+## Stations panel top-left, relative to the Prep Board anchor on the stage (em).
+@export var board_offset_em := Vector2(-21.0, -5.0)
+## Keep the Stations panel this far (em) above the bottom edge, clear of the hand.
+@export var board_bottom_margin_em := 17.5
 @export_group("")
 
 var _views: Array[CardView] = []
@@ -724,12 +731,26 @@ func _station_at(m: Vector2) -> int:
 	return -1
 
 
+## The Stations panel sits on the stage beside Apis (over the prep table), scaled by board_scale.
+## It grows downward with its stacks; it is pushed up so it never runs into the hand.
+func _place_board() -> void:
+	var b: Control = %Board
+	b.scale = Vector2.ONE * board_scale
+	var p: Vector2 = anchors.board + board_offset_em * Pal.EM
+	var h := b.size.y * board_scale
+	p.y = minf(p.y, %Root.size.y - Pal.em(board_bottom_margin_em) - h)
+	p.x = clampf(p.x, Pal.em(1.4), %Root.size.x - b.size.x * board_scale - Pal.em(1.4))
+	p.y = maxf(p.y, Pal.em(5.0))
+	b.position = p
+
+
 ## Where the next card of a station lands (global rect).
 func _next_card_rect(i: int) -> Rect2:
 	var holder: Control = _cols[i].get_meta("holder")
 	var n := duel.stack(i).size()
 	var r := holder.get_global_rect()
-	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * n), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)))
+	var s := holder.get_global_transform().get_scale().x
+	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * n * s), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)) * s)
 
 
 ## Top card of a station (global rect), or an empty Rect2.
@@ -739,7 +760,8 @@ func _top_card_rect(i: int) -> Rect2:
 		return Rect2()
 	var holder: Control = _cols[i].get_meta("holder")
 	var r := holder.get_global_rect()
-	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * (n - 1)), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)))
+	var s := holder.get_global_transform().get_scale().x
+	return Rect2(r.position + Vector2(0, Pal.em(BAND_EM) * (n - 1) * s), Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM)) * s)
 
 
 ## While dragging an ingredient: gold = continues a recipe (or empty), orange = off path, grey = full.
@@ -858,6 +880,7 @@ func _process(_delta: float) -> void:
 	# The Stations panel grows downward with its stacks (solitaire).
 	%RivalKitchen.position = anchors.rival_stations - %RivalKitchen.size / 2.0
 	%Board.reset_size()
+	_place_board()
 	%Rival.reset_size()
 	_emote_holder.position = anchors.rival + Vector2(Pal.em(2.6), Pal.em(0.9))
 	_update_hover()
@@ -1062,7 +1085,8 @@ func _station_drag_input(event: InputEvent) -> bool:
 			var r := _top_card_rect(_sdrag.from)
 			var ghost := _stack_card(duel.stack(_sdrag.from).back(), true)
 			%DragLayer.add_child(ghost)
-			ghost.size = r.size
+			ghost.size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM))
+			ghost.scale = Vector2.ONE * board_scale
 			ghost.position = r.position
 			ghost.rotation_degrees = 3.0
 			_sdrag.off = m - r.position
