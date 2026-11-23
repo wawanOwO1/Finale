@@ -44,27 +44,27 @@ var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = 
 
 @export_group("Hand")
 ## Card size in hand (1 = the card_view.tscn size). Hover grows it a little more.
-@export_range(0.5, 3.0, 0.05) var hand_card_scale := 1.7
+@export_range(0.5, 3.0, 0.05) var hand_card_scale := 1.9
 ## How much neighbouring cards overlap, as a share of the card width.
 @export_range(0.0, 0.6, 0.01) var hand_overlap := 0.12
 ## The whole hand may be at most this share of the screen width.
-@export_range(0.3, 1.0, 0.01) var hand_max_width := 0.55
+@export_range(0.3, 1.0, 0.01) var hand_max_width := 0.6
 ## How far the cards sink below the bottom edge (em, before scaling).
 @export var hand_sink_em := 0.8
 ## Moves the hand right of center (em) so it clears the player panel and draw pile.
-@export var hand_offset_em := 6.5
+@export var hand_offset_em := 1.0
 @export_group("Stations")
-## Size of the player's Stations panel (1 = as laid out in the scene).
-@export_range(0.5, 2.0, 0.05) var board_scale := 1.2
-## Stations panel top-left, relative to the Prep Board anchor on the stage (em).
-@export var board_offset_em := Vector2(-21.0, -5.0)
-## Keep the Stations panel this far (em) above the bottom edge, clear of the hand.
-@export var board_bottom_margin_em := 17.5
-@export_group("Rival Kitchen")
-## Size of the rival's face-down kitchen panel (1 = as laid out in the scene).
-@export_range(0.5, 3.0, 0.05) var rival_kitchen_scale := 2.0
-## Panel center, relative to the rival stations anchor on the stage (em).
-@export var rival_kitchen_offset_em := Vector2(1.5, -1.0)
+## Both Stations panels (Apis left, rival right) share this layout, in UI pixels (1920x1080 base).
+## Size of the cards and stacks inside the panels (1 = as laid out in code).
+@export_range(0.5, 2.5, 0.05) var board_scale := 1.4
+## Gap between each panel and its screen edge.
+@export var stations_margin_px := 29.0
+## Top of both panels (their tab sits above this).
+@export var stations_top_px := 278.0
+## Smallest panel size; a tall stack can still grow it downward.
+@export var stations_size_px := Vector2(432, 560)
+## Space kept above each Stations panel for its tab when the panel above it grows.
+@export var stations_tab_room_px := 52.0
 @export_group("")
 
 var _views: Array[CardView] = []
@@ -222,8 +222,7 @@ func rival_act(action: Dictionary) -> void:
 	match action.get("kind", ""):
 		"place":
 			# The new face-down card drops onto its station.
-			var col := %RivalStations.get_child(action.station) as Control if action.station < %RivalStations.get_child_count() else null
-			var back := col.get_child(col.get_child_count() - 1) as Control if col and col.get_child_count() > 0 else null
+			var back: Control = _rival_tops.get(action.station)
 			if back:
 				back.pivot_offset = back.size / 2.0
 				back.position.y -= Pal.em(1.2)
@@ -322,11 +321,13 @@ func _build_static() -> void:
 	%DrawPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.BLUE, Pal.HUD_INK, 0.2, 0.3), 0.5, 0.25))
 	%DrawPile.get_node("HBox/Icon").self_modulate = Pal.CREAM
 	%DrawCount.add_theme_color_override("font_color", Pal.CREAM)
+	%RivalDrawPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.RED_DARK, Pal.HUD_INK, 0.2, 0.3), 0.5, 0.25))
+	_tip(%RivalDrawPile, "Rival draw pile", "Cards the rival has left to draw.", "draw")
 	%DiscardPile.add_theme_stylebox_override("panel", Ui.pad(HudKit.box(Pal.HUD_PANEL, Pal.HUD_INK, 0.2, 0.3), 0.5, 0.2))
 	%DiscardPile.get_node("HBox/Icon").self_modulate = Pal.HUD_MUTED
 	%DiscardCount.add_theme_color_override("font_color", Pal.CREAM)
 	# Buttons
-	Ui.style_button(%EndTurn, Pal.RED, Pal.CREAM, 1.75, 1.0, 0.4)
+	Ui.style_button(%EndTurn, Pal.RED, Pal.CREAM, 2.2, 1.0, 0.4)
 	HudKit.style_red_button(%EndTurn)
 	%EndTurn.text = "END TURN"
 	Ui.style_button(%StartButton, Pal.RED, Pal.CREAM, 1.75, 1.6, 0.5)
@@ -374,6 +375,8 @@ func _refresh() -> void:
 	if %Intent.visible:
 		_fill_intent(d.intent())
 	%RivalKitchen.visible = d.drafting()
+	%RivalInfo.visible = d.drafting()
+	%RivalDrawPile.visible = d.drafting()
 	if d.drafting():
 		_refresh_rival_kitchen()
 	%RivalName.text = d.enemy_def.name
@@ -483,9 +486,11 @@ const CARD_H_EM := 6.4
 ## Visible strip of a covered card (name + tag icon).
 const BAND_EM := 1.75
 ## Rival face-down stations (card backs fanned down like the player's stacks).
-const RIVAL_BACK_W_EM := 2.2
-const RIVAL_BACK_H_EM := 2.9
-const RIVAL_BACK_STEP_EM := 0.55
+const RIVAL_BACK_W_EM := 4.9
+const RIVAL_BACK_H_EM := 6.6
+const RIVAL_BACK_STEP_EM := 1.15
+## Top face-down card of each rival station (for the drop animation).
+var _rival_tops := {}
 ## Light tag colors get ink text, dark ones cream.
 const DARK_TAGS: PackedStringArray = ["VEGGIE", "SPICE", "SAUCE"]
 ## Recipe Book chapter ribbon colors (Recipe Book v2 board).
@@ -499,39 +504,76 @@ func _refresh_rival_kitchen() -> void:
 	for c in %RivalStations.get_children():
 		%RivalStations.remove_child(c)
 		c.queue_free()
+	_rival_tops.clear()
+	var right := _grid_right_column()
 	for i in Duel.STATIONS:
 		var n := k.stack(i).size()
-		var col := Control.new()
-		col.custom_minimum_size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM) + Pal.em(RIVAL_BACK_STEP_EM) * maxi(n - 1, 0))
+		var col := Ui.vbox(0.35)
+		col.alignment = BoxContainer.ALIGNMENT_BEGIN
+		col.custom_minimum_size.x = Pal.em(CARD_W_EM)
+		col.add_child(Ui.label("Station %d" % (i + 1), 0.85, Pal.HUD_MUTED))
+		var holder := Control.new()
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.custom_minimum_size = Vector2(Pal.em(CARD_W_EM), Pal.em(RIVAL_BACK_H_EM) + Pal.em(RIVAL_BACK_STEP_EM) * maxi(n - 1, 0))
 		if n == 0:
-			col.add_child(_rival_back(Color(Pal.CREAM, 0.06), Color(Pal.CREAM, 0.3), 0))
+			var ph := HudKit.Dashed.new()
+			ph.add_child(Ui.label("Empty", 0.8, Pal.HUD_DASH, HORIZONTAL_ALIGNMENT_CENTER))
+			ph.size = Vector2(Pal.em(CARD_W_EM), Pal.em(RIVAL_BACK_H_EM))
+			holder.add_child(ph)
+		var x := (Pal.em(CARD_W_EM) - Pal.em(RIVAL_BACK_W_EM)) / 2.0
 		for j in n:
-			col.add_child(_rival_back(Pal.RED_DARK, Pal.INK, j))
+			var back := _rival_back(Pal.RED_DARK, Pal.INK, j)
+			back.position.x = x
+			if j == n - 1:
+				var q := Ui.label("?", 2.6, Pal.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+				q.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				q.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+				back.add_child(q)
+				_rival_tops[i] = back
+			holder.add_child(back)
+		if n > 0:
+			var badge := HudKit.tag("x%d" % n, Pal.GOLD, Pal.HUD_INK, 0.85)
+			badge.position = Vector2(x + Pal.em(RIVAL_BACK_W_EM) - Pal.em(1.2), Pal.em(RIVAL_BACK_STEP_EM) * (n - 1) + Pal.em(RIVAL_BACK_H_EM) - Pal.em(1.0))
+			holder.add_child(badge)
+		col.add_child(holder)
 		_tip(col, "%s's station %d" % [duel.enemy_def.name, i + 1],
 				"%d card%s, face down. You see the dish only when it is served." % [n, "" if n == 1 else "s"], "serve")
-		%RivalStations.add_child(col)
+		(%RivalStations if i == 0 else right).add_child(col)
+	%RivalStations.add_child(right)
 	%RivalHand.text = "Hand %d" % k.hand.size()
 	%RivalHeat.text = "Heat %d/%d" % [duel.enemy.heat, k.max_heat]
+	%RivalDrawCount.text = str(k.draw_pile.size())
 	%RivalKitchen.reset_size()
+
+
+## Right column of a Stations panel: Station 2 over Station 3.
+func _grid_right_column() -> VBoxContainer:
+	var v := Ui.vbox(STATION_GAP_EM)
+	v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return v
 
 
 func _rival_back(bg: Color, border: Color, index: int) -> Panel:
 	var p := Panel.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_theme_stylebox_override("panel", Ui.box(bg, border, 0.12, 0.3, 0.0))
+	p.add_theme_stylebox_override("panel", Ui.box(bg, border, 0.14, 0.3, 0.0))
 	p.position = Vector2(0, Pal.em(RIVAL_BACK_STEP_EM) * index)
 	p.size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM))
 	return p
 
 
 func _refresh_stations() -> void:
-	for c in _cols:
+	for c in %StationsRow.get_children():
+		%StationsRow.remove_child(c)
 		c.queue_free()
 	_cols.clear()
+	var right := _grid_right_column()
 	for i in Duel.STATIONS:
 		var frame := _station_column(i)
-		%StationsRow.add_child(frame)
+		(%StationsRow if i == 0 else right).add_child(frame)
 		_cols.append(frame)
+	%StationsRow.add_child(right)
 	_highlight_stations(-1)
 
 
@@ -543,7 +585,10 @@ func _station_column(i: int) -> PanelContainer:
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	col.custom_minimum_size.x = Pal.em(CARD_W_EM)
 	col.add_child(Ui.label("Station %d" % (i + 1), 0.85, Pal.HUD_MUTED))
-	col.add_child(_ticket_view(i, tk))
+	# An empty station is just its drop slot; the Order Ticket shows once cooking starts.
+	var ticket := _ticket_view(i, tk)
+	ticket.visible = not st.is_empty()
+	col.add_child(ticket)
 
 	var holder := Control.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -551,7 +596,11 @@ func _station_column(i: int) -> PanelContainer:
 	holder.custom_minimum_size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM) + Pal.em(BAND_EM) * maxi(n - 1, 0))
 	if n == 0:
 		var ph := HudKit.Dashed.new()
-		ph.add_child(Ui.label("+", 1.6, Pal.HUD_DASH, HORIZONTAL_ALIGNMENT_CENTER))
+		var hint := Ui.label("+
+Drop an
+ingredient", 0.8, Pal.HUD_DASH, HORIZONTAL_ALIGNMENT_CENTER)
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ph.add_child(hint)
 		ph.position = Vector2.ZERO
 		ph.size = Vector2(Pal.em(CARD_W_EM), Pal.em(CARD_H_EM))
 		holder.add_child(ph)
@@ -736,28 +785,22 @@ func _station_at(m: Vector2) -> int:
 	return -1
 
 
-## The rival's kitchen sits on the floor right of its counter, scaled by rival_kitchen_scale.
+## Rival Stations panel: right edge, mirror of Apis's.
 func _place_rival_kitchen() -> void:
-	var k: Control = %RivalKitchen
-	k.scale = Vector2.ONE * rival_kitchen_scale
-	var sz := k.size * rival_kitchen_scale
-	var p: Vector2 = anchors.rival_stations + rival_kitchen_offset_em * Pal.em(1.0) - sz / 2.0
-	p.x = clampf(p.x, Pal.em(1.4), %Root.size.x - sz.x - Pal.em(1.4))
-	p.y = clampf(p.y, Pal.em(5.0), %Root.size.y - sz.y - Pal.em(1.4))
-	k.position = p
+	_place_stations_panel(%RivalKitchen, %Root.size.x - stations_margin_px - stations_size_px.x)
 
 
-## The Stations panel sits on the stage beside Apis (over the prep table), scaled by board_scale.
-## It grows downward with its stacks; it is pushed up so it never runs into the hand.
+## Apis's Stations panel: left edge, under the PLAYER panel.
 func _place_board() -> void:
-	var b: Control = %Board
-	b.scale = Vector2.ONE * board_scale
-	var p: Vector2 = anchors.board + board_offset_em * Pal.EM
-	var h := b.size.y * board_scale
-	p.y = minf(p.y, %Root.size.y - Pal.em(board_bottom_margin_em) - h)
-	p.x = clampf(p.x, Pal.em(1.4), %Root.size.x - b.size.x * board_scale - Pal.em(1.4))
-	p.y = maxf(p.y, Pal.em(5.0))
-	b.position = p
+	_place_stations_panel(%Board, stations_margin_px)
+
+
+func _place_stations_panel(p: Control, x: float) -> void:
+	p.scale = Vector2.ONE * board_scale
+	p.custom_minimum_size = stations_size_px / board_scale
+	# Below the PLAYER / rival panels even when those grow (statuses), leaving room for the tab.
+	var top := maxf(stations_top_px, maxf(%PlayerHud.get_rect().end.y, %Rival.get_rect().end.y) + stations_tab_room_px)
+	p.position = Vector2(x, top)
 
 
 ## Where the next card of a station lands (global rect).
@@ -1232,7 +1275,8 @@ func _toast(text: String) -> void:
 ## Mise en Place helped this side's opening hand (GRAND_DESIGN §4.2): shown, never hidden.
 ## Over Apis's stations, or over the rival's face-down stations (the swapped card stays secret).
 func show_mise(side: String) -> void:
-	var at: Vector2 = anchors.rival_stations if side == "enemy" else anchors.board
+	var panel: Control = %RivalKitchen if side == "enemy" else %Board
+	var at: Vector2 = panel.get_global_rect().get_center()
 	_float(at + Vector2(0, -Pal.em(1.0)), "Mise en place!", Pal.GOLD, 1.3, "inspired", 0.1)
 
 
