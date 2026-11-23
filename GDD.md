@@ -44,7 +44,7 @@ Tidak ada meta-progression di versi jam (lihat §11).
 ### 4.1 Stat
 | Stat | Fungsi |
 |---|---|
-| **Confidence** (HP) | Mental chef. 0 = menyerah. Pemain mulai **60**, nilainya terbawa antar duel. |
+| **Confidence** (HP) | Mental chef. 0 = menyerah. Pemain mulai **100** (fase G, 23 Nov; dulu 60), nilainya terbawa antar duel. |
 | **Composure** (Block) | Menahan Pressure. Hilang di awal giliran pemiliknya. |
 | **Heat** (Energy) | **3** per giliran. Biaya kartu dan Serve. |
 | **Pressure** (Damage) | Mengurangi Composure dulu, lalu Confidence lawan. |
@@ -208,9 +208,9 @@ Pilih satu: **Rest** (pulihkan 30% Confidence), **Upgrade** satu kartu, atau **M
 ### 6.5 Lawan (Market Street)
 | Lawan | Tipe | Confidence | Gimmick |
 |---|---|---|---|
-| **Tony**, street noodle cook | Duel | ±30 | Pola sederhana. Lawan tutorial. |
-| **Rosa**, taco truck queen | Duel | ±38 | Sering Taunt (Flustered). |
-| **Marco**, pizza showman | Duel | ±42 | Cooking 2 turn yang besar, mengajarkan pentingnya Composure. |
+| **Tony**, street noodle cook | Duel | ±45 (fase G; dulu 30) | Pola sederhana. Lawan tutorial. |
+| **Rosa**, taco truck queen | Duel | ±50 (fase G; dulu 38) | Sering Taunt (Flustered). |
+| **Marco**, pizza showman | Duel | ±42 (belum dituning, Confidence pemain kini 100) | Cooking 2 turn yang besar, mengajarkan pentingnya Composure. |
 | **Élodie**, rival patissière | Elite | ±60 | Saat Plate-mu penuh (5), ia membuatmu Rattled. |
 | **"Iron" Bruno**, butcher-turned-grill master | Boss | ±110 (2 fase) | Fase 1: setiap 2 giliran membuatmu **Burnt**. Fase 2 (≤50%): Focus bertambah tiap giliran. Harus diselesaikan dengan cepat. |
 

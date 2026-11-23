@@ -36,6 +36,8 @@ signal flow_offer(side: String, choices: Array[ModifierDef])
 signal modifier_gained(side: String, modifier: ModifierDef, stacks: int)
 signal changed
 
+## Apis's starting Confidence (GDD §4.1). Tuned in phase G with tests/balance.gd.
+const PLAYER_CONFIDENCE := 100
 const MAX_HEAT := 3
 const HAND_SIZE := 5
 ## Station Stack (ART_DIRECTION §6): three columns, each stacks up to 6 ingredients in order.
@@ -53,7 +55,7 @@ const CLUMP_TECHNIQUES := 4
 const CLUMP_WINDOW := 5
 const CLUMP_RETRIES := 3
 ## Chef's Flow thresholds for Apis (rivals set theirs in EnemyDef.flow_thresholds).
-const PLAYER_FLOW: PackedInt32Array = [2, 3, 4]
+const PLAYER_FLOW: PackedInt32Array = [1, 2, 3]
 ## Offer slot 3 is Rare this often (GRAND_DESIGN §5.2); 3 offers without one guarantee it.
 const RARE_CHANCE := 0.25
 const RARE_PITY := 3
@@ -136,13 +138,13 @@ var _ai_steps := 0
 var _next_uid := 0
 
 
-## opts: { confidence, max_confidence, hype, seed, enemy_deck: Array[CardDef],
-##         enemy_recipes: Array[RecipeDef] } — all optional. A drafting rival (EnemyDef with a
+## opts: { confidence, max_confidence, hype, seed, player_flow: PackedInt32Array,
+##         enemy_deck: Array[CardDef], enemy_recipes: Array[RecipeDef] } — all optional. A drafting rival (EnemyDef with a
 ## deck and an AI profile) brings its own deck, books, Heat and hand size; enemy_deck /
 ## enemy_recipes override them (tests).
 func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef], opts := {}) -> void:
 	var rng_seed: int = opts.get("seed", int(Time.get_unix_time_from_system() * 1000.0))
-	var max_conf: int = opts.get("max_confidence", 60)
+	var max_conf: int = opts.get("max_confidence", PLAYER_CONFIDENCE)
 	player = Fighter.new(opts.get("confidence", max_conf), max_conf)
 	enemy_def = enemy_def_
 	enemy = Fighter.new(enemy_def.confidence, enemy_def.confidence)
@@ -153,7 +155,7 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	kitchens.enemy.ai_rng = SeededRng.stream(rng_seed, "ai_enemy")
 	kitchens.player.offer_rng = SeededRng.stream(rng_seed, "offers")
 	kitchens.enemy.offer_rng = SeededRng.stream(rng_seed, "offers_enemy")
-	kitchens.player.flow_thresholds = PLAYER_FLOW
+	kitchens.player.flow_thresholds = opts.get("player_flow", PLAYER_FLOW)
 	if not enemy_def.flow_thresholds.is_empty():
 		kitchens.enemy.flow_thresholds = enemy_def.flow_thresholds
 	kitchens.player.recipes = recipes_

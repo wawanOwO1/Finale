@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
 	_smart_playthroughs("starter vs Tony", GameDB.enemy("tony"))
 	_smart_playthroughs("starter vs Rosa", GameDB.enemy("rosa"))
+	_balance()
 
 	print("\n%d check(s) failed" % failures if failures else "\nAll checks passed")
 	quit(1 if failures else 0)
@@ -59,9 +60,11 @@ func inst(ids: Array) -> Array[CardInstance]:
 	return out
 
 
-func new_duel(seed_: int, enemy: EnemyDef = null, hype := 0, all := false) -> Duel:
+## `flow`: Chef's Flow thresholds. Out of reach by default so a Perfect Serve in an unrelated
+## test never opens a pick; the Chef's Flow tests pin [2, 3, 4] (mechanics, not tuning).
+func new_duel(seed_: int, enemy: EnemyDef = null, hype := 0, all := false, flow: PackedInt32Array = [99]) -> Duel:
 	return Duel.new(GameDB.deck("starter"), enemy if enemy else intent_only("tony"),
-			all_recipes if all else basics, {seed = seed_, hype = hype})
+			all_recipes if all else basics, {seed = seed_, hype = hype, player_flow = flow})
 
 
 ## A rival on its old intent pattern (no deck / AI), so tests control exactly what it does.
@@ -557,8 +560,8 @@ func _smart_playthroughs(label: String, enemy: EnemyDef) -> void:
 			conf_left += d.player.confidence
 		turns_total += d.turn
 	check("smart Apis vs %s: every duel ends" % label.trim_prefix("starter vs "), ended)
-	print("      smart bot %s: %d/%d wins, avg %.1f turns, avg Confidence left on a win %.0f/60" % [
-			label, wins, n, float(turns_total) / n, float(conf_left) / maxi(1, wins)])
+	print("      smart bot %s: %d/%d wins, avg %.1f turns, avg Confidence left on a win %.0f/%d" % [
+			label, wins, n, float(turns_total) / n, float(conf_left) / maxi(1, wins), Duel.PLAYER_CONFIDENCE])
 	print("      Chef's Flow modifiers per duel: Apis %.2f, rival %.2f" % [float(mods_taken[0]) / n, float(mods_taken[1]) / n])
 
 
@@ -668,8 +671,11 @@ func _perfect_serve(d: Duel, next_turn := true) -> void:
 
 
 ## Phase E (GRAND_DESIGN §5): Chef's Flow meter, the 1-of-3 offer, and every modifier.
+const FLOW: PackedInt32Array = [2, 3, 4]
+
+
 func _chefs_flow() -> void:
-	var d := new_duel(30, dummy)
+	var d := new_duel(30, dummy, 0, false, FLOW)
 	var k := d.kitchen("player")
 	var offers := [0]
 	d.flow_offer.connect(func(_side: String, _c: Array[ModifierDef]) -> void: offers[0] += 1)
@@ -696,7 +702,7 @@ func _chefs_flow() -> void:
 	var dry := 0
 	var spice_offered := false
 	for s in 40:
-		var x := new_duel(100 + s, dummy)
+		var x := new_duel(100 + s, dummy, 0, false, FLOW)
 		var xk := x.kitchen("player")
 		for _i in 6:
 			var o := x._make_offer("player")
@@ -724,39 +730,39 @@ func _chefs_flow() -> void:
 	check("a SPICE deck is always offered its build modifier", always)
 
 	# Each modifier, applied directly.
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {hot_pan = 1}
 	var before := d.enemy.confidence
 	_perfect_serve(d, false)
 	check("Hot Pan: Perfect Toast 12 + 3", lost(d, before) == 15, str(lost(d, before)))
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {encore = 1}
 	before = d.enemy.confidence
 	_perfect_serve(d, false)
 	check("Encore: (6 + 2) x1.75 = 14", lost(d, before) == 14, str(lost(d, before)))
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {plating_pro = 1}
 	d.stations[0] = inst(["bread", "butter", "tomato"])
 	before = d.enemy.confidence
 	d.serve(0)
 	check("Plating Pro: garnish counts twice, (6 + 4) x1.5 = 15", lost(d, before) == 15, str(lost(d, before)))
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {crowd_favorite = 1}
 	var hype_before := d.hype
 	_perfect_serve(d, false)
 	check("Crowd Favorite: +10 Hype on top", d.hype == hype_before + GameDB.recipe("toast").hype + 10)
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {extra_burner = 1, prep_cook = 1}
 	_perfect_serve(d)
 	check("Extra Burner: +1 Heat after a Perfect Serve", d.player.heat == Duel.MAX_HEAT + 1, str(d.player.heat))
 	check("Prep Cook: draws 1 more", d.hand.size() == Duel.HAND_SIZE + 1, str(d.hand.size()))
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {steady_hands = 1, spice_whisperer = 1}
 	var chili := give_hand(d, ["chili"])[0]
 	d.play(chili.uid, 1)
 	check("Steady Hands: +1 Composure per ingredient", d.player.composure >= 1)
 	check("Spice Whisperer: SPICE gives the rival Spicy", d.enemy.stacks("spicy") >= 1)
-	d = new_duel(31, dummy)
+	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {free_move = 1}
 	d.stations[0] = inst(["bread", "butter", "egg"])
 	check("Free Move: 2 moves a turn", d.move_top(0, 1).ok and d.move_top(0, 2).ok and not d.move_top(0, 1).ok)
@@ -857,3 +863,30 @@ func _almanac() -> void:
 	check("finder rejects recipes missing a pick", Almanac.find([toast], ["DAIRY"]).is_empty())
 	var uses := Almanac.uses_of(GameDB.card("butter"), all_recipes).map(func(r: RecipeDef) -> String: return r.id)
 	check("Used in lists the recipes an ingredient fits", uses.has("toast"), str(uses))
+
+
+# ---------------------------------------------------------------- balance targets (phase G)
+
+## Guards the tuning from GRAND_DESIGN §8.1 / §8.2 so a content change that breaks it shows up.
+## Ranges are loose on purpose; tests/balance.gd prints the full picture.
+func _balance() -> void:
+	print("\n-- Balance targets (tests/balance.gd for details)")
+	var Bots := preload("res://tests/balance_runner.gd")
+	var n := 200
+	var tony_simple: Dictionary = Bots.run(GameDB.enemy("tony"), "simple", n, {})
+	var tony_smart: Dictionary = Bots.run(GameDB.enemy("tony"), "smart", n, {})
+	var rosa_simple: Dictionary = Bots.run(GameDB.enemy("rosa"), "simple", n, {})
+	var rosa_smart: Dictionary = Bots.run(GameDB.enemy("rosa"), "smart", n, {})
+	check("Tony loses about 80%% to a simple player (65-90): %d%%" % tony_simple.win_pct,
+			tony_simple.win_pct >= 65 and tony_simple.win_pct <= 90)
+	check("Tony rarely beats a careful player (>= 90): %d%%" % tony_smart.win_pct, tony_smart.win_pct >= 90)
+	check("Rosa is harder than Tony for both players",
+			rosa_simple.win_pct < tony_simple.win_pct and rosa_smart.win_pct < tony_smart.win_pct)
+	check("a careful player still beats Rosa mostly (70-95): %d%%" % rosa_smart.win_pct,
+			rosa_smart.win_pct >= 70 and rosa_smart.win_pct <= 95)
+	for pair in [["Tony simple", tony_simple], ["Tony smart", tony_smart], ["Rosa simple", rosa_simple], ["Rosa smart", rosa_smart]]:
+		var s: Dictionary = pair[1]
+		check("%s: duel lasts 4.5-8.5 turns on average: %.1f" % [pair[0], s.turns], s.turns >= 4.5 and s.turns <= 8.5)
+		check("%s: rival averages <= 6 actions a turn (§9): %.1f" % [pair[0], s.acts_per_turn], s.acts_per_turn <= 6.0)
+	check("Chef's Flow: a careful player gets ~1 modifier a duel (>= 0.7): %.2f / %.2f" % [
+			tony_smart.flow_player, rosa_smart.flow_player], tony_smart.flow_player >= 0.7 and rosa_smart.flow_player >= 0.7)
