@@ -40,8 +40,8 @@ signal changed
 const PLAYER_CONFIDENCE := 100
 const MAX_HEAT := 3
 const HAND_SIZE := 5
-## Station Stack (ART_DIRECTION §6): three columns, each stacks up to 6 ingredients in order.
-const STATIONS := 3
+## Station Stack (ART_DIRECTION §6): two columns, each stacks up to 6 ingredients in order.
+const STATIONS := 2
 const STATION_SIZE := 6
 const SERVE_COST := 1
 const MAX_HYPE := 100

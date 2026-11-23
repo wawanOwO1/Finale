@@ -505,7 +505,6 @@ func _refresh_rival_kitchen() -> void:
 		%RivalStations.remove_child(c)
 		c.queue_free()
 	_rival_tops.clear()
-	var right := _grid_right_column()
 	for i in Duel.STATIONS:
 		var n := k.stack(i).size()
 		var col := Ui.vbox(0.35)
@@ -538,20 +537,11 @@ func _refresh_rival_kitchen() -> void:
 		col.add_child(holder)
 		_tip(col, "%s's station %d" % [duel.enemy_def.name, i + 1],
 				"%d card%s, face down. You see the dish only when it is served." % [n, "" if n == 1 else "s"], "serve")
-		(%RivalStations if i == 0 else right).add_child(col)
-	%RivalStations.add_child(right)
+		%RivalStations.add_child(col)
 	%RivalHand.text = "Hand %d" % k.hand.size()
 	%RivalHeat.text = "Heat %d/%d" % [duel.enemy.heat, k.max_heat]
 	%RivalDrawCount.text = str(k.draw_pile.size())
 	%RivalKitchen.reset_size()
-
-
-## Right column of a Stations panel: Station 2 over Station 3.
-func _grid_right_column() -> VBoxContainer:
-	var v := Ui.vbox(STATION_GAP_EM)
-	v.alignment = BoxContainer.ALIGNMENT_BEGIN
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return v
 
 
 func _rival_back(bg: Color, border: Color, index: int) -> Panel:
@@ -568,12 +558,10 @@ func _refresh_stations() -> void:
 		%StationsRow.remove_child(c)
 		c.queue_free()
 	_cols.clear()
-	var right := _grid_right_column()
 	for i in Duel.STATIONS:
 		var frame := _station_column(i)
-		(%StationsRow if i == 0 else right).add_child(frame)
+		%StationsRow.add_child(frame)
 		_cols.append(frame)
-	%StationsRow.add_child(right)
 	_highlight_stations(-1)
 
 

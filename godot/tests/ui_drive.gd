@@ -66,11 +66,12 @@ func _initialize() -> void:
 		await _drag(_card_point(ing), ui._cols[1].get_global_rect().get_center(), "4_dragging_ingredient")
 		await _wait(0.5)
 		_check("ingredient dragged onto station 2 lands there", duel.stack(1).size() == before + 1)
-		# Move it to station 3 by dragging the top card.
+		# Move it to station 1 by dragging the top card.
+		var before0 := duel.stack(0).size()
 		var top: Rect2 = ui._top_card_rect(1)
-		await _drag(top.get_center(), ui._cols[2].get_global_rect().get_center(), "4b_moving_top_card")
+		await _drag(top.get_center(), ui._cols[0].get_global_rect().get_center(), "4b_moving_top_card")
 		await _wait(0.4)
-		_check("top card dragged to station 3 moves there", duel.stack(2).size() == 1 and duel.moved_this_turn)
+		_check("top card dragged to station 1 moves there", duel.stack(0).size() == before0 + 1 and duel.moved_this_turn)
 	# Drag a technique up into the play zone.
 	var tech: CardView = null
 	for v: CardView in ui._views:
@@ -95,8 +96,8 @@ func _initialize() -> void:
 	await _wait(0.3)
 	_shot("5b_stations")
 	_crop("5c_stations", Rect2(0.0, 0.15, 0.5, 0.75))
-	if duel.can_serve(2).ok:
-		await _click(_serve_button(ui, 2).get_global_rect().get_center())
+	if duel.can_serve(0).ok:
+		await _click(_serve_button(ui, 0).get_global_rect().get_center())
 		await _wait(0.35)
 		_shot("6_served")
 		_crop("6a_served", Rect2(0.0, 0.1, 0.75, 0.45))

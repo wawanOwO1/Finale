@@ -9,7 +9,7 @@
 |---|---|---|
 | 1 | Tempo giliran | Urutan tetap: **YOUR TURN banner → giliran pemain → RIVAL TURN banner → rival drafting (dianimasikan) → loop**, sampai menang/kalah. |
 | 2 | Logika vs tempo | `Duel` tetap logika murni. Tempo diatur **Turn Director** di lapisan UI. |
-| 3 | Rival | Rival **drafting dengan aturan yang sama** dengan pemain: deck, tangan, Heat, 3 station, Serve. Tidak ada lagi pola Intent. |
+| 3 | Rival | Rival **drafting dengan aturan yang sama** dengan pemain: deck, tangan, Heat, 2 station, Serve. Tidak ada lagi pola Intent. |
 | 4 | Informasi | Kartu rival **blind**. Pemain melihat **punggung kartu** di station rival (jumlahnya), animasi, damage, buff/debuff, dan stats. |
 | 5 | Intent | Dihapus. Diganti **mood** rival (emote samar). |
 | 6 | Almanac | Model **discovered**, bisa dibuka saat duel (game pause). Resep yang disajikan rival ikut tercatat. |
