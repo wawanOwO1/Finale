@@ -270,7 +270,7 @@ func _signature() -> void:
 
 func _stations() -> void:
 	var d := new_duel(30, dummy, 0, true)
-	check("three empty stations", d.stations.size() == 3 and d.ingredient_count() == 0)
+	check("two empty stations", d.stations.size() == 2 and d.ingredient_count() == 0)
 	var h := give_hand(d, ["butter", "egg", "bread"])
 	d.play(h[0].uid, 1)
 	check("ingredient goes to the chosen station", d.stack(1).size() == 1)
@@ -282,20 +282,22 @@ func _stations() -> void:
 	var tk := d.ticket(1)
 	check("ticket while building: butter, egg -> a 3-step dish, step 3 is next",
 			tk.state == "building" and tk.recipe.id in ["omelette", "mixedGrill"] and tk.steps[1].state == "done" and tk.steps[2].state == "next", str(tk.state))
-	check("empty station has an empty ticket", d.ticket(2).state == "empty")
-	d.stations[2] = inst(["chili", "cheese"])
-	check("off-path stack is Improvised", d.ticket(2).state == "improvised")
-	d.stations[2] = inst(["butter", "bread"])
-	check("toast out of order is Cooked", d.ticket(2).state == "cooked" and d.ticket(2).recipe.id == "toast")
-	d.stations[2] = inst(["bread", "butter", "garlic"])
-	check("toast in order + garnish is Perfect", d.ticket(2).state == "perfect" and d.ticket(2).garnish == 1)
+	d.stations[0] = inst([])
+	check("empty station has an empty ticket", d.ticket(0).state == "empty")
+	d.stations[0] = inst(["chili", "cheese"])
+	check("off-path stack is Improvised", d.ticket(0).state == "improvised")
+	d.stations[0] = inst(["butter", "bread"])
+	check("toast out of order is Cooked", d.ticket(0).state == "cooked" and d.ticket(0).recipe.id == "toast")
+	d.stations[0] = inst(["bread", "butter", "garlic"])
+	check("toast in order + garnish is Perfect", d.ticket(0).state == "perfect" and d.ticket(0).garnish == 1)
 
-	check("move top card", d.move_top(1, 2).ok and d.stack(1).size() == 1 and d.stack(2).back().def.id == "egg")
-	check("only one move per turn", not d.move_top(2, 1).ok)
+	check("move top card", d.move_top(1, 0).ok and d.stack(1).size() == 1 and d.stack(0).back().def.id == "egg")
+	check("only one move per turn", not d.move_top(0, 1).ok)
 	check("clear also uses the move", not d.clear_station(0).ok)
 	d.end_turn(); d.run_enemy_turn()
 	var discard_before := d.discard.size()
-	check("clear station after a new turn", d.clear_station(0).ok and d.stack(0).is_empty() and d.discard.size() == discard_before + 1)
+	var cleared := d.stack(0).size()
+	check("clear station after a new turn", d.clear_station(0).ok and d.stack(0).is_empty() and d.discard.size() == discard_before + cleared)
 
 	d = new_duel(31, dummy, 0, true)
 	d.stations[1] = inst(["butter", "egg", "tomato"])
@@ -765,7 +767,7 @@ func _chefs_flow() -> void:
 	d = new_duel(31, dummy, 0, false, FLOW)
 	d.kitchen("player").modifiers = {free_move = 1}
 	d.stations[0] = inst(["bread", "butter", "egg"])
-	check("Free Move: 2 moves a turn", d.move_top(0, 1).ok and d.move_top(0, 2).ok and not d.move_top(0, 1).ok)
+	check("Free Move: 2 moves a turn", d.move_top(0, 1).ok and d.move_top(0, 1).ok and not d.move_top(0, 1).ok)
 	var mm := 0
 	var plain := 0
 	var two_tech: Array[CardDef] = []
