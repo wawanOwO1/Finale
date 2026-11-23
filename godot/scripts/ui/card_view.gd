@@ -8,10 +8,15 @@ extends Control
 const TECH_ART := Color("#2f6f7a")
 const SIG_ART := Color("#4a2a3a")
 const HOVER_LIFT_EM := 4.4
-const HOVER_SCALE := 1.16
+## Hover grows the card by this much on top of base_scale.
+const HOVER_SCALE := 1.1
 
 var card: CardInstance
 var playable := true
+## Size of the card in hand (DuelUI.hand_card_scale). The scene is drawn at 1x; keyword tips
+## are counter-scaled so they stay normal size.
+var base_scale := 1.0
+var _tips_left := false
 ## Fan pose set by DuelUI.layout_hand().
 var home_pos := Vector2.ZERO
 var home_rot := 0.0
@@ -55,8 +60,8 @@ func setup(card_: CardInstance, playable_: bool, tips_left: bool) -> void:
 	%Tips.add_child(_tip(Keywords.card_role(d)))
 	for k in Keywords.for_card(d):
 		%Tips.add_child(_tip(k))
-	if tips_left:
-		%Tips.position.x = -Pal.em(13.0 + 0.6)
+	_tips_left = tips_left
+	set_base_scale(base_scale)
 
 	modulate = Color.WHITE if playable else Color(0.86, 0.83, 0.8)
 	if sig:
@@ -67,16 +72,34 @@ func _tip(k: Dictionary) -> Control:
 	return Ui.tip_box(k.name, k.text, k.icon)
 
 
+## Card size in hand. Tips keep their normal size, beside the scaled card.
+func set_base_scale(s: float) -> void:
+	base_scale = s
+	scale = Vector2.ONE * s
+	%Tips.scale = Vector2.ONE / s
+	%Tips.position.x = -Pal.em(13.0 + 0.6) / s if _tips_left else size.x + Pal.em(0.6) / s
+
+
+## Where the card is drawn in its fan pose, ignoring rotation (hover hit-tests, tests).
+func visual_rect() -> Rect2:
+	return Rect2(home_pos + pivot_offset * (1.0 - base_scale), size * base_scale)
+
+
+## Fan pose whose drawn top-left corner is `top_left` (the pivot sits below the card).
+func pose_at(top_left: Vector2) -> Vector2:
+	return top_left - pivot_offset * (1.0 - base_scale)
+
+
 ## Snap or glide to the fan pose.
 func go_home(animated := true) -> void:
 	_kill()
 	var target_pos := home_pos
 	var target_rot := home_rot
-	var target_scale := Vector2.ONE
+	var target_scale := Vector2.ONE * base_scale
 	if hovered:
 		target_pos.y = base_y - Pal.em(HOVER_LIFT_EM)
 		target_rot = 0.0
-		target_scale = Vector2.ONE * HOVER_SCALE
+		target_scale = Vector2.ONE * base_scale * HOVER_SCALE
 	if not animated:
 		position = target_pos
 		rotation_degrees = target_rot

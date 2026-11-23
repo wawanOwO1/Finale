@@ -255,7 +255,8 @@ func _serve_button(ui: Node, station: int) -> Button:
 
 
 func _card_point(v: CardView) -> Vector2:
-	return v.home_pos + Vector2(v.size.x / 2.0, v.size.y * 0.3)
+	var r := v.visual_rect()
+	return r.position + Vector2(r.size.x / 2.0, r.size.y * 0.3)
 
 
 func _wait(t: float) -> void:

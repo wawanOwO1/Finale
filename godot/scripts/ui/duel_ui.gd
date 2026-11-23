@@ -42,6 +42,19 @@ var _almanac_queued := false
 var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = Vector2(300, 400),
 		rival_stations = Vector2(1300, 420)}
 
+@export_group("Hand")
+## Card size in hand (1 = the card_view.tscn size). Hover grows it a little more.
+@export_range(0.5, 3.0, 0.05) var hand_card_scale := 1.7
+## How much neighbouring cards overlap, as a share of the card width.
+@export_range(0.0, 0.6, 0.01) var hand_overlap := 0.12
+## The whole hand may be at most this share of the screen width.
+@export_range(0.3, 1.0, 0.01) var hand_max_width := 0.55
+## How far the cards sink below the bottom edge (em, before scaling).
+@export var hand_sink_em := 0.8
+## Moves the hand right of center (em) so it clears the player panel and draw pile.
+@export var hand_offset_em := 6.5
+@export_group("")
+
 var _views: Array[CardView] = []
 var _prev_hand := {}
 var _placed_uid := -1
@@ -803,6 +816,7 @@ func _rebuild_hand(live: bool) -> void:
 		var k := i - (n - 1) / 2.0
 		var v: CardView = CARD_VIEW.instantiate()
 		%Hand.add_child(v)
+		v.base_scale = hand_card_scale
 		v.setup(c, live and duel.can_play(c.uid).ok, k > 0.5)
 		_views.append(v)
 	_layout_hand()
@@ -819,17 +833,23 @@ func _rebuild_hand(live: bool) -> void:
 
 func _layout_hand() -> void:
 	var n := _views.size()
-	var w := Pal.em(8.4)
-	var h := Pal.em(11.8)
-	var step := w - Pal.em(1.4)
+	if n == 0:
+		return
+	var s := hand_card_scale
+	var w: float = _views[0].size.x * s
+	var h: float = _views[0].size.y * s
+	var step := w * (1.0 - hand_overlap)
 	var area: Vector2 = %Root.size
-	var base_y := area.y + Pal.em(1.6) - h
+	if n > 1:
+		step = minf(step, (area.x * hand_max_width - w) / (n - 1))
+	var cx := area.x / 2.0 + Pal.em(hand_offset_em)
+	var top := area.y + Pal.em(hand_sink_em) * s - h
 	for i in n:
 		var k := i - (n - 1) / 2.0
 		var v := _views[i]
-		v.base_y = base_y
-		v.home_pos = Vector2(area.x / 2.0 + k * step - w / 2.0, base_y + Pal.em(k * k * 0.3))
-		v.home_rot = k * 3.5
+		v.home_pos = v.pose_at(Vector2(cx + k * step - w / 2.0, top + Pal.em(k * k * 0.3) * s))
+		v.base_y = v.pose_at(Vector2(0, top)).y
+		v.home_rot = k * 3.0
 		v.z_index = i
 
 
@@ -850,16 +870,17 @@ func _update_hover() -> void:
 	var target: CardView = null
 	if _drag.is_empty() and _sdrag.is_empty() and not _busy and not %Cookbook.visible and not %Overlay.visible and not _announcer.visible and not %FlowPick.visible and not %Almanac.visible:
 		var m: Vector2 = _mouse
-		var w := Pal.em(8.4)
-		var h := Pal.em(11.8)
 		var lift := Pal.em(CardView.HOVER_LIFT_EM)
 		if _hover and is_instance_valid(_hover):
-			var r := Rect2(_hover.home_pos.x - w * 0.1, _hover.base_y - lift - h * 0.2, w * 1.2, h * 1.2 + lift + h)
+			var vr := _hover.visual_rect()
+			var w := vr.size.x
+			var h := vr.size.y
+			var r := Rect2(vr.position.x - w * 0.05, vr.position.y - lift - h * 0.15, w * 1.1, h * 1.15 + lift + h)
 			if r.has_point(m):
 				target = _hover
 		if target == null:
 			for i in range(_views.size() - 1, -1, -1):
-				if Rect2(_views[i].home_pos, Vector2(w, h)).has_point(m):
+				if _views[i].visual_rect().has_point(m):
 					target = _views[i]
 					break
 	if target == _hover:
@@ -930,7 +951,7 @@ func _drag_begin(m: Vector2) -> void:
 	ghost.setup(view.card, true, false)
 	ghost.pivot_offset = ghost.size / 2.0
 	ghost.position = center - ghost.size / 2.0
-	ghost.scale = Vector2.ONE * 1.08
+	ghost.scale = Vector2.ONE * view.base_scale * 1.05
 	_drag.ghost = ghost
 	view.set_hovered(false)
 	view.visible = false
@@ -994,7 +1015,7 @@ func _drag_release(m: Vector2) -> void:
 		var home := view.get_transform() * (view.size / 2.0)
 		tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tw.tween_property(ghost, "position", home - ghost.size / 2.0, 0.18)
-		tw.tween_property(ghost, "scale", Vector2.ONE, 0.18)
+		tw.tween_property(ghost, "scale", Vector2.ONE * view.base_scale, 0.18)
 		tw.tween_property(ghost, "rotation_degrees", view.home_rot, 0.18)
 		tw.chain().tween_callback(_drag_finish.bind(uid, false))
 		if target >= 0:

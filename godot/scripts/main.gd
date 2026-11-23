@@ -14,7 +14,9 @@ extends Node
 @export var player_flow: PackedInt32Array = Duel.PLAYER_FLOW
 @export_group("")
 ## Vertical resolution of the 3D view when the pixel filter is on.
-@export var pixel_height := 360
+@export var pixel_height := 270
+## Start with the pixel filter on (P / the HUD button toggles it). Only the 3D view; the HUD stays sharp.
+@export var pixel_on_start := true
 
 @onready var view: SubViewportContainer = $StageView
 @onready var stage: Stage = $StageView/StageViewport/Stage
@@ -32,7 +34,9 @@ var round_number := 1
 
 func _ready() -> void:
 	ui.restart_requested.connect(_start_duel)
-	ui.pixel_toggled.connect(_toggle_pixel)
+	ui.pixel_toggled.connect(func() -> void: _set_pixel(not pixelated))
+	view.resized.connect(func() -> void: _set_pixel(pixelated))
+	_set_pixel(pixel_on_start)
 	director.ui = ui
 	ui.director = director
 	ui.almanac_keeper = almanac_keeper
@@ -99,8 +103,12 @@ func _screen(anchor: Node3D) -> Vector2:
 	return view.position + stage.screen_pos(anchor) * view.stretch_shrink
 
 
-## Pixel filter: render the 3D view at ~360p and upscale it with nearest filtering.
-func _toggle_pixel() -> void:
-	pixelated = not pixelated
-	view.stretch_shrink = maxi(1, roundi(view.size.y / pixel_height)) if pixelated else 1
-	ui.set_pixel_on(pixelated)
+## Pixel filter: render the 3D view at ~360p, upscale it with nearest filtering, and run the
+## post-process quad (outlines + posterized palette). MSAA off, or edges get smoothed back.
+func _set_pixel(on: bool) -> void:
+	pixelated = on
+	view.stretch_shrink = maxi(1, roundi(view.size.y / pixel_height)) if on else 1
+	var vp: SubViewport = view.get_node("StageViewport")
+	vp.msaa_3d = Viewport.MSAA_DISABLED if on else Viewport.MSAA_2X
+	stage.pixel_post.visible = on
+	ui.set_pixel_on(on)

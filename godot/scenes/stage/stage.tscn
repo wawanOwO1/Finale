@@ -3,6 +3,20 @@
 [ext_resource type="Script" path="res://scripts/stage/stage.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/stage/chef.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/stage/counter.tscn" id="3"]
+[ext_resource type="Shader" path="res://assets/shaders/pixel_post.gdshader" id="4"]
+
+[sub_resource type="ShaderMaterial" id="pixel_post_mat"]
+render_priority = 100
+shader = ExtResource("4")
+shader_parameter/outlines = true
+shader_parameter/outline_strength = 0.7
+shader_parameter/outline_threshold = 0.15
+shader_parameter/outline_tint = Color(0.23, 0.14, 0.08, 1)
+shader_parameter/color_levels = 12.0
+shader_parameter/dither = 0.2
+shader_parameter/saturation = 1.1
+
+[sub_resource type="QuadMesh" id="pixel_post_quad"]
 
 [sub_resource type="Environment" id="env"]
 background_mode = 1
@@ -89,6 +103,14 @@ directional_shadow_max_distance = 45.0
 transform = Transform3D(1, 0, 0, 0, 0.755, 0.6557, 0, -0.6557, 0.755, 0, 17, 19)
 fov = 30.0
 current = true
+
+[node name="PixelPost" type="MeshInstance3D" parent="Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+visible = false
+material_override = SubResource("pixel_post_mat")
+cast_shadow = 0
+extra_cull_margin = 16384.0
+mesh = SubResource("pixel_post_quad")
 
 [node name="Floor" type="MeshInstance3D" parent="."]
 mesh = SubResource("floor_mesh")

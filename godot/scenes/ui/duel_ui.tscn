@@ -186,6 +186,51 @@ shadow_color = Color(0.231, 0.141, 0.078, 1)
 shadow_size = 1
 shadow_offset = Vector2(0, 5)
 
+[sub_resource type="StyleBoxFlat" id="almanac_cover"]
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 18.0
+bg_color = Color(0.42, 0.259, 0.149, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.102, 0.071, 0.051, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0.102, 0.071, 0.051, 1)
+shadow_size = 1
+shadow_offset = Vector2(6, 6)
+anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="page_left"]
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+bg_color = Color(0.953, 0.89, 0.769, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 6
+border_width_bottom = 3
+border_color = Color(0.231, 0.141, 0.078, 1)
+anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="page_right"]
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+bg_color = Color(0.953, 0.89, 0.769, 1)
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.231, 0.141, 0.078, 1)
+anti_aliasing = false
+
 [node name="DuelUI" type="CanvasLayer"]
 script = ExtResource("1")
 
@@ -1265,23 +1310,33 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="AlmanacBox" type="PanelContainer" parent="Root/Almanac/Center"]
+[node name="BookRow" type="HBoxContainer" parent="Root/Almanac/Center"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="BookBalance" type="Control" parent="Root/Almanac/Center/BookRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="AlmanacBox" type="PanelContainer" parent="Root/Almanac/Center/BookRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(1280, 0)
+custom_minimum_size = Vector2(1260, 0)
 layout_mode = 2
-theme_override_styles/panel = SubResource("modal_box")
+theme_override_styles/panel = SubResource("almanac_cover")
 
-[node name="VBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox"]
+[node name="VBox" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 0
 
-[node name="Head" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+[node name="Head" type="HBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 13
 
-[node name="BookIcon" type="TextureRect" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
-self_modulate = Color(0.847, 0.204, 0.173, 1)
-custom_minimum_size = Vector2(50, 50)
+[node name="BookIcon" type="TextureRect" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head"]
+self_modulate = Color(0.949, 0.714, 0.196, 1)
+custom_minimum_size = Vector2(42, 42)
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
@@ -1289,102 +1344,151 @@ texture = ExtResource("8")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Titles" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+[node name="Titles" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 0
 
-[node name="AlmanacTitle" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+[node name="AlmanacTitle" type="Label" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head/Titles"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 30
-text = "Almanac"
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_colors/font_outline_color = Color(0.102, 0.071, 0.051, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = "ALMANAC"
 
-[node name="AlmanacSub" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head/Titles"]
+[node name="AlmanacSub" type="Label" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head/Titles"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
-text = "Everything you have found so far. The duel is paused. Tab or Esc closes it."
+theme_override_colors/font_color = Color(0.788, 0.722, 0.639, 1)
+theme_override_font_sizes/font_size = 14
+text = "The duel is paused. Tab or Esc closes the book."
 
-[node name="AlmanacProgress" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+[node name="AlmanacProgress" type="Label" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
+theme_override_colors/font_color = Color(0.949, 0.714, 0.196, 1)
 text = "Found 0 / 0"
 
-[node name="AlmanacClose" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/Head"]
+[node name="AlmanacClose" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Head"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
 text = "Close"
 
-[node name="AlmanacTabs" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+[node name="TabsGap" type="Control" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="AlmanacTabs" type="HBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox"]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Ingredients" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+size_flags_vertical = 8
+text = "Ingredients"
+
+[node name="Techniques" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+size_flags_vertical = 8
+text = "Techniques"
+
+[node name="Recipes" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+size_flags_vertical = 8
+text = "Recipes"
+
+[node name="Rivals" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+size_flags_vertical = 8
+text = "Rivals"
+
+[node name="Keywords" type="Button" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/AlmanacTabs"]
+layout_mode = 2
+size_flags_vertical = 8
+text = "Keywords"
+
+[node name="Body" type="HBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="LeftPage" type="PanelContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("page_left")
+
+[node name="LeftVBox" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Ingredients" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
-layout_mode = 2
-text = "Ingredients"
-
-[node name="Techniques" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
-layout_mode = 2
-text = "Techniques"
-
-[node name="Recipes" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
-layout_mode = 2
-text = "Recipes"
-
-[node name="Rivals" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
-layout_mode = 2
-text = "Rivals"
-
-[node name="Keywords" type="Button" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacTabs"]
-layout_mode = 2
-text = "Keywords"
-
-[node name="AlmanacFinder" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
+[node name="PageTitle" type="Label" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_colors/font_color = Color(0.847, 0.204, 0.173, 1)
+theme_override_font_sizes/font_size = 18
+text = "RECIPES"
+horizontal_alignment = 1
 
-[node name="FinderHint" type="Label" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+[node name="AlmanacFinder" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="FinderHint" type="Label" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox/AlmanacFinder"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.196, 1)
-theme_override_font_sizes/font_size = 15
-text = "Pick up to 3 tags or ingredients to find the recipes that use them."
+theme_override_font_sizes/font_size = 13
+text = "Find a recipe: pick up to 3 tags or ingredients."
 
-[node name="FinderChips" type="HFlowContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/AlmanacFinder"]
+[node name="FinderChips" type="HFlowContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox/AlmanacFinder"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/h_separation = 6
-theme_override_constants/v_separation = 6
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
 
-[node name="Body" type="HBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 18
-
-[node name="Scroll" type="ScrollContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
+[node name="Scroll" type="ScrollContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox"]
 custom_minimum_size = Vector2(0, 520)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="AlmanacList" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/Scroll"]
+[node name="AlmanacList" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/LeftPage/LeftVBox/Scroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="AlmanacDetail" type="PanelContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(450, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("page_right")
+
+[node name="DetailScroll" type="ScrollContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/AlmanacDetail"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="DetailBox" type="VBoxContainer" parent="Root/Almanac/Center/BookRow/AlmanacBox/VBox/Body/AlmanacDetail/DetailScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="AlmanacChapters" type="VBoxContainer" parent="Root/Almanac/Center/BookRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+size_flags_vertical = 0
+mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="AlmanacDetail" type="PanelContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(350, 0)
+[node name="ChaptersGap" type="Control" parent="Root/Almanac/Center/BookRow/AlmanacChapters"]
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
-theme_override_styles/panel = SubResource("book_rule")
-
-[node name="DetailBox" type="VBoxContainer" parent="Root/Almanac/Center/AlmanacBox/VBox/Body/AlmanacDetail"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 10
+mouse_filter = 2
 
 [node name="Tooltip" type="Control" parent="Root"]
 z_index = 200

@@ -21,6 +21,8 @@ const TAG_COLORS := {
 @export var crowd_origin := Vector3(-11, 0.6, 6.2)
 
 @onready var camera: Camera3D = $Camera3D
+## Pixel filter post-process quad (assets/shaders/pixel_post.gdshader); main.gd toggles it.
+@onready var pixel_post: MeshInstance3D = $Camera3D/PixelPost
 @onready var player: Node3D = $Player
 @onready var rival: Node3D = $Rival
 @onready var plate_items: Node3D = $Plate/Items
@@ -60,7 +62,7 @@ func _flatten_all(node: Node) -> void:
 	for child in node.get_children():
 		_flatten_all(child)
 	var mi := node as MeshInstance3D
-	if mi and mi.mesh is PrimitiveMesh:
+	if mi and mi.mesh is PrimitiveMesh and not mi.material_override is ShaderMaterial:
 		mi.mesh = flat_mesh(mi.mesh)
 		if mi.material_override is StandardMaterial3D:
 			_matte(mi.material_override)
