@@ -7,6 +7,12 @@ extends Node
 @export var dev_deck := false
 ## 100 = Signature Dish in hand from turn 1.
 @export_range(0, 100) var start_hype := 0
+@export_group("Balance (GRAND_DESIGN §8 G, check with tests/balance.gd)")
+## Apis's Confidence at the start of a duel.
+@export_range(10, 300) var player_confidence := Duel.PLAYER_CONFIDENCE
+## Chef's Flow: Perfect Serves needed for each modifier; the last value repeats.
+@export var player_flow: PackedInt32Array = Duel.PLAYER_FLOW
+@export_group("")
 ## Vertical resolution of the 3D view when the pixel filter is on.
 @export var pixel_height := 360
 
@@ -65,7 +71,7 @@ func _start_duel() -> void:
 		round_number += 1
 	ui.round_number = round_number
 	duel = Duel.new(deck, GameDB.enemy(enemy_id), recipes,
-			{hype = start_hype})
+			{hype = start_hype, max_confidence = player_confidence, player_flow = player_flow})
 	# Visuals listen to the duel's signals; the duel never knows about them (GDD §9).
 	duel.changed.connect(_sync_plate)
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:

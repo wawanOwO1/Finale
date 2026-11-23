@@ -69,6 +69,7 @@ godot/
   tests/sim.gd            Test headless logika (port dari scripts/sim.ts)
   tests/ui_drive.gd       Test UI dengan input mouse simulasi + screenshot
   tests/hit_probe.gd      Cek area klik semua tombol di beberapa ukuran window
+  tests/balance.gd        Balancing: ratusan duel bot vs rival, win rate + panjang duel (-- sweep)
 ```
 
 ### Peta TS → Godot
@@ -106,6 +107,13 @@ sekali untuk migrasi; menjalankannya lagi akan **menimpa** editan di Godot.
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/sim.gd
+```
+
+Balancing (GRAND_DESIGN §8.2): laporan angka sekarang, atau `-- sweep` untuk mencoba nilai lain
+(`hp=`, `tony=`, `rosa=`, `flow=`, `n=`). Angkanya diubah di `.tres` rival dan Inspector `Main` → Balance.
+
+```powershell
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/balance.gd
 ```
 
 Kalau baru clone (folder `.godot/` belum ada), jalankan sekali dulu:

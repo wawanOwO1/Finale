@@ -16,7 +16,7 @@
 | 7 | Fast-forward | Tahan klik/Space = giliran rival ×3. |
 | 8 | Tingkat AI | Rival awal serakah → Elite sabar → Boss dengan gimmick. |
 | 9 | RNG | Output **deterministik**. Input random dengan pseudo-random ringan (anti-clump + Mise en Place). AI memakai aturan RNG yang sama. |
-| 10 | Power-up | **Chef's Flow**: 2 Perfect Order → pilih 1 dari 3 modifier, threshold naik 2 → 3 → 4, **per duel**, bisa di-stack. |
+| 10 | Power-up | **Chef's Flow**: Perfect Order → pilih 1 dari 3 modifier, threshold naik 1 → 2 → 3 (fase G; awalnya 2 → 3 → 4), **per duel**, bisa di-stack. |
 | 11 | Rival & modifier | Rival juga bisa mendapat modifier (threshold lebih tinggi untuk rival awal), tampil sebagai ikon buff. |
 | 12 | Pity diberi tanda | Bad-luck protection **terlihat**: "✨ Mise en place!". |
 
@@ -279,7 +279,7 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
 
 ### 5.1 Aturan
 - Setiap Serve **Perfect Order** = +1 Flow. Serve Cooked/Improvised = +0.
-- Threshold: **2 → 3 → 4** (lalu tetap 4). Saat tercapai, Flow kembali 0 dan muncul **pilih 1 dari 3 modifier**.
+- Threshold: **1 → 2 → 3** (lalu tetap 3). Diturunkan dari 2 → 3 → 4 di fase G (§8.2). Saat tercapai, Flow kembali 0 dan muncul **pilih 1 dari 3 modifier**.
 - **Per duel**: modifier dan Flow reset di awal duel berikutnya. Kitchen Tool tetap reward run (GDD §6.4).
 - Pemain: overlay pilih kartu (ref Gambar 3) muncul **setelah Serve selesai diresolusi**. Game pause.
 - Rival: memilih otomatis sesuai profil. Announcer chip **"TONY GOT HOT PAN!"** (1 s) + ikon di baris modifier rival.
@@ -329,7 +329,7 @@ Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direp
   - **Hot Pan** berlaku di setiap Serve, karena Serve memang hanya sekali per giliran.
   - **Plating Pro**: belum ada batas Garnish di aturan, jadi efeknya "Quality Garnish ×2".
   - **Free Move**: AI belum memakai pindah kartu, jadi nilainya rendah untuk rival.
-- ⚠️ Balancing (untuk fase G): di `sim.gd` bot pintar Apis rata-rata mendapat 0.06 (vs Tony) / 0.22 (vs Rosa) modifier per duel. Duel hanya ±3 giliran dengan 1 Serve per giliran, jadi 2 Serve Perfect jarang tercapai. Pertimbangkan threshold 1→2→3, atau Flow +1 juga dari Serve Cooked.
+- ✅ Balancing (fase G, §8.2): threshold pemain diturunkan ke 1 → 2 → 3. Pemain hati-hati kini mendapat ±1 modifier per duel (dulu 0.06–0.22).
 
 ---
 
@@ -393,7 +393,7 @@ Aset tambahan untuk daftar ART_DIRECTION §8: punggung kartu versi rival (warna 
 
 ---
 
-## 8. Rencana implementasi
+## 8. Rencana implementasi — ✅ fase A–G selesai 23 Nov
 
 | Fase | Isi | Tergantung | Perkiraan |
 |---|---|---|---|
@@ -415,10 +415,35 @@ Total ±9 hari kerja, masuk ke minggu 2 jadwal GDD §10 (29 Nov–5 Des) dengan 
 - Tes fair: dua run dengan seed sama, keputusan pemain berbeda → urutan draw pemain tetap sama (stream terpisah).
 - Target balancing awal: Tony kalah dari deck starter ±80% (di tangan AI pemain sederhana), duel 5–8 giliran.
 
+### 8.2 Status balancing (fase G, 23 Nov)
+Alat: `tests/balance.gd` (headless) memainkan ratusan duel per rival dengan dua bot (`tests/balance_runner.gd`): **simple** (kartu acak, Serve apa pun yang jadi = pemain baru) dan **smart** (`RivalAI` di sisi Apis = pemain hati-hati). `-- sweep` mencoba grid Confidence pemain × Confidence rival × threshold Flow. `tests/sim.gd` menjaga targetnya (`_balance()`).
+
+Masalah awal: duel terlalu pendek (smart ±2.7 giliran vs Tony), dan Chef's Flow hampir tidak pernah aktif. Menaikkan Confidence rival saja membuat pemain kalah di giliran ±6, karena kedua sisi memberi ±10 Pressure per giliran. Jadi kedua sisi dinaikkan.
+
+| Nilai | Dulu | Sekarang | Tempat mengubah |
+|---|---|---|---|
+| Confidence Apis | 60 | **100** | `Duel.PLAYER_CONFIDENCE`, Inspector `Main` → Balance |
+| Confidence Tony | 30 | **45** | `data/enemies/tony.tres` |
+| Confidence Rosa | 38 | **50** | `data/enemies/rosa.tres` |
+| Threshold Flow pemain | 2 → 3 → 4 | **1 → 2 → 3** | `Duel.PLAYER_FLOW`, Inspector `Main` → Balance |
+
+Hasil (300 duel, deck starter):
+
+| Rival | Bot | Menang | Giliran | Confidence sisa | Aksi rival/giliran | Modifier Apis/duel |
+|---|---|---|---|---|---|---|
+| Tony | simple | 76% | 7.5 | 38/100 | 4.8 (maks 7) | 0.30 |
+| Tony | smart | 98% | 4.7 | 64/100 | 4.8 | 1.00 |
+| Rosa | simple | 38% | 6.3 | 34/100 | 4.2 (maks 6) | 0.30 |
+| Rosa | smart | 87% | 4.7 | 55/100 | 4.2 | 0.99 |
+
+- Target §8.1 tercapai: Tony kalah ±80% dari pemain sederhana, duel 5–8 giliran (pemain sungguhan ada di antara kedua bot). Rosa lebih sulit dari Tony untuk kedua bot.
+- Risiko §9 "panjang giliran rival": rata-rata 4.2–4.8 aksi, di bawah batas 6.
+- Belum: Marco, Élodie, dan Bruno belum ada di data. Confidence mereka di GDD §6.5 perlu disesuaikan dengan skala baru saat dibuat (cek dengan `balance.gd`).
+
 ---
 
 ## 9. Risiko & pertanyaan terbuka
-- [ ] **Panjang giliran rival.** Kalau rival rata-rata > 6 aksi, giliran terasa lama. Mitigasi: Heat rival kecil, gabungkan "taruh 2 bahan" jadi satu animasi.
+- [x] **Panjang giliran rival.** (Fase G: rata-rata 4.2–4.8 aksi, lihat §8.2.) Kalau rival rata-rata > 6 aksi, giliran terasa lama. Mitigasi: Heat rival kecil, gabungkan "taruh 2 bahan" jadi satu animasi.
 - [ ] **AI terlalu pintar/bodoh.** Bobot profil perlu dituning lewat sim (fase G).
 - [ ] **Hilangnya telegraph.** Mood + jumlah kartu di station rival harus cukup untuk keputusan bertahan. Dicek di playtest pertama; kalau kurang, tambahkan "ready glow" pada station rival yang bisa di-Serve.
 - [ ] **Élodie & station pemain.** Gimmicknya membaca *jumlah* kartu station pemain (publik), jadi tetap sesuai janji fair.
