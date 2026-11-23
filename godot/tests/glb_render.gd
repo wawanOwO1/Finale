@@ -1,8 +1,8 @@
 extends SceneTree
 ## Windowed: render APIS (top row) and TONY (bottom row) in each chef clip at a key moment.
-## Saves user://glb_render.png. Columns: idle, chop (impact), busy (left reach), victory (end), lose (end).
+## Saves user://glb_render.png. Columns: idle, chop (big wind-up), busy (left reach), victory (jump peak), lose (end).
 
-const SHOTS := [["idle", 1.0], ["chop", 0.17], ["busy", 0.55], ["victory", 99.0], ["lose", 99.0]]
+const SHOTS := [["idle", 1.0], ["chop", 0.8], ["busy", 0.3], ["victory", 0.43], ["lose", 99.0]]
 
 func _initialize() -> void:
 	var world := Node3D.new()

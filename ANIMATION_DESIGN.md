@@ -42,68 +42,92 @@ Napas dan berat badan, tidak pernah benar-benar diam.
 Lapisan kecil: kepala bergoyang kiri-kanan 3° dengan periode penuh (offset ¼ siklus) supaya tidak robotik.
 **Tony:** 2.4 s, berat di kaki kanan (Hips miring 4°), tangan kiri di pinggang, kepala miring 6°.
 
-### 3.2 `chop` — loop, 1.0 s (30 f), dua potongan per siklus
-Memotong di talenan di depan perut.
+### Easing (revisi 2)
 
-| Frame | Pose |
-|---|---|
-| 0 | Badan condong ke depan 7°, kepala menunduk 10° melihat talenan (kepala chibi besar: tunduk lebih dari ini menutup wajah dengan topi). Tangan kiri di depan perut, telapak menahan bahan. Tangan kanan **naik** (siku 90°, tangan setinggi dada) = anticipation. |
-| 5 | **Impact**: tangan kanan turun cepat ke tinggi talenan, bahu kanan turun, badan ikut turun 1 cm. |
-| 7 | Hold impact (tangan sedikit memantul). |
-| 15 | Naik lagi, tangan kiri bergeser 2 cm ke samping (menggeser bahan). |
-| 20 | Impact kedua. |
-| 22 | Hold. |
-| 30 | = frame 0. |
+Setiap key bisa memberi easing pada segmen yang **menuju** key itu. Ini yang membuat gerakan terasa tegas, bukan melayang:
 
-**Tony:** 0.8 s (lebih cepat, pamer), tangan kanan naik lebih tinggi (setinggi kepala), kepala tidak menunduk sepenuhnya (melirik penonton).
+| Easing | Blender | Dipakai untuk |
+|---|---|---|
+| `in` | Cubic, ease-in | Mempercepat ke arah impact: pisau menghantam, mendarat, jatuh berlutut |
+| `out` | Back, ease-out (overshoot 1.2) | Tiba di pose lalu memantul sedikit: recoil pisau, sampai di station, pose kemenangan |
+| `snap` | Expo, ease-out | Lepas sangat cepat lalu melambat: kaget, lompat, lempar wajan |
+
+### 3.2 `chop` — loop, 1.2 s (36 f), ritme "chop, chop, CHOP"
+Seluruh badan ikut memotong: condong dan turun di setiap hantaman.
+
+| Frame | Pose | Easing |
+|---|---|---|
+| 0 | **Angkat**: pisau di tangan kanan setinggi kepala (lengan atas naik ke samping, siku 120°), bahu kanan naik, badan sedikit tegak. Tangan kiri menahan bahan di depan perut. | |
+| 4 | **Hantam**: tangan kanan lurus ke talenan, badan condong 10°+8°, kepala mengangguk, Hips turun 3.5 cm. | `in` |
+| 6 | Recoil kecil. | `out` |
+| 10–16 | Ulangi, tangan kiri bergeser 6° ke samping (menggeser bahan). | |
+| 24 | **Angkat besar**: tangan lebih tinggi, badan sedikit mundur. Tony melirik penonton (kepala 22°). | |
+| 28 | **Hantam besar**: Hips turun 5.5 cm, badan condong 14°. | `in` |
+| 31 | Recoil. | `out` |
+| 36 | = frame 0. | |
+
+**Tony:** tempo 0.85, amplitudo ×1.15, tangan diangkat lebih tinggi, kepala tidak menunduk.
 
 ### 3.3 `busy` — loop, 2.4 s (72 f)
-Bolak-balik kiri-kanan, terlihat sibuk memasak di dua station.
+Ambil bahan di kiri, masukkan ke panci di tengah, goyang dan lempar wajan di kanan. Melompat kecil antar station.
 
-| Frame | Pose |
-|---|---|
-| 0 | Tengah, netral kerja (badan condong 8°, kedua tangan di depan). |
-| 12 | Putar badan ke **kiri** 35° (Hips 15°, Spine 20°), langkah kecil: berat ke kaki kiri. Tangan kanan menjangkau ke kiri (ambil bahan). |
-| 18 | Hold, tangan kanan "mengambil". |
-| 36 | Putar ke **kanan** 35°. Tangan kanan mengaduk/goyang wajan: lengan bawah berputar kecil. |
-| 42–54 | Dua kali goyang wajan (lengan maju-mundur 10°), kepala mengikuti. |
-| 72 | = frame 0. |
+| Frame | Pose | Easing |
+|---|---|---|
+| 0 | Tengah, posisi kerja. | |
+| 4 | Kepala melirik ke kiri lebih dulu. | |
+| 9 | **Tiba di kiri**: badan berputar 50° total (Hips 35%, Spine 65%, kaki diputar balik supaya tetap menapak), Hips geser 3 cm. Tangan kanan menjangkau jauh menyilang badan, tangan kiri terbuka untuk keseimbangan. | `out` |
+| 14 | **Ambil**: badan menunduk, jongkok 3 cm, tangan menggenggam. | `in` |
+| 19 | Lompat kecil ke tengah (Hips +3 cm), bahan dibawa. | `snap` |
+| 24 | **Masukkan ke panci**: kedua tangan ke depan-bawah, badan condong 16°, jongkok. | `in` |
+| 27 | Memantul. | `out` |
+| 30 | Kepala melirik ke kanan. | |
+| 35 | **Tiba di kanan**, memegang gagang wajan. | `out` |
+| 39–51 | Dua kali goyang wajan: dorong (`in`) dan tarik (`out`), badan ikut turun naik. | |
+| 55 | **Lempar wajan**: lengan naik, badan mundur 12°, kepala menengadah mengikuti makanan, Hips +3.5 cm. | `snap` |
+| 61 | **Tangkap**: jongkok 3.5 cm. | `in` |
+| 66 | Kembali ke tengah dengan memantul. | `out` |
+| 72 | = frame 0. | |
 
-Kepala selalu sedikit **mendahului** arah putar (4 frame lebih awal) supaya terbaca "melihat dulu, baru bergerak".
-**Tony:** 2.8 s, satu goyang wajan dengan gaya lempar. Putaran dasarnya 28° (setelah amplitudo ×1.3 ≈ 36°), karena 45° membuat wajahnya hampir menyamping.
+**Tony:** tempo 1.1, amplitudo ×1.1.
 
 ### 3.4 `victory` — sekali main, 2.0 s (60 f), hold di akhir
 
-| Frame | Pose |
-|---|---|
-| 0 | Netral. |
-| 8 | Anticipation: lutut tekuk, Hips −6 cm, lengan ditarik ke belakang. |
-| 16 | **Lompat**: Hips +12 cm, kedua lengan ke atas serong (V, ±60° di atas horizontal), kepala menengadah. |
-| 24 | Mendarat, lutut tekuk (Hips −3 cm). |
-| 32–52 | Fist pump: lengan kanan naik-turun 2× di atas kepala, lengan kiri mengepal di pinggang. |
-| 60 | Pose akhir: kepalan kanan teracung serong ke atas di samping kepala (lurus ke atas tertutup kepala dan topi dari depan), dada membusung, kepala naik. Hold. |
+**Apis** (lompat gembira):
 
-**Tony:** tidak lompat tinggi (Hips +6 cm). Pose akhir sombong: tangan kiri di pinggang, tangan kanan menunjuk serong ke depan-samping (lurus ke depan tidak terbaca dari kamera depan), badan bersandar ke belakang 8°.
+| Frame | Pose | Easing |
+|---|---|---|
+| 0 | Netral. | |
+| 7 | **Ancang-ancang**: jongkok 9 cm, badan condong 22°, kedua lengan ditarik jauh ke belakang. | |
+| 13 | **Lompat**: Hips +20 cm, kaki ditekuk di udara, kedua lengan V tinggi, kepala menengadah. | `snap` |
+| 19 | Turun, kaki mulai lurus. | |
+| 22 | **Mendarat**: squash, jongkok 7 cm, lengan terbuka. | `in` |
+| 28–43 | Dua fist pump: kepalan kanan naik (`out`), turun dengan badan ikut jongkok (`in`). Kepalan kiri di pinggang. | |
+| 50 | **Pose akhir**: kepalan kanan serong ke atas, dada membusung, kepala menengadah. Hold sampai 60. | `out` |
+
+**Tony** (sombong): ancang-ancang kecil, lompat kecil 9 cm (`snap`), mendarat, lalu **tertawa terbahak**: badan bersandar ke belakang, tangan kiri di pinggang, tangan kanan di perut, badan berguncang 4× (frame 22–44). Frame 49: **menunjuk** lawan serong ke depan-samping dengan overshoot (`out`), hold.
 
 ### 3.5 `lose` — sekali main, 2.4 s (72 f), hold di akhir
 
-| Frame | Pose |
-|---|---|
-| 0 | Netral. |
-| 6 | **Kaget**: badan terhentak ke belakang 10°, bahu naik, kedua tangan terangkat setengah. |
-| 14 | Hold kaget. |
-| 36 | Lemas: bahu jatuh, lengan menggantung, Spine membungkuk ke depan ±13°. |
-| 52 | Lutut tekuk, Hips −8 cm, kepala menunduk 20°. |
-| 72 | Pose akhir: tertunduk lesu, sedikit bergoyang lalu diam. Hold. |
+Awal yang sama untuk keduanya: frame 5 **kaget** (`snap`): melompat mundur 3.5 cm dan naik 4 cm, kedua tangan ke wajah, bahu naik, kepala terhentak ke belakang. Frame 8–17: gemetar kiri-kanan.
 
-**Tony:** lebih dramatis: di frame 36 kedua tangan memegang kepala, lalu jatuh berlutut (Hips turun sepanjang tulang kering), kepala menunduk ke depan.
+**Apis** (kecewa):
+
+| Frame | Pose | Easing |
+|---|---|---|
+| 30 | Kempis: bahu turun, lengan jatuh. | |
+| 40 | **Ambruk**: jongkok 11 cm, badan condong, lengan menggantung ke depan. | `in` |
+| 45 | Memantul sedikit. | `out` |
+| 55 | Tarik napas: bahu naik, kepala sedikit naik. | |
+| 66 | **Menghela napas**: bahu jatuh, kepala menunduk dan miring. Hold. Wajah tetap terlihat dari depan. | `in` |
+
+**Tony** (drama): frame 22 memegang kepala (`out`), 27–37 menggeleng 3× tidak percaya, frame 43 **jatuh berlutut** (`in`, memantul di 47), frame 52–63 memukul lantai 2× dengan kedua kepalan (`in`/`out`), lalu tertunduk. Hold.
 
 ## 4. Parameter gaya per karakter
 
 | Parameter | Apis | Tony |
 |---|---|---|
-| Pengali tempo `idle` / `chop` / `busy` | 1.0 / 1.0 / 1.0 | 1.2 / 0.8 / 1.15 |
-| Pengali amplitudo | 1.0 | 1.3 |
+| Pengali tempo `idle` / `chop` / `busy` | 1.0 / 1.0 / 1.0 | 1.2 / 0.85 / 1.1 |
+| Pengali amplitudo (`idle` / `chop` / `busy`) | 1.0 | 1.3 / 1.15 / 1.1 (`victory`, `lose` punya pose Tony sendiri) |
 | Postur dasar (Spine) | condong +4° | membungkuk +8°, perut maju |
 | Hips tinggi (dari rest) | 0.248 m | 0.213 m → semua offset Hips dikali 0.86 |
 | Pose khusus | — | tangan di pinggang (`idle`, `victory`), tangan di kepala (`lose`) |
@@ -146,3 +170,7 @@ di tabel pose khusus Tony.
 - Penyesuaian dari rencana: tunduk kepala dan putaran `busy` Tony dikurangi, dan lengan pose `victory` dibuat serong
   (lihat catatan di tiap clip). Kepala chibi yang besar menutup gerakan yang terlalu lurus ke atas atau ke depan.
 - Durasi di Godot +1 frame (mis. 2.03 s), karena frame terakhir loop = frame pertama. Tidak terlihat saat main.
+- **Revisi 2** (feedback: terlalu kaku dan kecil): `chop`, `busy`, `victory`, `lose` dibuat ulang dengan pose lebih besar
+  dan easing per key (§3, tabel Easing). `idle` tetap. `chop` jadi 3 potongan per siklus (1.2 s). Lompat `victory`
+  20 cm dengan kaki ditekuk. `lose` Apis ambruk dengan wajah tetap terlihat, Tony memukul lantai.
+- Cek sheet tanpa export: `-- apis --sheet <png> --no-export --clips chop,busy --cols 12 --view front --size 220`.

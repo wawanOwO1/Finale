@@ -34,12 +34,13 @@ B = "mixamorig:"
 STYLES = {
     "apis": {
         "tempo": {"idle": 1.0, "chop": 1.0, "busy": 1.0, "victory": 1.0, "lose": 1.0},
-        "amp": 1.0,
+        "amp": {"idle": 1.0, "chop": 1.0, "busy": 1.0, "victory": 1.0, "lose": 1.0},
         "base": {"Spine": [("X", 4)]},
     },
     "tony": {
-        "tempo": {"idle": 1.2, "chop": 0.8, "busy": 1.15, "victory": 1.0, "lose": 1.0},
-        "amp": 1.3,
+        "tempo": {"idle": 1.2, "chop": 0.85, "busy": 1.1, "victory": 1.0, "lose": 1.0},
+        # victory/lose have their own Tony poses, so they are not amplified again
+        "amp": {"idle": 1.3, "chop": 1.15, "busy": 1.1, "victory": 1.0, "lose": 1.0},
         # Slouch with the belly pushed out: pelvis-up spine leans back, upper spine forward, head stays level.
         "base": {
             "Spine": [("X", -6)],
@@ -125,122 +126,171 @@ def clip_idle(c):
     return 60, True, keys
 
 
-def _chop_body(look_down=10, crouch=0.01):
-    return {"Spine": [("X", 4)], "Spine1": [("X", 3)], "Head": [("X", look_down)]}
-
-
 def clip_chop(c):
+    """Three chops per cycle (chop, chop, BIG chop). Whole body drives the knife: lean in and dip on every hit."""
     tony = c == "tony"
-    look = 2 if tony else 10
-    left_hold = arm("L", down=28, fwd=40, elbow=70, twist=-20)
-    left_slide = arm("L", down=28, fwd=40, out=6, elbow=70, twist=-20)
+    look = 4 if tony else 12
 
-    def up(left):
-        r = arm("R", down=10, fwd=70 + (25 if tony else 0), elbow=125, twist=-15, hand=-25)
-        return merge(_chop_body(look), left, r)
+    def left(slide):  # left hand holds the food and steps aside after each cut
+        return arm("L", down=22, fwd=48, out=slide, elbow=78, twist=-20, hand=-10)
 
-    def hit(left):
-        r = arm("R", down=30, fwd=30, elbow=40, twist=-15, hand=20)
-        return merge(_chop_body(look + 4), left, r, {"RightShoulder": [("to", "DOWN", 6)]})
+    def up(slide, big=False):
+        lift = 12 if big else 0
+        r = arm("R", down=-50 - lift - (12 if tony else 0), fwd=40, elbow=120 + lift, twist=-20, hand=-45)
+        body = {"Spine": [("X", -2)], "Spine1": [("X", -2 - lift * 0.3)], "Head": [("X", look - 4)],
+                "RightShoulder": [("to", "UP", 16 + lift)], "Spine2": [("Z", 6)]}
+        return merge(body, left(slide), r)
 
-    def bounce(left):
-        r = arm("R", down=28, fwd=36, elbow=52, twist=-15, hand=8)
-        return merge(_chop_body(look + 2), left, r)
+    def hit(slide, big=False):
+        r = arm("R", down=42, fwd=34, elbow=18, twist=-20, hand=35)
+        body = {"Spine": [("X", 10 + (4 if big else 0))], "Spine1": [("X", 8)], "Head": [("X", look + 8)],
+                "RightShoulder": [("to", "DOWN", 14)], "LeftShoulder": [("to", "DOWN", 4)], "Spine2": [("Z", -4)]}
+        return merge(body, left(slide), r)
 
-    head_peek = {"Head": [("Z", 12)]} if tony else {}  # Tony glances at the crowd between chops
+    def recoil(slide):
+        r = arm("R", down=26, fwd=42, elbow=50, twist=-20, hand=10)
+        body = {"Spine": [("X", 7)], "Spine1": [("X", 5)], "Head": [("X", look + 4)]}
+        return merge(body, left(slide), r)
+
+    peek = {"Head": [("Z", 22), ("Y", -8)]} if tony else {}  # Tony shows off to the crowd before the big one
     keys = [
-        dict(f=0, pose=up(left_hold), hips=(0, 0, -0.008)),
-        dict(f=5, pose=hit(left_hold), hips=(0, 0, -0.018)),
-        dict(f=7, pose=bounce(left_hold), hips=(0, 0, -0.015)),
-        dict(f=15, pose=merge(up(left_slide), head_peek), hips=(0, 0, -0.008)),
-        dict(f=20, pose=hit(left_slide), hips=(0, 0, -0.018)),
-        dict(f=22, pose=bounce(left_slide), hips=(0, 0, -0.015)),
-        dict(f=30, pose=up(left_hold), hips=(0, 0, -0.008)),
+        dict(f=0, pose=up(0), hips=(0, 0, 0.004)),
+        dict(f=4, pose=hit(0), crouch=0.035, ease="in"),
+        dict(f=6, pose=recoil(0), crouch=0.018, ease="out"),
+        dict(f=10, pose=up(6), hips=(0, 0, 0.004)),
+        dict(f=14, pose=hit(6), crouch=0.035, ease="in"),
+        dict(f=16, pose=recoil(6), crouch=0.018, ease="out"),
+        dict(f=24, pose=merge(up(12, big=True), peek), hips=(0, 0, 0.012)),
+        dict(f=28, pose=hit(12, big=True), crouch=0.055, ease="in"),
+        dict(f=31, pose=recoil(12), crouch=0.03, ease="out"),
+        dict(f=36, pose=up(0), hips=(0, 0, 0.004)),
     ]
-    return 30, True, keys
+    return 36, True, keys
 
 
 def clip_busy(c):
-    tony = c == "tony"
-    turn = 28 if tony else 35
-    work = merge({"Spine": [("X", 8)], "Head": [("X", 10)]},
-                 arm("L", down=26, fwd=35, elbow=60), arm("R", down=26, fwd=35, elbow=60))
+    """Grab from the left, drop it in the middle, shake and toss the pan on the right. Hops between stations."""
+    turn = 50
 
-    def turned(sign, extra):
-        # sign +1 = character's left. Hips turn a little, spine the rest; legs counter-rotate to keep feet planted.
-        hip = 0.4 * turn * sign
-        body = {"Hips": [("Z", hip)], "LeftUpLeg": [("Z", -hip)], "RightUpLeg": [("Z", -hip)],
-                "Spine": [("X", 8), ("Z", 0.3 * turn * sign)], "Spine1": [("Z", 0.3 * turn * sign)],
-                "Spine2": [("Y", 4 * sign)]}
+    def turned(sign, extra, lean=0.0):
+        hip = 0.35 * turn * sign
+        body = {"Hips": [("Z", hip), ("Y", 3 * sign)], "LeftUpLeg": [("Z", -hip), ("Y", -3 * sign)],
+                "RightUpLeg": [("Z", -hip), ("Y", -3 * sign)],
+                "Spine": [("X", 8 + lean), ("Z", 0.35 * turn * sign)], "Spine1": [("Z", 0.3 * turn * sign)],
+                "Spine2": [("Y", 3 * sign)]}
         return merge(body, extra)
 
-    reach_left = merge(arm("R", down=18, fwd=60, out=-25, elbow=25), arm("L", down=28, fwd=30, elbow=70))
-    grab_left = merge(arm("R", down=24, fwd=55, out=-25, elbow=45, hand=20), arm("L", down=28, fwd=30, elbow=70))
-    pan = lambda push: merge(arm("R", down=24, fwd=35 + push, elbow=80 - push, twist=-10, hand=-10),
-                             arm("L", down=26, fwd=30, elbow=75))
-    head = lambda yaw: {"Head": [("X", 10), ("Z", yaw)]}
+    def head(yaw, pitch=12):
+        return {"Head": [("X", pitch), ("Z", yaw)]}
 
-    lean_l = (0.012, 0, -0.012)
-    lean_r = (-0.012, 0, -0.012)
+    work = merge({"Spine": [("X", 10)], "Head": [("X", 12)]},
+                 arm("L", down=24, fwd=42, elbow=65), arm("R", down=24, fwd=42, elbow=65))
+    drop = merge({"Spine": [("X", 16)], "Spine1": [("X", 4)], "Head": [("X", 18)]},
+                 arm("L", down=30, fwd=50, out=-10, elbow=40, hand=20),
+                 arm("R", down=30, fwd=50, out=-10, elbow=40, hand=20))
+    reach = merge(arm("R", down=0, fwd=70, out=-50, elbow=5, hand=-20), arm("L", down=0, out=25, elbow=45))
+    grab = merge(arm("R", down=12, fwd=62, out=-45, elbow=35, hand=35), arm("L", down=5, out=20, elbow=50))
+    carry = merge(arm("R", down=20, fwd=55, out=-20, elbow=75, hand=20), arm("L", down=20, fwd=40, elbow=70))
+
+    def pan(push):
+        return merge(arm("R", down=18, fwd=45 + push, elbow=85 - push, twist=-10, hand=-15),
+                     arm("L", down=10, out=20, elbow=55))
+
+    toss = merge(arm("R", down=-35, fwd=55, elbow=60, twist=-10, hand=-35), arm("L", down=0, out=30, elbow=50))
+    side_l = (0.03, 0, -0.01)
+    side_r = (-0.03, 0, -0.01)
     keys = [
         dict(f=0, pose=work, hips=(0, 0, -0.008)),
-        dict(f=8, pose=head(turn * 0.5), only=True),
-        dict(f=12, pose=merge(turned(1, reach_left), head(turn * 0.5)), hips=lean_l),
-        dict(f=18, pose=merge(turned(1, grab_left), head(turn * 0.45)), hips=lean_l),
-        dict(f=28, pose=merge(work, head(0)), hips=(0, 0, -0.008)),
-        dict(f=32, pose=head(-turn * 0.5), only=True),
-        dict(f=36, pose=merge(turned(-1, pan(0)), head(-turn * 0.5)), hips=lean_r),
-        dict(f=42, pose=merge(turned(-1, pan(25 if tony else 15)), head(-turn * 0.45)), hips=lean_r),
-        dict(f=48, pose=merge(turned(-1, pan(0)), head(-turn * 0.5)), hips=lean_r),
-        dict(f=54, pose=merge(turned(-1, pan(25 if tony else 15)), head(-turn * 0.45)), hips=lean_r),
-        dict(f=62, pose=merge(work, head(0)), hips=(0, 0, -0.008)),
+        dict(f=4, pose=head(turn * 0.6, 4), only=True),
+        dict(f=9, pose=merge(turned(1, reach, lean=-2), head(turn * 0.5, 6)), hips=side_l, ease="out"),
+        dict(f=14, pose=merge(turned(1, grab, lean=8), head(turn * 0.45, 16)), hips=side_l, crouch=0.03, ease="in"),
+        dict(f=19, pose=merge(turned(0.4, carry), head(turn * 0.1)), hips=(0.01, 0, 0.03), ease="snap"),
+        dict(f=24, pose=drop, crouch=0.035, ease="in"),
+        dict(f=27, pose=merge(drop, {"Head": [("X", -4)]}), crouch=0.02, ease="out"),
+        dict(f=30, pose=head(-turn * 0.6, 4), only=True),
+        dict(f=35, pose=merge(turned(-1, pan(0)), head(-turn * 0.5)), hips=side_r, ease="out"),
+        dict(f=39, pose=merge(turned(-1, pan(30)), head(-turn * 0.45, 16)), hips=side_r, crouch=0.015, ease="in"),
+        dict(f=43, pose=merge(turned(-1, pan(-10)), head(-turn * 0.5)), hips=side_r, ease="out"),
+        dict(f=47, pose=merge(turned(-1, pan(30)), head(-turn * 0.45, 16)), hips=side_r, crouch=0.015, ease="in"),
+        dict(f=51, pose=merge(turned(-1, pan(-15)), head(-turn * 0.5)), hips=side_r, crouch=0.03, ease="out"),
+        dict(f=55, pose=merge(turned(-1, toss, lean=-12), head(-turn * 0.4, -22)), hips=(-0.03, 0, 0.035), ease="snap"),
+        dict(f=61, pose=merge(turned(-1, pan(0)), head(-turn * 0.5, 14)), hips=side_r, crouch=0.035, ease="in"),
+        dict(f=66, pose=merge(work, head(0)), hips=(0, 0, 0.015), ease="out"),
         dict(f=72, pose=work, hips=(0, 0, -0.008)),
     ]
-    if tony:  # one big toss instead of two shakes
-        keys[7]["pose"] = merge(turned(-1, pan(45)), head(-turn * 0.4), {"Spine1": [("X", -6)]})
-        keys[8]["pose"] = merge(turned(-1, pan(-10)), head(-turn * 0.5))
-        keys[9]["pose"] = merge(turned(-1, pan(0)), head(-turn * 0.5))
     return 72, True, keys
+
+
+def hand_on_hip():
+    return arm("L", down=10, fwd=-28, elbow=100, twist=40)
 
 
 def clip_victory(c):
     tony = c == "tony"
-    neutral = merge(relaxed_arms(), {})
-    antic = merge({"Spine": [("X", 14)], "Head": [("X", 8)]},
-                  arm("L", down=40, fwd=-35, elbow=20), arm("R", down=40, fwd=-35, elbow=20))
-    jump = merge({"Spine": [("X", -6)], "Spine2": [("X", -6)], "Head": [("X", -18)]},
-                 arm("L", down=-100, elbow=10), arm("R", down=-100, elbow=10))
-    land = merge({"Spine": [("X", 8)], "Head": [("X", -6)]},
-                 arm("L", down=-90, elbow=25), arm("R", down=-90, elbow=25))
-    fist_hi = merge({"Spine": [("X", -4)], "Spine2": [("X", -4)], "Head": [("X", -12)]},
-                    arm("R", down=-102, fwd=8, elbow=15), arm("L", down=28, fwd=10, elbow=105, twist=30))
-    fist_lo = merge({"Spine": [("X", -2)], "Head": [("X", -8)]},
-                    arm("R", down=-70, fwd=8, elbow=80), arm("L", down=28, fwd=10, elbow=105, twist=30))
-    final = merge({"Spine": [("X", -6)], "Spine2": [("X", -6)], "Head": [("X", -14), ("Y", -4)]},
-                  arm("R", down=-105, fwd=8, elbow=12), arm("L", down=28, fwd=10, elbow=105, twist=30))
-    jump_h = 0.06 if tony else 0.12
-    if tony:
-        # smug: no big cheer, lean back, point at the rival, other hand on the hip
-        jump = merge({"Spine": [("X", -4)], "Head": [("X", -10)]},
-                     arm("R", down=-60, out=10, elbow=15), arm("L", down=10, fwd=-25, elbow=95, twist=40))
-        land = merge({"Spine": [("X", -6)], "Head": [("X", -8)]},
-                     arm("R", down=-40, elbow=20), arm("L", down=10, fwd=-25, elbow=95, twist=40))
-        fist_hi = merge({"Spine": [("X", -8)], "Spine2": [("X", -4)], "Head": [("X", -10), ("Y", -8)]},
-                        arm("R", down=5, fwd=45, out=40, elbow=5), arm("L", down=10, fwd=-25, elbow=95, twist=40))
-        fist_lo = merge({"Spine": [("X", -6)], "Head": [("X", -6), ("Y", -6)]},
-                        arm("R", down=8, fwd=40, out=36, elbow=15), arm("L", down=10, fwd=-25, elbow=95, twist=40))
-        final = merge({"Spine": [("X", -8)], "Spine2": [("X", -4)], "Head": [("X", -10), ("Y", -10)]},
-                      arm("R", down=5, fwd=45, out=42, elbow=0), arm("L", down=10, fwd=-25, elbow=95, twist=40))
+    neutral = relaxed_arms()
+    if not tony:
+        fist_hip = arm("L", down=26, fwd=12, elbow=110, twist=30)
+        antic = merge({"Spine": [("X", 22)], "Spine1": [("X", 6)], "Head": [("X", 4)]},
+                      arm("L", down=50, fwd=-50, elbow=15), arm("R", down=50, fwd=-50, elbow=15))
+        tuck = {"LeftUpLeg": [("X", -45)], "RightUpLeg": [("X", -45)], "LeftLeg": [("X", 80)],
+                "RightLeg": [("X", 80)], "LeftFoot": [("X", -20)], "RightFoot": [("X", -20)]}
+        half_tuck = {k: [(o[0], o[1] * 0.3) for o in ops] for k, ops in tuck.items()}
+        jump = merge({"Spine": [("X", -12)], "Spine2": [("X", -8)], "Head": [("X", -22)]}, tuck,
+                     arm("L", down=-115, out=10, elbow=8), arm("R", down=-115, out=10, elbow=8))
+        fall = merge({"Spine": [("X", -6)], "Head": [("X", -14)]}, half_tuck,
+                     arm("L", down=-100, elbow=15), arm("R", down=-100, elbow=15))
+        land = merge({"Spine": [("X", 16)], "Spine1": [("X", 6)], "Head": [("X", 2)]},
+                     arm("L", down=-55, elbow=45), arm("R", down=-55, elbow=45))
+        pump_hi = merge({"Spine": [("X", -10)], "Spine2": [("X", -6)], "Head": [("X", -18), ("Y", -5)]},
+                        arm("R", down=-110, fwd=8, elbow=10), fist_hip)
+        pump_lo = merge({"Spine": [("X", 6)], "Head": [("X", -4)]},
+                        arm("R", down=-45, fwd=12, elbow=100), fist_hip)
+        final = merge({"Spine": [("X", -12)], "Spine2": [("X", -8)], "Head": [("X", -18), ("Y", -7)]},
+                      arm("R", down=-112, fwd=8, elbow=8), fist_hip)
+        keys = [
+            dict(f=0, pose=neutral, hips=(0, 0, 0)),
+            dict(f=7, pose=antic, crouch=0.09),
+            dict(f=13, pose=jump, hips=(0, 0, 0.2), ease="snap"),
+            dict(f=19, pose=fall, hips=(0, 0, 0.07)),
+            dict(f=22, pose=land, crouch=0.07, ease="in"),
+            dict(f=28, pose=pump_hi, hips=(0, 0, 0.02), ease="out"),
+            dict(f=33, pose=pump_lo, crouch=0.035, ease="in"),
+            dict(f=38, pose=pump_hi, hips=(0, 0, 0.02), ease="out"),
+            dict(f=43, pose=pump_lo, crouch=0.035, ease="in"),
+            dict(f=50, pose=final, hips=(0, 0, 0.012), ease="out"),
+            dict(f=60, pose=final, hips=(0, 0, 0.008)),
+        ]
+        return 60, False, keys
+
+    # Tony: smug. Little hop, a belly laugh leaning back, then snaps a finger point at the rival.
+    hip = hand_on_hip()
+    belly = arm("R", down=30, fwd=35, out=-25, elbow=95)
+    antic = merge({"Spine": [("X", 12)], "Head": [("X", 6)]}, hip, arm("R", down=40, fwd=-30, elbow=20))
+    hop = merge({"Spine": [("X", -14)], "Head": [("X", -16)]}, hip, arm("R", down=-80, out=20, elbow=20))
+
+    def laugh(phase):
+        return merge({"Spine": [("X", -16)], "Spine1": [("X", -4 + 4 * phase)], "Spine2": [("X", -6)],
+                      "Head": [("X", -22 + 6 * phase), ("Y", -6)],
+                      "LeftShoulder": [("to", "UP", 6 * (1 - phase))],
+                      "RightShoulder": [("to", "UP", 6 * (1 - phase))]},
+                     hip, belly)
+
+    point = merge({"Spine": [("X", -6)], "Spine1": [("Z", -12)], "Head": [("X", -8), ("Y", -10)]},
+                  hip, arm("R", down=0, fwd=48, out=40, elbow=0, hand=-10))
     keys = [
         dict(f=0, pose=neutral, hips=(0, 0, 0)),
-        dict(f=8, pose=antic, crouch=0.06),
-        dict(f=16, pose=jump, hips=(0, 0, jump_h)),
-        dict(f=24, pose=land, crouch=0.03),
-        dict(f=32, pose=fist_hi, hips=(0, 0, 0)),
-        dict(f=38, pose=fist_lo, crouch=0.01),
-        dict(f=44, pose=fist_hi, hips=(0, 0, 0)),
-        dict(f=50, pose=fist_lo, crouch=0.01),
-        dict(f=60, pose=final, hips=(0, 0, 0.005)),
+        dict(f=6, pose=antic, crouch=0.05),
+        dict(f=12, pose=hop, hips=(0, 0, 0.09), ease="snap"),
+        dict(f=17, pose=merge(hop, {"Spine": [("X", 10)]}), crouch=0.035, ease="in"),
+        dict(f=22, pose=laugh(0), hips=(0, 0, 0.01), ease="out"),
+        dict(f=25, pose=laugh(1), crouch=0.012),
+        dict(f=28, pose=laugh(0), hips=(0, 0, 0.012)),
+        dict(f=31, pose=laugh(1), crouch=0.012),
+        dict(f=34, pose=laugh(0), hips=(0, 0, 0.012)),
+        dict(f=38, pose=laugh(1), crouch=0.01),
+        dict(f=44, pose=merge(laugh(0), {"Head": [("X", 6)]}), crouch=0.02),
+        dict(f=49, pose=point, hips=(0, 0, 0.01), ease="out"),
+        dict(f=60, pose=point, hips=(0, 0, 0.006)),
     ]
     return 60, False, keys
 
@@ -248,35 +298,65 @@ def clip_victory(c):
 def clip_lose(c):
     tony = c == "tony"
     neutral = relaxed_arms()
-    shock = merge({"Spine": [("X", -10)], "Spine2": [("X", -4)], "Head": [("X", -8)],
-                   "LeftShoulder": [("to", "UP", 10)], "RightShoulder": [("to", "UP", 10)]},
-                  arm("L", down=0, fwd=35, elbow=60), arm("R", down=0, fwd=35, elbow=60))
-    slump = merge({"Spine": [("X", 6)], "Spine1": [("X", 4)], "Spine2": [("X", 3)], "Head": [("X", 14)],
-                   "LeftShoulder": [("to", "DOWN", 8)], "RightShoulder": [("to", "DOWN", 8)]},
-                  relaxed_arms(extra_down=18))
-    down = merge({"Spine": [("X", 8)], "Spine1": [("X", 5)], "Spine2": [("X", 4)], "Head": [("X", 20)],
-                  "LeftShoulder": [("to", "DOWN", 10)], "RightShoulder": [("to", "DOWN", 10)]},
-                 arm("L", down=50, fwd=10, elbow=5), arm("R", down=50, fwd=10, elbow=5))
-    sway = merge(down, {"Head": [("Y", 4)], "Spine2": [("Y", 3)]})
+    shock = merge({"Spine": [("X", -16)], "Spine2": [("X", -6)], "Head": [("X", -20)],
+                   "LeftShoulder": [("to", "UP", 16)], "RightShoulder": [("to", "UP", 16)]},
+                  arm("L", down=-35, fwd=45, elbow=105, hand=-20), arm("R", down=-35, fwd=45, elbow=105, hand=-20))
+
+    def tremble(s):
+        return merge(shock, {"Head": [("Y", 5 * s)], "Spine2": [("Y", 2 * s)]})
+
     keys = [
         dict(f=0, pose=neutral, hips=(0, 0, 0)),
-        dict(f=6, pose=shock, hips=(0, 0.01, 0.01)),
-        dict(f=14, pose=shock, hips=(0, 0.01, 0.008)),
-        dict(f=36, pose=slump, crouch=0.02),
-        dict(f=52, pose=down, crouch=0.08),
-        dict(f=62, pose=sway, crouch=0.075),
-        dict(f=72, pose=down, crouch=0.08),
+        dict(f=5, pose=shock, hips=(0, 0.035, 0.04), ease="snap"),
+        dict(f=8, pose=tremble(1), hips=(0, 0.03, 0.02)),
+        dict(f=11, pose=tremble(-1), hips=(0, 0.03, 0.02)),
+        dict(f=14, pose=tremble(1), hips=(0, 0.03, 0.018)),
+        dict(f=17, pose=shock, hips=(0, 0.03, 0.015)),
     ]
-    if tony:
-        # dramatic: grabs his head, then drops to his knees
-        grab = merge({"Spine": [("X", -6)], "Head": [("X", 10)]},
-                     arm("L", down=-60, fwd=40, elbow=130), arm("R", down=-60, fwd=40, elbow=130))
-        kneel = merge({"Spine": [("X", 10)], "Spine1": [("X", 6)], "Spine2": [("X", 4)], "Head": [("X", 18)]},
-                      arm("L", down=50, fwd=15, elbow=10), arm("R", down=50, fwd=15, elbow=10))
-        keys[3] = dict(f=36, pose=grab, crouch=0.02)
-        keys[4] = dict(f=52, pose=kneel, kneel=True)
-        keys[5] = dict(f=62, pose=merge(kneel, {"Head": [("Y", 5)]}), kneel=True)
-        keys[6] = dict(f=72, pose=kneel, kneel=True)
+    if not tony:
+        deflate = merge({"Spine": [("X", 10)], "Spine1": [("X", 4)], "Head": [("X", 12)],
+                         "LeftShoulder": [("to", "DOWN", 8)], "RightShoulder": [("to", "DOWN", 8)]},
+                        relaxed_arms(extra_down=22))
+        slump = merge({"Spine": [("X", 9)], "Spine1": [("X", 4)], "Spine2": [("X", 2)], "Head": [("X", 12)],
+                       "LeftShoulder": [("to", "DOWN", 14)], "RightShoulder": [("to", "DOWN", 14)]},
+                      arm("L", down=55, fwd=22, elbow=5), arm("R", down=55, fwd=22, elbow=5))
+        sigh_in = merge(slump, {"Spine2": [("X", -6)], "Head": [("X", -6)],
+                                "LeftShoulder": [("to", "UP", 10)], "RightShoulder": [("to", "UP", 10)]})
+        final = merge(slump, {"Head": [("X", 6), ("Y", 5)], "Spine": [("X", 2)]})
+        keys += [
+            dict(f=30, pose=deflate, crouch=0.04),
+            dict(f=40, pose=slump, crouch=0.11, ease="in"),
+            dict(f=45, pose=slump, crouch=0.095, ease="out"),
+            dict(f=55, pose=sigh_in, crouch=0.09),
+            dict(f=66, pose=final, crouch=0.105, ease="in"),
+            dict(f=72, pose=final, crouch=0.105),
+        ]
+        return 72, False, keys
+
+    # Tony: grabs his head, shakes it in denial, drops to his knees and pounds the floor.
+    def grab(yaw):
+        return merge({"Spine": [("X", -6)], "Spine2": [("Z", yaw * 0.5)], "Head": [("X", 8), ("Z", yaw)]},
+                     arm("L", down=-65, fwd=42, elbow=135), arm("R", down=-65, fwd=42, elbow=135))
+
+    kneel = merge({"Spine": [("X", 14)], "Spine1": [("X", 6)], "Head": [("X", 12)]},
+                  arm("L", down=40, fwd=30, elbow=35), arm("R", down=40, fwd=30, elbow=35))
+    pound_up = merge({"Spine": [("X", 6)], "Head": [("X", 6)]},
+                     arm("L", down=-20, fwd=55, elbow=90), arm("R", down=-20, fwd=55, elbow=90))
+    pound = merge({"Spine": [("X", 30)], "Spine1": [("X", 8)], "Head": [("X", 10)]},
+                  arm("L", down=60, fwd=45, elbow=10, hand=20), arm("R", down=60, fwd=45, elbow=10, hand=20))
+    keys += [
+        dict(f=22, pose=grab(0), crouch=0.015, ease="out"),
+        dict(f=27, pose=grab(18), crouch=0.015),
+        dict(f=32, pose=grab(-18), crouch=0.015),
+        dict(f=37, pose=grab(12), crouch=0.015),
+        dict(f=43, pose=kneel, kneel=True, ease="in"),
+        dict(f=47, pose=merge(kneel, {"Spine": [("X", -6)]}), kneel=True, ease="out"),
+        dict(f=52, pose=pound_up, kneel=True),
+        dict(f=56, pose=pound, kneel=True, ease="in"),
+        dict(f=59, pose=merge(pound, {"Spine": [("X", -6)]}), kneel=True, ease="out"),
+        dict(f=63, pose=pound, kneel=True, ease="in"),
+        dict(f=72, pose=merge(pound, {"Head": [("X", 6), ("Y", 5)]}), kneel=True),
+    ]
     return 72, False, keys
 
 
@@ -394,7 +474,8 @@ def build_clip(rig, char, name, fn):
     style = STYLES[char]
     frames, loop, keys = fn(char)
     tempo = style["tempo"][name]
-    amp = style["amp"]
+    amp = style["amp"][name]
+    ease_at = {}  # frame of the key a segment STARTS at -> easing of that segment
     arm_obj = rig.obj
     ad = arm_obj.animation_data or arm_obj.animation_data_create()
     act = bpy.data.actions.new(name)
@@ -410,8 +491,13 @@ def build_clip(rig, char, name, fn):
     touched = sorted(touched)
 
     prev = {}
+    last_full = None
     for k in keys:
         f = round(k["f"] * tempo) + 1
+        if not k.get("only"):
+            if k.get("ease") and last_full is not None:
+                ease_at[last_full] = k["ease"]
+            last_full = f
         pose = {b: scale_ops(o, amp) for b, o in k["pose"].items()}
         hips = Vector(k.get("hips", (0, 0, 0))) * amp * rig.k
         if k.get("crouch"):
@@ -437,6 +523,19 @@ def build_clip(rig, char, name, fn):
                 pb.location = rig.local_loc(name_b, hips)
                 pb.keyframe_insert("location", frame=f, group=name_b)
 
+    # Easing of the segment arriving at a key ("ease" on that key):
+    #   "in"   accelerate into the key (strikes, landings)
+    #   "out"  overshoot and settle (arrivals, poses that pop)
+    #   "snap" leave fast, settle slow (surprise reactions)
+    modes = {"in": ("CUBIC", "EASE_IN"), "out": ("BACK", "EASE_OUT"), "snap": ("EXPO", "EASE_OUT")}
+    for fc in action_fcurves(act, ad):
+        for kp in fc.keyframe_points:
+            mode = ease_at.get(int(round(kp.co.x)))
+            if mode:
+                kp.interpolation, kp.easing = modes[mode]
+                if mode == "out":
+                    kp.back = 1.2
+
     end = round(frames * tempo) + 1
     act.frame_range = (1, end)
     act.use_frame_range = True
@@ -451,6 +550,15 @@ def build_clip(rig, char, name, fn):
     return act, end, loop
 
 
+def action_fcurves(act, ad):
+    """F-curves of an action, for both legacy and layered (slotted) actions."""
+    if hasattr(act, "fcurves"):
+        return list(act.fcurves)
+    from bpy_extras import anim_utils
+    cb = anim_utils.action_get_channelbag_for_slot(act, ad.action_slot)
+    return list(cb.fcurves) if cb else []
+
+
 def reset_pose(arm_obj):
     for pb in arm_obj.pose.bones:
         pb.rotation_mode = "QUATERNION"
@@ -462,7 +570,7 @@ def reset_pose(arm_obj):
 # Contact sheet
 # ---------------------------------------------------------------------------------------------
 
-def render_sheet(arm_obj, clips, path, cols=8, size=200):
+def render_sheet(arm_obj, clips, path, cols=8, size=200, view="three"):
     import numpy as np
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_WORKBENCH"
@@ -481,7 +589,7 @@ def render_sheet(arm_obj, clips, path, cols=8, size=200):
     cam_data.ortho_scale = 1.25
     cam = bpy.data.objects.new("sheet_cam", cam_data)
     scene.collection.objects.link(cam)
-    cam.location = (1.1, -2.6, 0.75)
+    cam.location = (1.1, -2.6, 0.75) if view == "three" else (0, -3.0, 0.5)
     look = Vector((0, 0, 0.48)) - cam.location
     cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
     scene.camera = cam
@@ -523,6 +631,10 @@ def main():
     char = argv[0] if argv else "apis"
     sheet = argv[argv.index("--sheet") + 1] if "--sheet" in argv else None
     do_export = "--no-export" not in argv
+    only = argv[argv.index("--clips") + 1].split(",") if "--clips" in argv else None
+    cols = int(argv[argv.index("--cols") + 1]) if "--cols" in argv else 8
+    view = argv[argv.index("--view") + 1] if "--view" in argv else "three"
+    size = int(argv[argv.index("--size") + 1]) if "--size" in argv else 200
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(ROOT, "art", "blender", "src", f"{char}_src.glb"))
@@ -544,7 +656,7 @@ def main():
     scene.frame_start, scene.frame_end = 1, max(c[2] for c in clips)
 
     if sheet:
-        render_sheet(arm_obj, clips, sheet)
+        render_sheet(arm_obj, [c for c in clips if not only or c[0] in only], sheet, cols=cols, view=view, size=size)
         print("SHEET", sheet)
 
     if do_export:
