@@ -60,6 +60,11 @@ var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = 
 @export var board_offset_em := Vector2(-21.0, -5.0)
 ## Keep the Stations panel this far (em) above the bottom edge, clear of the hand.
 @export var board_bottom_margin_em := 17.5
+@export_group("Rival Kitchen")
+## Size of the rival's face-down kitchen panel (1 = as laid out in the scene).
+@export_range(0.5, 3.0, 0.05) var rival_kitchen_scale := 2.0
+## Panel center, relative to the rival stations anchor on the stage (em).
+@export var rival_kitchen_offset_em := Vector2(1.5, -1.0)
 @export_group("")
 
 var _views: Array[CardView] = []
@@ -499,7 +504,7 @@ func _refresh_rival_kitchen() -> void:
 		var col := Control.new()
 		col.custom_minimum_size = Vector2(Pal.em(RIVAL_BACK_W_EM), Pal.em(RIVAL_BACK_H_EM) + Pal.em(RIVAL_BACK_STEP_EM) * maxi(n - 1, 0))
 		if n == 0:
-			col.add_child(_rival_back(Color(Pal.INK, 0.08), Color(Pal.INK, 0.35), 0))
+			col.add_child(_rival_back(Color(Pal.CREAM, 0.06), Color(Pal.CREAM, 0.3), 0))
 		for j in n:
 			col.add_child(_rival_back(Pal.RED_DARK, Pal.INK, j))
 		_tip(col, "%s's station %d" % [duel.enemy_def.name, i + 1],
@@ -731,6 +736,17 @@ func _station_at(m: Vector2) -> int:
 	return -1
 
 
+## The rival's kitchen sits on the floor right of its counter, scaled by rival_kitchen_scale.
+func _place_rival_kitchen() -> void:
+	var k: Control = %RivalKitchen
+	k.scale = Vector2.ONE * rival_kitchen_scale
+	var sz := k.size * rival_kitchen_scale
+	var p: Vector2 = anchors.rival_stations + rival_kitchen_offset_em * Pal.em(1.0) - sz / 2.0
+	p.x = clampf(p.x, Pal.em(1.4), %Root.size.x - sz.x - Pal.em(1.4))
+	p.y = clampf(p.y, Pal.em(5.0), %Root.size.y - sz.y - Pal.em(1.4))
+	k.position = p
+
+
 ## The Stations panel sits on the stage beside Apis (over the prep table), scaled by board_scale.
 ## It grows downward with its stacks; it is pushed up so it never runs into the hand.
 func _place_board() -> void:
@@ -878,7 +894,7 @@ func _layout_hand() -> void:
 func _process(_delta: float) -> void:
 	# HUD v2 panels are fixed in the scene; only the emote bubble follows the rival's head.
 	# The Stations panel grows downward with its stacks (solitaire).
-	%RivalKitchen.position = anchors.rival_stations - %RivalKitchen.size / 2.0
+	_place_rival_kitchen()
 	%Board.reset_size()
 	_place_board()
 	%Rival.reset_size()
