@@ -23,8 +23,8 @@ const TAG_COLORS := {
 @onready var camera: Camera3D = $Camera3D
 ## Pixel filter post-process quad (assets/shaders/pixel_post.gdshader); main.gd toggles it.
 @onready var pixel_post: MeshInstance3D = $Camera3D/PixelPost
-@onready var player: Node3D = $Player
-@onready var rival: Node3D = $Rival
+@onready var player: Chef = $Player
+@onready var rival: Chef = $Rival
 @onready var plate_items: Node3D = $Plate/Items
 ## Above the rival's head: intent label. Above Apis: floating numbers. Prep table: board UI.
 @onready var rival_intent_anchor: Marker3D = $Rival/IntentAnchor
@@ -145,6 +145,11 @@ func act(who: String) -> void:
 	_act_at[who] = _time
 
 
+## The chef for a duel side: "player" → Apis, anything else ("enemy") → the rival.
+func chef(side: String) -> Chef:
+	return player if side == "player" else rival
+
+
 ## Screen position of a 3D anchor, for UI that follows the stage.
 func screen_pos(anchor: Node3D) -> Vector2:
 	return camera.unproject_position(anchor.global_position)
@@ -152,9 +157,10 @@ func screen_pos(anchor: Node3D) -> Vector2:
 
 func _process(delta: float) -> void:
 	_time += delta
-	# Idle bob + sideways flinch shake that decays over ~0.4 s.
-	player.position = _base[player] + Vector3(_shake("player"), absf(sin(_time * 2.2)) * 0.06 + _hop("player"), 0)
-	rival.position = _base[rival] + Vector3(_shake("rival"), absf(sin(_time * 2.0 + 1.0)) * 0.06 + _hop("rival"), 0)
+	# Sideways flinch shake that decays over ~0.4 s. Placeholder chefs also bob and hop;
+	# chefs with a model get that from their clips (Chef: idle, chop, busy).
+	player.position = _base[player] + Vector3(_shake("player"), _bob(player, 2.2, 0.0) + _hop("player"), 0)
+	rival.position = _base[rival] + Vector3(_shake("rival"), _bob(rival, 2.0, 1.0) + _hop("rival"), 0)
 	for m in _crowd:
 		var phase: float = m.get_meta("phase")
 		var base_y: float = m.get_meta("base_y")
@@ -166,8 +172,14 @@ func _shake(who: String) -> float:
 	return sin(dt * 60.0) * 0.18 * (1.0 - dt / 0.4) if dt < 0.4 else 0.0
 
 
-## Quick 0.3 s hop up and back down.
+func _bob(c: Chef, speed: float, phase: float) -> float:
+	return 0.0 if c.has_model() else absf(sin(_time * speed + phase)) * 0.06
+
+
+## Quick 0.3 s hop up and back down (placeholder chefs only).
 func _hop(who: String) -> float:
+	if chef(who).has_model():
+		return 0.0
 	var dt: float = _time - _act_at[who]
 	return sin(dt / 0.3 * PI) * 0.22 if dt < 0.3 else 0.0
 

@@ -149,7 +149,7 @@ di tabel pose khusus Tony.
 
 ## 6. Di luar scope (tahap berikutnya)
 
-- Memasang GLB ke `scenes/stage/chef.tscn` dan memanggil clip dari `chef.gd` / Turn Director.
+- ~~Memasang GLB ke `scenes/stage/chef.tscn` dan memanggil clip dari `chef.gd`~~ ✅ (lihat §7).
 - Clip tambahan GDD §7.4: `hit`, `taunt`, `hop`.
 - Props (pisau, talenan, wajan).
 - Skala panggung: GLB tetap tinggi 1 m; skala di scene (Apis 2.3 m, Tony ×0.95 menurut CHARACTER_PLAN §6.1).
@@ -174,3 +174,7 @@ di tabel pose khusus Tony.
   dan easing per key (§3, tabel Easing). `idle` tetap. `chop` jadi 3 potongan per siklus (1.2 s). Lompat `victory`
   20 cm dengan kaki ditekuk. `lose` Apis ambruk dengan wajah tetap terlihat, Tony memukul lantai.
 - Cek sheet tanpa export: `-- apis --sheet <png> --no-export --clips chop,busy --cols 12 --view front --size 220`.
+- ✅ **Terpasang di game.** `stage.tscn`: model jadi child `Player/apis` dan `Rival/tony` (skala 2.6 dan 2.47, naik 0.3 m
+  supaya tangan yang bekerja terlihat di atas counter). `Chef.character` memilih model, dan Rosa (belum ada model) memakai
+  placeholder. `main.gd` → `_bind_chefs`: `card_played` → `chop`, `dish_served` → `busy`, `duel_ended` → `victory`/`lose`.
+  Bob dan hop prosedural hanya untuk placeholder, tapi flinch saat kena Pressure tetap. Test: `tests/chef_drive.gd`.

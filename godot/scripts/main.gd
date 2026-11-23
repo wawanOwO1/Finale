@@ -80,10 +80,26 @@ func _start_duel() -> void:
 	duel.changed.connect(_sync_plate)
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:
 		stage.hit("rival" if target == "enemy" else "player"))
+	_bind_chefs()
 	almanac_keeper.watch(duel)
 	ui.bind(duel)
 	Audio.bind(duel)
 	_sync_plate()
+
+
+## Chef clips (ANIMATION_DESIGN.md): card placed → chop, dish served → busy,
+## duel over → victory / lose (held until the next duel).
+func _bind_chefs() -> void:
+	stage.rival.character = enemy_id
+	stage.player.reset()
+	stage.rival.reset()
+	duel.card_played.connect(func(side: String, _card: CardInstance) -> void:
+		stage.chef(side).perform("chop"))
+	duel.dish_served.connect(func(side: String, _r: RecipeDef, _p: int, _q: int, _n: int) -> void:
+		stage.chef(side).perform("busy"))
+	duel.duel_ended.connect(func(winner: String) -> void:
+		stage.chef(winner).finish("victory")
+		stage.chef("enemy" if winner == "player" else "player").finish("lose"))
 
 
 func _sync_plate() -> void:

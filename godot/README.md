@@ -71,7 +71,17 @@ godot/
   tests/ui_drive.gd       Test UI dengan input mouse simulasi + screenshot
   tests/hit_probe.gd      Cek area klik semua tombol di beberapa ukuran window
   tests/balance.gd        Balancing: ratusan duel bot vs rival, win rate + panjang duel (-- sweep)
+  tests/glb_check.gd      Headless: model karakter (apis/tony.glb) berisi 5 clip + flag loop
+  tests/chef_drive.gd     Window: clip chef mengikuti event duel di game sungguhan + screenshot
 ```
+
+### Karakter 3D
+
+Model ada di `assets/characters/` (dibuat lewat `../art/blender/chef_anims.py`, lihat `../ANIMATION_DESIGN.md`).
+Di `stage.tscn`, tiap chef (`Player`, `Rival`) punya child model bernama id karakter (`apis`, `tony`);
+`Chef.character` memilih yang tampil, dan tanpa model yang cocok (mis. Rosa) placeholder kapsul yang muncul.
+Skala dan tinggi model diatur di transform child itu. Clip mengikuti event duel (`main.gd` → `_bind_chefs`):
+kartu dimainkan → `chop`, dish disajikan → `busy`, duel selesai → `victory` / `lose` (ditahan sampai duel berikutnya).
 
 ### Peta TS → Godot
 
@@ -115,6 +125,12 @@ Balancing (GRAND_DESIGN §8.2): laporan angka sekarang, atau `-- sweep` untuk me
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/balance.gd
+```
+
+Animasi chef di game (butuh window):
+
+```powershell
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1600x900 --script res://tests/chef_drive.gd -- "$env:TEMP"
 ```
 
 Kalau baru clone (folder `.godot/` belum ada), jalankan sekali dulu:
