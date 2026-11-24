@@ -13,6 +13,9 @@ extends Node
 ## Chef's Flow: Perfect Serves needed for each modifier; the last value repeats.
 @export var player_flow: PackedInt32Array = Duel.PLAYER_FLOW
 @export_group("")
+## Run (RunState): after a win the next duel starts with the Confidence you have left.
+## Off = every duel starts at full Confidence (handy for replaying one matchup).
+@export var carry_confidence := true
 ## Vertical resolution of the 3D view when the pixel filter is on.
 @export var pixel_height := 270
 ## Start with the pixel filter on (P / the HUD button toggles it). Only the 3D view; the HUD stays sharp.
@@ -27,6 +30,8 @@ extends Node
 @onready var almanac_keeper: AlmanacKeeper = $AlmanacKeeper
 
 var duel: Duel
+## Deck, Confidence, Tips, books and Tools carried from duel to duel.
+var run: RunState
 var pixelated := false
 ## Duel number shown by the announcer ("ROUND 2"). Goes up after a win.
 var round_number := 1
@@ -63,19 +68,29 @@ func _process(_delta: float) -> void:
 	}
 
 
+## A new run: the Inspector's deck / books / Confidence until the Course Path picks them.
+func _new_run() -> void:
+	run = RunState.start(player_confidence, "dev" if dev_deck else RunState.START_DECK,
+			GameDB.ALL_BOOKS if dev_deck else RunState.START_BOOKS)
+
+
 func _start_duel() -> void:
-	var books: PackedStringArray = GameDB.ALL_BOOKS if dev_deck else PackedStringArray(["basics"])
-	var recipes := GameDB.book_recipes(books)
-	var deck := GameDB.deck("dev" if dev_deck else "starter")
-	almanac_keeper.prepare(deck, recipes)
+	# The run carries between duels: a win keeps the Confidence you have left, a loss starts over.
+	# Restarting a duel in progress replays it from the run as it was.
+	if run == null or (duel and duel.phase == "lost"):
+		_new_run()
+	elif duel and duel.phase == "won":
+		round_number += 1
+		run.finish_duel(duel)
+		if not carry_confidence:
+			run.confidence = run.max_confidence
+	var recipes := run.recipes()
+	almanac_keeper.prepare(run.deck, recipes)
 	stage.set_plate([])
 	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
-	if duel and duel.phase == "won":
-		round_number += 1
 	ui.round_number = round_number
-	duel = Duel.new(deck, GameDB.enemy(enemy_id), recipes,
-			{hype = start_hype, max_confidence = player_confidence, player_flow = player_flow})
+	duel = run.new_duel(GameDB.enemy(enemy_id), {hype = start_hype, player_flow = player_flow})
 	# Visuals listen to the duel's signals; the duel never knows about them (GDD §9).
 	duel.changed.connect(_sync_plate)
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:

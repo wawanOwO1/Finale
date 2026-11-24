@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_rng()
 	_chefs_flow()
 	_almanac()
+	_run_state()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -865,6 +866,84 @@ func _almanac() -> void:
 	check("finder rejects recipes missing a pick", Almanac.find([toast], ["DAIRY"]).is_empty())
 	var uses := Almanac.uses_of(GameDB.card("butter"), all_recipes).map(func(r: RecipeDef) -> String: return r.id)
 	check("Used in lists the recipes an ingredient fits", uses.has("toast"), str(uses))
+
+
+# ---------------------------------------------------------------- RunState (GDD §6)
+
+func _run_state() -> void:
+	print("\n-- RunState")
+	var r := RunState.start()
+	check("a new run starts with the starter deck", r.deck.size() == GameDB.deck("starter").size() and r.deck.size() > 0)
+	check("a new run starts at full Confidence (100)", r.confidence == 100 and r.max_confidence == 100)
+	check("a new run has no Tips, Tools or wins", r.tips == 0 and r.tools.is_empty() and r.duels_won == 0 and not r.over)
+	check("a new run masters only the Basics Cookbook", r.books == PackedStringArray(["basics"]) and r.recipes().size() == basics.size())
+
+	# The duel is built from the run: Confidence in, extras merged on top.
+	var d := r.new_duel(dummy, {seed = 5, hype = 0, player_flow = [99]})
+	check("the duel starts with the run's deck", d.draw_pile.size() + d.hand.size() == r.deck.size())
+	check("the duel uses the run's recipes", d.recipes.size() == r.recipes().size())
+	r.confidence = 64
+	var d2 := r.new_duel(dummy, {seed = 5, player_flow = [99]})
+	check("the duel starts at the run's Confidence", d2.player.confidence == 64 and d2.player.max_confidence == 100)
+	check("extra options override the run's", r.duel_opts({confidence = 10}).confidence == 10)
+	var deck_before := r.deck.size()
+	d2.draw_pile.clear()
+	check("a duel never changes the run's deck", r.deck.size() == deck_before)
+
+	# Settling a duel: a win carries Confidence, a loss ends the run, an unfinished duel changes nothing.
+	r.finish_duel(d2)
+	check("an unfinished duel settles nothing", r.confidence == 64 and r.duels_won == 0 and not r.over)
+	d2.player.confidence = 41
+	d2.phase = "won"
+	r.finish_duel(d2)
+	check("a win carries the Confidence you have left", r.confidence == 41 and r.duels_won == 1)
+	r.finish_duel(d2)
+	check("settling the same duel twice counts once", r.duels_won == 1)
+	var d3 := r.new_duel(dummy, {seed = 6, player_flow = [99]})
+	check("the next duel starts from the carried Confidence", d3.player.confidence == 41)
+	d3.player.confidence = 0
+	d3.phase = "won"
+	r.finish_duel(d3)
+	check("a win never leaves Confidence at 0", r.confidence == 1)
+	var d4 := r.new_duel(dummy, {seed = 7, player_flow = [99]})
+	d4.phase = "lost"
+	r.finish_duel(d4)
+	check("a loss ends the run", r.over and r.duels_won == 2)
+
+	# Confidence: heal clamps to the cap, reports what it gave.
+	var h := RunState.start()
+	h.confidence = 70
+	check("heal restores Confidence and reports it", h.heal(20) == 20 and h.confidence == 90)
+	check("heal stops at the maximum", h.heal(50) == 10 and h.confidence == 100)
+	h.change_max_confidence(10)
+	check("a higher cap raises Confidence too", h.max_confidence == 110 and h.confidence == 110)
+	h.change_max_confidence(-30)
+	check("a lower cap pulls Confidence down to it", h.max_confidence == 80 and h.confidence == 80)
+
+	# Tips.
+	var t := RunState.start()
+	t.add_tips(120)
+	check("Tips add up", t.tips == 120 and t.can_afford(120) and not t.can_afford(121))
+	check("spending Tips pays the price", t.spend_tips(75) and t.tips == 45)
+	check("you cannot spend Tips you do not have", not t.spend_tips(46) and t.tips == 45)
+	t.add_tips(-10)
+	check("negative Tips are ignored", t.tips == 45)
+
+	# Deck.
+	var butter := GameDB.card("butter")
+	var n := t.count_card(butter)
+	t.add_card(butter)
+	check("a card is added to the deck", t.count_card(butter) == n + 1)
+	check("removal takes one copy", t.remove_card(butter) and t.count_card(butter) == n)
+	var chili := GameDB.card("chili")
+	check("removing a card you do not have fails", t.count_card(chili) == 0 and not t.remove_card(chili))
+
+	# Books and Tools.
+	check("a new book is mastered", t.add_book("grill") and t.has_book("grill"))
+	check("a mastered book adds its recipes", t.recipes().size() == GameDB.book_recipes(["basics", "grill"]).size())
+	check("a book is never mastered twice", not t.add_book("grill") and t.books.size() == 2)
+	check("an unknown book is refused", not t.add_book("nope") and t.books.size() == 2)
+	check("a Kitchen Tool is gained once", t.add_tool("grandmasPan") and t.has_tool("grandmasPan") and not t.add_tool("grandmasPan") and t.tools.size() == 1)
 
 
 # ---------------------------------------------------------------- balance targets (phase G)
