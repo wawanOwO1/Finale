@@ -46,9 +46,13 @@ extends Node
 var duel: Duel
 ## Signature Dish cutscene (main.tscn); null = cut-in + cue only.
 var cutscene: SignatureCutscene
+## End-of-duel cutscene (main.tscn); null = only the win / lose cue.
+var finish: FinishCutscene
 ## While true (a cutscene's close-up), play() queues cues; release() plays them at the impact.
 var hold := false
 var _pending: Array = []
+## A duel ended and its finish cutscene has not started yet (waiting for a Signature's impact).
+var _finish_queued := false
 var stage: Stage
 var ui: DuelUI
 var hud: FxHud
@@ -112,16 +116,17 @@ func bind(d: Duel) -> void:
 	_impact_phase = -1
 	hold = false
 	_pending.clear()
+	_finish_queued = false
 	if cutscene:
 		cutscene.abort()
+	if finish:
+		finish.abort()
 	d.card_played.connect(_on_card_played)
 	d.dish_revealed.connect(_on_dish_revealed)
 	d.dish_served.connect(_on_dish_served)
 	d.confidence_lost.connect(_on_confidence_lost)
 	d.signature_served.connect(_on_signature)
-	d.duel_ended.connect(func(winner: String) -> void:
-		var loser := "enemy" if winner == "player" else "player"
-		play(win if winner == "player" else lose, _hit_point(loser), Color.WHITE, loser))
+	d.duel_ended.connect(_on_duel_ended)
 
 
 ## Fire a cue. Values merge with what is already running (strongest wins), so a Serve that fires
@@ -138,13 +143,29 @@ func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> v
 	play_now(cue, at, tint, target)
 
 
+## Run `f` now, or at the impact if a cutscene is holding cues.
+func after_hold(f: Callable) -> void:
+	if hold:
+		_pending.append(f)
+	else:
+		f.call()
+
+
+## True from the end of a duel until its finish cutscene is over (DuelUI waits for this).
+func finish_pending() -> bool:
+	return _finish_queued or (finish != null and finish.playing)
+
+
 ## Play the cues held during a cutscene close-up, all in one frame (they merge as usual).
 func release() -> void:
 	hold = false
 	var cues := _pending.duplicate()
 	_pending.clear()
-	for c: Array in cues:
-		play_now(c[0], c[1], c[2], c[3])
+	for c in cues:
+		if c is Array:
+			play_now(c[0], c[1], c[2], c[3])
+		else:
+			(c as Callable).call()
 
 
 ## Cues queued by hold (tests).
@@ -368,6 +389,16 @@ func _on_signature(side: String, dish: String) -> void:
 	if side == "player" and ui:
 		ui.play_cutin(dish)
 	play(signature, _serve_point(side))
+
+
+func _on_duel_ended(winner: String) -> void:
+	var loser := "enemy" if winner == "player" else "player"
+	play(win if winner == "player" else lose, _hit_point(loser), Color.WHITE, loser)
+	if finish and finish.enabled:
+		_finish_queued = true
+		after_hold(func() -> void:
+			_finish_queued = false
+			finish.play(winner == "player"))
 
 
 func _on_card_played(side: String, card: CardInstance) -> void:

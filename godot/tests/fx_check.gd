@@ -19,6 +19,7 @@ func _initialize() -> void:
 	root.add_child(main)
 	await process_frame
 	var fx: FxDirector = main.fx
+	_check("FinishCutscene is wired", fx.finish != null and fx.finish == main.finish_cutscene and main.ui.fx == fx)
 	_check("SignatureCutscene is wired", fx.cutscene != null and fx.cutscene == main.signature_cutscene)
 	for slot in ["place", "serve", "serve_big", "serve_burnt", "big_hit", "signature", "win", "lose"]:
 		_check("FxDirector.%s is set" % slot, fx.get(slot) is FxCue)
@@ -39,6 +40,8 @@ func _initialize() -> void:
 	await _impact(fx)
 	await _real_serve(fx, duel)
 	await _cutscene(fx, main, duel)
+	await _finish(fx, main, duel)
+	await _vs(main)
 	_end()
 
 
@@ -83,6 +86,7 @@ func _hitstop(fx: FxDirector) -> void:
 func _mapping(fx: FxDirector, duel: Duel) -> void:
 	# Plain cue mapping; the Signature cutscene has its own test (_cutscene).
 	fx.cutscene.enabled = false
+	fx.finish.enabled = false
 	var expect := func(what: String, cue: FxCue) -> void:
 		_check(what, fx.last_cue == cue)
 		fx.last_cue = null
@@ -120,6 +124,7 @@ func _mapping(fx: FxDirector, duel: Duel) -> void:
 	fx.reduce_flashing = false
 	fx.hit_stop.clear()
 	fx.cutscene.enabled = true
+	fx.finish.enabled = true
 
 
 func _shake(fx: FxDirector) -> void:
@@ -291,8 +296,7 @@ func _cutscene(fx: FxDirector, main: Node, duel: Duel) -> void:
 	_check("cutscene starts, long version first", cut.playing and cut.version == "long")
 	_check("cues wait for the impact: %d held" % fx.pending(), fx.hold and fx.pending() >= 3)
 	_check("input locked", ui._busy)
-	await _real_wait(0.05)
-	_check("world frozen", is_equal_approx(Engine.time_scale, cut.hold_scale))
+	_check("world frozen in the same frame", is_equal_approx(Engine.time_scale, cut.hold_scale))
 	await _real_wait(0.45)
 	_check("close-up camera on", stage.cut_camera.current)
 	_check("HUD faded out, letterbox in", ui.hud_root().modulate.a < 0.2 and ui.letterbox().visible)
@@ -311,7 +315,7 @@ func _cutscene(fx: FxDirector, main: Node, duel: Duel) -> void:
 	key.keycode = KEY_SPACE
 	key.pressed = true
 	cut._input(key)
-	_check("skip jumps to the impact", cut._impacted and not fx.hold and stage.camera.current)
+	_check("skip jumps to the impact", cut._impacted and not fx.hold and stage.camera.current and cut.playing)
 	await _real_wait(1.2)
 	_check("skipped cutscene finishes", not cut.playing)
 	# A new duel in the middle of the close-up puts everything back at once.
@@ -323,6 +327,79 @@ func _cutscene(fx: FxDirector, main: Node, duel: Duel) -> void:
 	_check("abort: stopped, camera, HUD and time restored", not cut.playing and stage.camera.current
 			and ui.hud_root().modulate.a == 1.0 and fx.hit_stop.cutscene_factor == 1.0 and not ui.letterbox().visible)
 	fx.hit_stop.clear()
+
+
+## F4: the finish cutscene (win: slow-mo onto the rival; lose: onto Apis, crowd still), and how it
+## waits for a Signature that ended the duel.
+func _finish(fx: FxDirector, main: Node, duel: Duel) -> void:
+	var fin: FinishCutscene = fx.finish
+	var stage: Stage = main.stage
+	var ui: DuelUI = main.ui
+	await _real_wait(0.5)
+	fx.hit_stop.clear()
+	duel.duel_ended.emit("player")
+	_check("win: finish cutscene starts", fin.playing and fin.version == "win" and fx.finish_pending())
+	await _real_wait(0.1)
+	_check("win: slow-mo", is_equal_approx(fx.hit_stop.cutscene_factor, fin.win_slowmo))
+	_check("win: camera glides from the duel view", stage.cut_camera.current and ui.letterbox().visible)
+	await _real_wait(fin.beat_time("_beat_back") + 0.4)
+	_check("win: over, duel camera, normal speed, HUD back", not fin.playing and stage.camera.current
+			and fx.hit_stop.cutscene_factor == 1.0 and ui.hud_root().modulate.a > 0.99 and not fx.finish_pending())
+	fx.hit_stop.clear()
+	duel.duel_ended.emit("enemy")
+	_check("lose: finish cutscene, crowd still", fin.playing and fin.version == "lose" and stage.crowd_still)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	fin._input(click)
+	_check("click skips the finish", not fin.playing and fx.hit_stop.cutscene_factor == 1.0 and stage.camera.current)
+	await _real_wait(0.5)
+	# A Signature that ends the duel: the finish waits for the Signature's impact.
+	fx.cutscene._long_done = true  # short version
+	fx.hit_stop.clear()
+	duel.signature_served.emit("player", "Omelette")
+	duel.duel_ended.emit("player")
+	_check("KO by Signature: finish queued, not started", fx.finish_pending() and not fin.playing)
+	await _real_wait(fx.cutscene.beat_time("_beat_impact") + 0.1)
+	_check("finish starts on the Signature's impact", fin.playing and fx.cutscene.playing)
+	await _real_wait(fx.cutscene.beat_time("_beat_close") - fx.cutscene.beat_time("_beat_impact") + 0.2)
+	_check("Signature closing keeps the finish's letterbox", not fx.cutscene.playing and fin.playing and ui.letterbox().visible)
+	await _real_wait(fin.beat_time("_beat_back"))
+	_check("both over, everything back", not fin.playing and not ui.letterbox().visible
+			and ui.hud_root().modulate.a > 0.99 and fx.hit_stop.cutscene_factor == 1.0)
+	fx.hit_stop.clear()
+	duel.duel_ended.emit("enemy")
+	fx.bind(Duel.new(GameDB.deck("dev"), GameDB.enemy("tony"), GameDB.book_recipes(GameDB.ALL_BOOKS), {seed = 5}))
+	_check("new duel aborts the finish", not fin.playing and fx.hit_stop.cutscene_factor == 1.0)
+	stage.crowd_still = false
+	fx.hit_stop.clear()
+
+
+## F4: the VS screen plays, shows the portraits, ends by itself, and a click skips it.
+func _vs(main: Node) -> void:
+	var vs: VsIntro = main.ui.vs_intro()
+	_check("VS has the Apis and Tony portraits", vs.portraits.get("apis") is Texture2D and vs.portraits.get("tony") is Texture2D)
+	var t0 := Time.get_ticks_msec()
+	var tony := GameDB.enemy("tony")
+	vs.play(tony)
+	await _real_wait(0.1)
+	_check("VS shows, rival name and portrait", vs.visible and vs.get_node("Right/Name").text == tony.name.to_upper()
+			and vs.get_node("Right/Portrait").visible)
+	await vs.done
+	var ms := Time.get_ticks_msec() - t0
+	_check("VS ends by itself in %d ms (1.5-2.5 s)" % ms, not vs.visible and ms > 1500 and ms < 2500)
+	var rosa := GameDB.enemy("rosa")
+	vs.play(rosa)
+	await _real_wait(0.1)
+	_check("a rival without a portrait shows its name only", not vs.get_node("Right/Portrait").visible
+			and vs.get_node("Right/Name").text == rosa.name.to_upper())
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	t0 = Time.get_ticks_msec()
+	vs._gui_input(click)
+	await vs.done
+	_check("click skips the VS screen", not vs.visible and Time.get_ticks_msec() - t0 < 600)
 
 
 func _real_wait(seconds: float) -> void:

@@ -45,6 +45,8 @@ var _hit_at := {player = -10.0, rival = -10.0}
 var _act_at := {player = -10.0, rival = -10.0}
 var _base := {}
 var _crowd: Array[Node3D] = []
+## Lost duel (FinishCutscene): the crowd stops bobbing until the next duel.
+var crowd_still := false
 var _cheer_at := -10.0
 var _cheer := 0.0
 
@@ -183,7 +185,8 @@ func _process(delta: float) -> void:
 		var base_y: float = m.get_meta("base_y")
 		var dt := _time - _cheer_at - fmod(phase, 0.5) * 0.12
 		var jump := sin(dt / cheer_time * PI) * cheer_height * _cheer if dt > 0.0 and dt < cheer_time else 0.0
-		m.position.y = base_y + maxf(0.0, sin(_time * 3.0 + phase)) * 0.12 + jump
+		var bob := 0.0 if crowd_still else maxf(0.0, sin(_time * 3.0 + phase)) * 0.12
+		m.position.y = base_y + bob + jump
 
 
 func _shake(who: String) -> float:

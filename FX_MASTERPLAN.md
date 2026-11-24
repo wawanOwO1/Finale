@@ -275,10 +275,18 @@ Versi pendek: lompati 0.25–0.90 (close-up), langsung ke impact frame.
 
 ### 6.3 Finish / KO (T3, ±2 s, lalu announcer yang sudah ada)
 
+> **Keputusan F4:** `FinishCutscene` (win 1.5 s, lose 1.8 s) memakai base class `FxCutscene` yang sama dengan
+> Signature. Kamera mulai **dari transform kamera duel** lalu meluncur ke marker (tanpa potongan). HUD memudar
+> selama cutscene; announcer menunggu `FxDirector.finish_pending()`. KO lewat Signature: Finish ditahan sampai
+> impact Signature.
+
 - **Menang:** hitstop panjang 0.25 s pada Serve terakhir → impact frame → slow-mo (`cutscene_factor = 0.3`) 0.6 s sambil kamera dorong pelan ke rival → rival `perform("lose")` → time scale normal → `FINISHED` → `YOU WINS!` (Announcer).
 - **Kalah:** tanpa impact frame. Desaturasi bertahap, kamera turun pelan ke Apis berlutut, crowd diam (berhenti bob). Lalu `LOSER` yang sudah ada.
 
 ### 6.4 Intro VS (T2, ±2 s, sebelum 3·2·1)
+
+> **Keputusan F4:** potret dirender dari GLB dengan `tests/portrait_render.gd` (360×420, transparan), bukan digambar.
+> Baru Apis dan Tony; rival lain tampil nama + gelar saja sampai modelnya ada.
 
 - Split-screen diagonal di `%FxLayer`: kiri Apis, kanan rival. Pakai **potret 2D pre-render** dari model 3D
   (1 PNG per chef, dibuat sekali), bukan render live ke SubViewport tambahan: tidak ada pass 3D ekstra.
@@ -337,7 +345,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 | **F1 Juice T0–T2** ✅ | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
 | **F2 Impact frame** ✅ | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
 | **F3 Cutscene Signature** ✅ | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
-| **F4 Finish + Intro VS** | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
+| **F4 Finish + Intro VS** ✅ | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
 | **F5 Optimasi & QA** | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
 | **Stretch** | Bruno fase 2, crowd wave, ilustrasi impact frame pre-drawn | — | — |
 
@@ -362,7 +370,7 @@ prewarm. Itu yang paling murah dan paling terasa.
 
 ## 11. Pertanyaan terbuka
 
-- [ ] Impact frame: **2 warna (tinta/krem)** sesuai palet, atau **hitam-putih murni** ala manga? Usulan: tinta/krem, lebih menyatu dengan ART_DIRECTION.
+- [x] ~~Impact frame: 2 warna atau hitam-putih?~~ → **tinta/krem**, F2.
 - [ ] Rival boleh punya mini cut-in (T2) saat Serve besar, atau Signature tetap eksklusif Apis secara visual juga?
 - [ ] Voice line: berapa yang realistis dari ElevenLabs sebelum 13 Des?
-- [ ] Cutscene panjang "sekali per run" atau "sekali per duel"?
+- [x] ~~Cutscene panjang "sekali per run" atau "sekali per duel"?~~ → sekali per sesi (`long_once`), F3.

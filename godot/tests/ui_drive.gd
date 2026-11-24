@@ -32,6 +32,15 @@ func _initialize() -> void:
 	await _wait(0.2)
 	_check("Tab closes it and unpauses", not ui.get_node("%Almanac").visible and not paused)
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
+	# VS screen (FX_MASTERPLAN.md §6.4) before the countdown.
+	var vs: Control = ui.get_node("%VsIntro")
+	await _wait(0.8)
+	_check("VS screen shows first", vs.visible)
+	_shot("2_vs")
+	var tv := Time.get_ticks_msec()
+	while vs.visible and Time.get_ticks_msec() - tv < 5000:
+		await _wait(0.05)
+	_check("VS screen ends by itself", not vs.visible)
 	await _wait(1.0)
 	_check("duel started after clicking the book button", main.duel != null)
 	_shot("2_intro_countdown")

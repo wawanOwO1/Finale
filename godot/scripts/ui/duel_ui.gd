@@ -78,6 +78,8 @@ var _drag := {}
 var _busy := false
 ## Round shown by the announcer ("ROUND 2"). Set by main.gd before bind().
 var round_number := 1
+## Set by main.gd: the result announcer waits for its finish cutscene.
+var fx: FxDirector
 ## One frame per station (PanelContainer); meta "holder" = the stack Control.
 var _cols: Array[PanelContainer] = []
 ## Dragging a station's top card to another station.
@@ -179,6 +181,8 @@ func bind(d: Duel) -> void:
 func _intro() -> void:
 	_busy = true
 	_hide_tip()
+	# VS screen first (FX_MASTERPLAN.md §6.4), then 3 · 2 · 1.
+	await vs_intro().play(duel.enemy_def)
 	await _announcer.intro(round_number)
 	await director.first_turn()
 	_busy = false
@@ -209,6 +213,11 @@ func speed_hint() -> Label:
 ## Full-screen flash / desaturate overlay, driven by FxDirector.
 func fx_screen() -> ColorRect:
 	return %FxScreen
+
+
+## VS screen before the countdown.
+func vs_intro() -> VsIntro:
+	return %VsIntro
 
 
 ## Layer above the HUD holding the cut-in, letterbox and every FX overlay: a cutscene can fade the
@@ -321,6 +330,9 @@ func _on_duel_ended(winner: String) -> void:
 	_busy = true
 	_hide_tip()
 	await get_tree().create_timer(0.7).timeout
+	# The finish cutscene (FX_MASTERPLAN.md §6.3) plays first; the announcer follows it.
+	while fx and fx.finish_pending() and duel and duel.over():
+		await get_tree().process_frame
 	await _announcer.result(won)
 	_busy = false
 	_result_done = true

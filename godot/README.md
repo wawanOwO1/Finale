@@ -213,6 +213,17 @@ dibekukan (`HitStop.cutscene_factor`) → kamera close-up `CutCamera` bergerak d
 ditahan `FxDirector` (damage, KO) mendarat bersamaan → letterbox keluar. Klik / Space / Esc = lompat ke impact.
 Cut-in, letterbox, dan semua overlay FX ada di `%FxLayer` (CanvasLayer di atas HUD) supaya HUD bisa memudar sendiri.
 
+**Cutscene Finish** (`FinishCutscene` di `main.tscn`, animasi `win` 1.5 s / `lose` 1.8 s): main sebelum announcer
+FINISHED. Menang: impact frame KO, slow-mo ×0.3, kamera meluncur dari pandangan duel ke `CutMarkers/KoWin` (rival),
+penonton bersorak. Kalah: slow-mo ×0.5, layar pudar, kamera turun ke `KoLose` (Apis), penonton diam. Kalau
+Signature yang menamatkan duel, Finish mulai tepat di impact Signature. Klik untuk skip. Kedua cutscene memakai
+base class `FxCutscene` (`scripts/fx/fx_cutscene.gd`).
+
+**Layar VS** (`%VsIntro` di `duel_ui.tscn`, `scripts/fx/vs_intro.gd`): ±2 s sebelum 3·2·1, layar dibagi diagonal,
+potret 2D dari `assets/portraits/<id>.png`. Potret dirender sekali dari GLB dengan
+`tests/portrait_render.gd` (butuh window; jalankan lagi kalau model berubah). Rival tanpa potret hanya tampil namanya.
+Klik untuk skip.
+
 Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
 Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel
 (≤ 150 hidup), satu kata per frame, retak, punch zoom, crowd, dan angka slam.

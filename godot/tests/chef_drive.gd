@@ -25,6 +25,10 @@ func _initialize() -> void:
 	_check("Apis shows its model", apis.has_model() and not apis.get_node("Placeholder").visible)
 	_check("Tony shows its model", tony.has_model() and tony.get_node("tony").visible)
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
+	# VS screen first (FX_MASTERPLAN.md §6.4), then the countdown.
+	await _wait(0.3)
+	while ui.get_node("%VsIntro").visible:
+		await _wait(0.05)
 	await _wait(5.5)
 	var duel: Duel = main.duel
 	if duel == null:

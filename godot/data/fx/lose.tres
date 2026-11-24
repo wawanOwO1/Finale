@@ -10,4 +10,3 @@ trauma = 0.4
 desat = 0.85
 desat_hold = 1.5
 desat_fade = 1.0
-burst = "smoke"
