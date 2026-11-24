@@ -1,85 +1,85 @@
-# GDD — *FINALE* (judul sementara) · Versi Jam
+# GDD — *FINALE* (working title) · Jam Version
 
-> OpenGame Game Jam #1 · Track: **05 Strategy** (deck-builder) + sponsor **fal**, **ElevenLabs** · Solo
-> Deadline upload: **18 Des 2026, 23:59 PT** (≈ 19 Des 14:59 WIB) · Target upload pertama: **14 Des**
-> Bahasa in-game: **full English** · Tech: **Godot 4.7** (renderer Compatibility, export Web) di `godot/`
+> OpenGame Game Jam #1 · Track: **05 Strategy** (deck-builder) + sponsors **fal**, **ElevenLabs** · Solo
+> Upload deadline: **18 Dec 2026, 23:59 PT** (≈ 19 Dec 14:59 WIB) · First upload target: **14 Dec**
+> In-game language: **full English** · Tech: **Godot 4.7** (Compatibility renderer, Web export) in `godot/`
 
-> **Diperbarui 24 Nov 2026** agar sesuai kode. Perubahan besar dari versi 18 Nov: **Godot** menggantikan Vite/TS/Three.js (versi web lama di `src/` hanya referensi), **Station Stack** menggantikan Plate, **rival drafting** menggantikan Intent, dan ada sistem baru (Chef's Flow, Almanac, RNG adil). Dokumen pendamping: [GRAND_DESIGN.md](GRAND_DESIGN.md) (giliran, rival AI, RNG, Flow, Almanac), [ART_DIRECTION.md](ART_DIRECTION.md) (visual, HUD, Station Stack), [MODIFIERS.md](MODIFIERS.md).
-> Tanda status: ✅ sudah ada di kode · ⏳ belum dikerjakan · ✂️ dipotong.
+> **Updated 24 Nov 2026** to match the code. Big changes from the 18 Nov version: **Godot** replaces Vite/TS/Three.js (the old web version in `src/` is reference only), **Station Stack** replaces the Plate, **rival drafting** replaces Intent, and there are new systems (Chef's Flow, Almanac, fair RNG). Companion docs: [GRAND_DESIGN.md](GRAND_DESIGN.md) (turns, rival AI, RNG, Flow, Almanac), [ART_DIRECTION.md](ART_DIRECTION.md) (visuals, HUD, Station Stack), [MODIFIERS.md](MODIFIERS.md). Those three are still written in Indonesian.
+> Status marks: ✅ in the code · ⏳ not done yet · ✂️ cut.
 
-> **Asal-usul (penting untuk aturan jam):** desain ini diturunkan dari GDD lama *Cooking Show Deckbuilder* (v0.1, 1 Nov 2026), yang isinya hanya dokumen, referensi, dan paper prototype. Belum ada kode atau aset. Aturan jam mengizinkan memakai ulang **ide & mekanik**. Semua kode, aset 3D, gambar, dan audio **dibuat mulai 18 Nov 2026** dan dicatat di git sejak commit pertama sebagai bukti riwayat pengembangan. Gambar referensi hanya dipakai sebagai acuan struktur dan rasa, tidak disalin.
+> **Origin (important for the jam rules):** this design is derived from the older *Cooking Show Deckbuilder* GDD (v0.1, 1 Nov 2026), which contained only documents, references and a paper prototype. There was no code or assets. The jam rules allow reusing **ideas and mechanics**. All code, 3D assets, images and audio are **made from 18 Nov 2026 onward** and logged in git from the first commit as proof of development history. Reference images are used only as guidance for structure and feel, never copied.
 
 ---
 
-## 1. Ringkasan
+## 1. Overview
 
-Roguelike deckbuilder bergaya **anime masak yang heboh**. Kamu adalah koki muda yang menantang chef-chef top kota dalam duel memasak. Susun bahan di **Station**, selesaikan resep, dan buat lawanmu kehilangan **Confidence** sampai menyerah.
+An **over-the-top cooking-anime** roguelike deckbuilder. You are a young chef challenging the city's top chefs to cooking duels. Stack ingredients on a **Station**, complete recipes, and make your opponent lose **Confidence** until they give up.
 
-**Pilar desain**
-1. **Resep adalah combo, dan urutan itu penting.** Bahan yang dimainkan menumpuk di **Station** seperti solitaire. Urutan yang pas dengan resep memberi **Perfect Order** (×1.5), bahan lengkap tapi urutan beda tetap **Cooked** (×1).
-2. **Dua lapis deckbuilding.** Deck = bahan dan teknik yang kamu punya. **Recipe Book** = apa yang bisa kamu masak dari bahan itu. Keduanya dibangun selama run.
-3. **Lawan bermain dengan aturan yang sama.** Rival punya deck, tangan, Heat, dan 2 Station sendiri. Kartunya tertutup, dan tidak ada yang dicurangi (lihat §4.9).
-4. **Lebay ala anime masak.** Reaksi dramatis, cut-in, aura, penonton terpukau. Setiap Serve resep harus *terasa* seperti momen.
-5. **Kecil tapi selesai.** Satu karakter, satu distrik yang dipoles penuh, run ±20–30 menit.
+**Design pillars**
+1. **Recipes are combos, and order matters.** Ingredients you play stack on a **Station** like solitaire. An exact match with a recipe's order gives **Perfect Order** (×1.5); the right ingredients in the wrong order is still **Cooked** (×1).
+2. **Two layers of deckbuilding.** Deck = the ingredients and techniques you own. **Recipe Book** = what you can cook from them. Both are built during a run.
+3. **The opponent plays by the same rules.** The rival has their own deck, hand, Heat and 2 Stations. Their cards are face-down, and nothing is rigged (see §4.9).
+4. **Over the top, anime style.** Dramatic reactions, cut-ins, auras, an awestruck crowd. Every recipe Serve must *feel* like a moment.
+5. **Small but finished.** One character, one polished district, runs of ±20–30 minutes.
 
-**Nada:** anime shounen kuliner. Rival sombong, monolog semangat, reaksi berlebihan. Ramah semua umur.
+**Tone:** culinary shounen anime. Arrogant rivals, fired-up monologues, exaggerated reactions. Friendly for all ages.
 
 ## 2. Setting
 
-- **Kota:** *Saporé City*, kota kuliner fiktif bernuansa internasional.
-- **Turnamen:** *The Grand Plate*. Versi jam memuat babak pertama, **Market Street**, yang ditutup duel melawan *"Iron" Bruno*.
-- **MC:** **Apis Tetrarch** ("Apis", nama sementara), koki muda tanpa reputasi dari dapur kecil keluarga, yang ingin jadi koki nomor satu di kota.
-- **Penyampaian cerita:** ⏳ intro singkat, dialog satu-dua baris sebelum dan sesudah duel (portrait + text box), VS screen sebelum boss, dan ending pendek dengan teaser distrik berikutnya.
+- **City:** *Saporé City*, a fictional food city with an international feel.
+- **Tournament:** *The Grand Plate*. The jam version contains the first round, **Market Street**, which ends with a duel against *"Iron" Bruno*.
+- **Protagonist:** **Apis Tetrarch** ("Apis", placeholder name), a young chef with no reputation from a small family kitchen who wants to become the city's number one chef.
+- **Storytelling:** ⏳ a short intro, one or two lines of dialogue before and after each duel (portrait + text box), a VS screen before the boss, and a short ending that teases the next district.
 
 ## 3. Core loop
 
 ```
-Title → New Run (deck awal + Basics Cookbook)                              ⏳
-  → Course Path Market Street: setiap langkah pilih 1 dari 2–3 kartu encounter ⏳
+Title → New Run (starter deck + Basics Cookbook)                              ⏳
+  → Market Street Course Path: each step, pick 1 of 2–3 encounter cards          ⏳
        [Duel | Elite | Shop | Event | Practice Kitchen]
-  → Reward → ... (±9 langkah) → Practice Kitchen → BOSS: "Iron" Bruno      ⏳
-  → Menang: ending + skor run · Kalah: ringkasan run → New Run             ⏳
+  → Reward → ... (±9 steps) → Practice Kitchen → BOSS: "Iron" Bruno             ⏳
+  → Win: ending + run score · Lose: run summary → New Run                       ⏳
 ```
 
-Yang sudah jalan saat ini hanya **satu duel** (Apis vs Tony atau Rosa), disetel lewat Inspector node `Main` (`Enemy Id`, `Dev Deck`, `Start Hype`). Lapisan run di atasnya belum ada. Tidak ada meta-progression di versi jam (lihat §11).
+Right now only **a single duel** works (Apis vs Tony or Rosa), set up through the `Main` node's Inspector (`Enemy Id`, `Dev Deck`, `Start Hype`). The run layer on top of it does not exist yet. There is no meta-progression in the jam version (see §11).
 
-## 4. Mekanik duel ✅
+## 4. Duel mechanics ✅
 
-### 4.1 Stat
-| Stat | Fungsi |
+### 4.1 Stats
+| Stat | Function |
 |---|---|
-| **Confidence** (HP) | Mental chef. 0 = menyerah. Apis mulai **100** (`Duel.PLAYER_CONFIDENCE`), terbawa antar duel. |
-| **Composure** (Block) | Menahan Pressure. Hilang di awal giliran pemiliknya. |
-| **Heat** (Energy) | **3** per giliran. Biaya kartu dan Serve. |
-| **Pressure** (Damage) | Mengurangi Composure dulu, lalu Confidence lawan. |
+| **Confidence** (HP) | The chef's morale. 0 = gives up. Apis starts at **100** (`Duel.PLAYER_CONFIDENCE`), carried between duels. |
+| **Composure** (Block) | Absorbs Pressure. Reset at the start of its owner's turn. |
+| **Heat** (Energy) | **3** per turn. Cost of cards and Serve. |
+| **Pressure** (Damage) | Reduces the opponent's Composure first, then Confidence. |
 
-### 4.2 Giliran pemain
-Urutan tetap: banner **YOUR TURN** → giliran pemain (tanpa timer) → banner **RIVAL'S TURN** → rival drafting (dianimasikan) → loop sampai ada yang menyerah. Detail waktu dan arsitektur ada di [GRAND_DESIGN.md §1](GRAND_DESIGN.md).
+### 4.2 Player turn
+Fixed order: **YOUR TURN** banner → player turn (no timer) → **RIVAL'S TURN** banner → rival drafting (animated) → loop until someone gives up. Timing and architecture details are in [GRAND_DESIGN.md §1](GRAND_DESIGN.md).
 
-1. Composure → 0, Heat → 3, draw **5** kartu.
-2. Mainkan kartu (di-**drag**):
-   - **Ingredient** → seret ke salah satu dari **2 Station**. Beberapa punya efek kecil langsung.
-   - **Technique** → seret ke atas keluar dari tangan. Efek langsung (Pressure, Composure, draw) atau memodifikasi bahan.
-3. **Serve** (tombol per Station, **1 Heat**, sekali per giliran): seluruh isi Station itu dihidangkan. Station kosong lagi.
-4. Opsional, gratis: **pindah kartu teratas** ke Station lain (sekali per giliran) atau **Clear** Station (buang seluruh tumpukan, memakai jatah pindah yang sama).
-5. End Turn (`E`): kartu di tangan dibuang. **Station tetap ada** ke giliran berikutnya.
+1. Composure → 0, Heat → 3, draw **5** cards.
+2. Play cards (by **dragging**):
+   - **Ingredient** → drag onto one of the **2 Stations**. Some have a small immediate effect.
+   - **Technique** → drag up and out of the hand. Immediate effect (Pressure, Composure, draw) or modifies ingredients.
+3. **Serve** (a button per Station, **1 Heat**, once per turn): everything on that Station is served. The Station is empty again.
+4. Optional, free: **move the top card** to the other Station (once per turn) or **Clear** a Station (discard the whole stack, using the same move allowance).
+5. End Turn (`E`): the hand is discarded. **Stations stay** into the next turn.
 
-> Station yang bertahan antar giliran adalah keputusan inti: Serve sekarang dengan hasil kecil, atau tahan untuk resep besar sambil menanggung tekanan lawan? Kamu bisa menyiapkan dua hidangan sekaligus.
+> Stations that persist between turns are the core decision: Serve now for a small result, or hold for a big recipe while absorbing the opponent's pressure? You can prepare two dishes at once.
 
 ### 4.3 Station Stack
-- **2 Station** per sisi (dari 3, diputuskan 23 Nov setelah playtest), maksimal **6** kartu per Station (**7** dengan *Bigger Plate*).
-- Bahan menumpuk ke bawah seperti solitaire. Kartu lama hanya terlihat pita nama + ikon tag, kartu terbaru terbuka penuh (bingkai emas = bisa diambil). Hanya kartu teratas yang bisa di-drag.
-- **Order Ticket** di atas tiap Station menampilkan **resep paling mungkin**, urutan bahan, dan langkah berikutnya (berkedip). Keluar jalur → "???" abu-abu. Resep lengkap → cap **PERFECT!** / **COOKED**. Tiket boleh memberi hint, jadi Recipe Book tidak ditutup saat duel.
+- **2 Stations** per side (down from 3, decided 23 Nov after playtesting), maximum **6** cards per Station (**7** with *Bigger Plate*).
+- Ingredients stack downward like solitaire. Older cards show only a name ribbon + tag icon, the newest card is fully visible (gold frame = can be taken). Only the top card can be dragged.
+- An **Order Ticket** above each Station shows the **most likely recipe**, its ingredient order, and the next step (blinking). Off track → grey "???". Recipe complete → **PERFECT!** / **COOKED** stamp. The ticket may give hints, so the Recipe Book is not locked during duels.
 
-### 4.4 Pencocokan resep (tag + urutan)
-| Hasil | Syarat | Efek |
+### 4.4 Recipe matching (tags + order)
+| Result | Condition | Effect |
 |---|---|---|
-| **Perfect** | Stack = urutan resep persis dari kartu pertama | Efek resep **×1.5** |
-| **Cooked** | Bahan resep lengkap, urutan beda | Efek resep ×1.0 |
-| **Garnish** | Bahan tambahan setelah resep lengkap | +1 Quality per bahan (maks +2) |
-| **Improvised** | Tidak cocok resep apa pun | Pressure = 2 × jumlah bahan |
+| **Perfect** | Stack = the recipe's exact order, from the first card | Recipe effect **×1.5** |
+| **Cooked** | All recipe ingredients present, different order | Recipe effect ×1.0 |
+| **Garnish** | Extra ingredients after the recipe is complete | +1 Quality per ingredient (max +2) |
+| **Improvised** | Matches no recipe | Pressure = 2 × number of ingredients |
 
-| Tag | Contoh bahan |
+| Tag | Example ingredients |
 |---|---|
 | `PROTEIN` | Egg, Chicken, Beef, Fish |
 | `CARB` | Rice, Bread, Pasta |
@@ -89,88 +89,88 @@ Urutan tetap: banner **YOUR TURN** → giliran pemain (tanpa timer) → banner *
 | `SPICE` | Chili, Garlic, Pepper |
 | `SAUCE` | Stock, Tomato Sauce, Soy Sauce |
 
-- Resep meminta tag (`FAT`) atau **bahan kunci** (`card:beef`) pada tiap langkahnya. Urutan lengkap tiap resep ada di [ART_DIRECTION.md §6.4](ART_DIRECTION.md), acuan akhirnya `godot/data/recipes/*.tres`.
-- Kalau lebih dari satu resep cocok, UI menampilkan yang cocok dan yang **kurang satu langkah** secara real-time.
+- A recipe asks for a tag (`FAT`) or a **key ingredient** (`card:beef`) at each step. The full order of every recipe is in [ART_DIRECTION.md §6.4](ART_DIRECTION.md); the final source of truth is `godot/data/recipes/*.tres`.
+- If more than one recipe matches, the UI shows the matching ones and the ones that are **one step short** in real time.
 
 ### 4.5 Quality & Hype
-- Tiap bahan punya **Quality** 1–3. Upgrade dan teknik tertentu menaikkannya.
-- **Efek resep = (nilai dasar + total Quality di Station) × pengali Perfect.**
-- **Hype Meter** (penonton): tiap resep punya nilai Hype sendiri (Omelette 25, Sandwich 30, Burger 40, dst.), plus dari kartu tertentu. Saat penuh (100), **Signature Dish** terbuka.
+- Each ingredient has **Quality** 1–3. Upgrades and certain techniques raise it.
+- **Recipe effect = (base value + total Quality on the Station) × Perfect multiplier.**
+- **Hype Meter** (audience): every recipe has its own Hype value (Omelette 25, Sandwich 30, Burger 40, etc.), plus some from certain cards. When full (100), the **Signature Dish** unlocks.
 
-### 4.6 Signature Dish — momen anime
-- Kartu khusus MC yang muncul di tangan saat Hype penuh, sekali per duel. **Hanya untuk Apis**: Hype rival hanya meter penonton.
-- Efeknya: Serve Station dengan efek **×2**, lalu **cut-in sinematik**: close-up chef, aura, speed lines, teks SFX besar, reaksi lawan dan penonton. ✅ efek, ⏳ cut-in sinematik.
-- Ini "money shot" untuk GIF, trailer, dan kesan juri.
+### 4.6 Signature Dish — the anime moment
+- A special MC card that appears in hand when Hype is full, once per duel. **Apis only**: the rival's Hype is just an audience meter.
+- Effect: Serve a Station with **×2** effect, then a **cinematic cut-in**: chef close-up, aura, speed lines, a big SFX word, opponent and crowd reactions. ✅ effect, ⏳ cinematic cut-in.
+- This is the "money shot" for GIFs, the trailer and the judges' impression.
 
-### 4.7 Chef's Flow & Modifier ✅
-- Setiap Serve **Perfect Order** = +1 Flow. Threshold pemain **1 → 2 → 3** (lalu tetap 3), tercapai → pilih **1 dari 3 modifier**.
-- Per duel: Flow dan modifier reset di awal duel berikutnya, bisa di-stack. Rival juga mendapat modifier (threshold lebih tinggi untuk rival awal).
-- 10 modifier awal (Hot Pan, Steady Hands, Encore, Extra Burner, Prep Cook, Crowd Favorite, Spice Whisperer, Free Move, Mise Master, Plating Pro). Daftar dan aturan penawaran: [GRAND_DESIGN.md §5](GRAND_DESIGN.md), [MODIFIERS.md](MODIFIERS.md).
+### 4.7 Chef's Flow & Modifiers ✅
+- Every **Perfect Order** Serve = +1 Flow. The player's threshold is **1 → 2 → 3** (then stays at 3); when reached, pick **1 of 3 modifiers**.
+- Per duel: Flow and modifiers reset at the start of the next duel, and they stack. The rival also gets modifiers (higher thresholds for early rivals).
+- 10 starting modifiers (Hot Pan, Steady Hands, Encore, Extra Burner, Prep Cook, Crowd Favorite, Spice Whisperer, Free Move, Mise Master, Plating Pro). List and offer rules: [GRAND_DESIGN.md §5](GRAND_DESIGN.md), [MODIFIERS.md](MODIFIERS.md).
 
-| Meter | Naik dari | Hadiah | Sifat |
+| Meter | Rises from | Reward | Nature |
 |---|---|---|---|
-| Hype | Serve resep apa pun | Signature Dish | Ledakan sekali pakai |
-| Chef's Flow | Serve Perfect Order | Modifier | Permanen dalam duel, bertumpuk |
+| Hype | Serving any recipe | Signature Dish | One-shot burst |
+| Chef's Flow | Serving a Perfect Order | Modifier | Permanent within the duel, stacks |
 
-### 4.8 Status (semua punya tooltip)
-| Status | Efek |
+### 4.8 Statuses (all have tooltips)
+| Status | Effect |
 |---|---|
-| **Spicy** | Kehilangan X Confidence di awal giliran, lalu X−1. |
-| **Flustered** | Pressure yang diberikan −25%. |
-| **Rattled** | Pressure yang diterima +50%. |
-| **Burnt** | Serve berikutnya −50% efek. |
-| **Focus** | +X Pressure untuk semua serangan (permanen di duel). |
-| **Inspired** | Draw +1 giliran berikutnya. |
+| **Spicy** | Lose X Confidence at the start of the turn, then X−1. |
+| **Flustered** | Pressure dealt −25%. |
+| **Rattled** | Pressure received +50%. |
+| **Burnt** | Next Serve has −50% effect. |
+| **Focus** | +X Pressure on all attacks (permanent within the duel). |
+| **Inspired** | Draw +1 next turn. |
 
-### 4.9 Lawan: rival drafting ✅
-Menggantikan sistem Intent (§4.6 versi lama). Selalu **1 lawan 1**, dan rival bermain dengan aturan yang sama dengan pemain.
+### 4.9 Opponent: rival drafting ✅
+Replaces the Intent system (the old §4.6). Always **1 vs 1**, and the rival plays by the same rules as the player.
 
-- Rival punya **deck, Recipe Book, tangan, Heat, dan 2 Station**. `RivalAI` memilih satu aksi per langkah: taruh bahan, mainkan Technique, Serve, atau End Turn. Profil AI: `greedy` (Tony), `trickster` (Rosa), `showman` (Marco), `patient` (Élodie), `boss` (Bruno).
-- **Informasi:** pemain melihat punggung kartu (jumlahnya) di tangan dan Station rival, Heat, damage, buff/debuff, dan hidangan yang dihidangkan (nama + PERFECT/COOKED) saat Serve. Isi kartu rival tidak terlihat. Pengganti Intent adalah **mood** (emote Confident, Wary, Smug, Angry).
-- **Janji fair:** rival memakai deck, shuffle, dan aturan pity yang sama; tidak melihat tangan atau isi Station pemain; draw-nya tidak dicurangi.
-- **RNG:** output duel deterministik (damage, Quality, efek). Yang random hanya input: shuffle, draw, penawaran. Ada anti-clump shuffle dan **Mise en Place** (jaminan tangan punya minimal satu bahan, tampil "✨ Mise en place!"). Stream RNG terpisah per tujuan supaya keputusan AI tidak menggeser draw pemain ([GRAND_DESIGN.md §4](GRAND_DESIGN.md)).
-- Tahan klik / Space saat giliran rival = percepat ×3.
+- The rival has a **deck, Recipe Book, hand, Heat and 2 Stations**. `RivalAI` picks one action per step: place an ingredient, play a Technique, Serve, or End Turn. AI profiles: `greedy` (Tony), `trickster` (Rosa), `showman` (Marco), `patient` (Élodie), `boss` (Bruno).
+- **Information:** the player sees card backs (the count) in the rival's hand and Stations, their Heat, damage, buffs/debuffs, and the dish served (name + PERFECT/COOKED) at Serve time. The contents of the rival's cards are hidden. The replacement for Intent is **mood** (Confident, Wary, Smug, Angry emotes).
+- **Fairness promise:** the rival uses the same deck, shuffle and pity rules; does not see the player's hand or Station contents; its draws are not rigged.
+- **RNG:** duel outputs are deterministic (damage, Quality, effects). Only inputs are random: shuffle, draw, offers. There is an anti-clump shuffle and **Mise en Place** (a guarantee that the hand has at least one ingredient, shown as "✨ Mise en place!"). Separate RNG streams per purpose so AI decisions never shift the player's draws ([GRAND_DESIGN.md §4](GRAND_DESIGN.md)).
+- Hold click / Space during the rival's turn = ×3 speed.
 
 ### 4.10 Almanac ✅
-Buku pengetahuan di HUD (tombol buku atau `Tab`, mem-pause game). Tab Ingredients, Techniques, Recipes, Rivals, Keywords. Entri terbuka saat ditemukan (deck, reward/shop, atau rival menyajikannya), disimpan lintas run di `user://almanac.save`. Ini **pengetahuan, bukan kekuatan**, jadi tidak melanggar keputusan tanpa meta-progression. Ada **combination finder** di tab Recipes.
+A knowledge book in the HUD (book button or `Tab`, pauses the game). Tabs: Ingredients, Techniques, Recipes, Rivals, Keywords. Entries unlock when discovered (deck, reward/shop, or a rival serves it) and are saved across runs in `user://almanac.save`. This is **knowledge, not power**, so it does not break the no-meta-progression decision. The Recipes tab has a **combination finder**.
 
-## 5. Progresi dalam run ⏳
+## 5. Run progression ⏳
 
 ### 5.1 Course Path
-- Pengganti map bercabang. Setelah setiap node, pemain memilih **1 dari 2–3 kartu encounter** (ikon tipe + petunjuk reward). Market Street punya ±9 pilihan, lalu Boss.
-- **Aturan generator:** Elite tidak muncul di 3 node pertama; minimal 1 Shop dan 1 Practice Kitchen; node sebelum Boss selalu Practice Kitchen.
-- Di atasnya ada strip progres kecil: node yang sudah lewat, posisi sekarang, dan boss di ujung. "ROUND N" di announcer = duel ke-N.
+- Replaces the branching map. After each node, the player picks **1 of 2–3 encounter cards** (type icon + reward hint). Market Street has ±9 choices, then the Boss.
+- **Generator rules:** no Elite in the first 3 nodes; at least 1 Shop and 1 Practice Kitchen; the node before the Boss is always a Practice Kitchen.
+- Above it is a small progress strip: nodes passed, current position, and the boss at the end. "ROUND N" in the announcer = the Nth duel.
 
-### 5.2 Reward
-| Sumber | Reward |
+### 5.2 Rewards
+| Source | Reward |
 |---|---|
-| Duel | Pilih 1 dari 3 kartu + Tips |
-| Elite | Kartu + **Kitchen Tool** (relic) + kesempatan Recipe Book |
-| Shop | Kartu, Kitchen Tool, **Recipe Book**, hapus kartu |
-| Boss | Menang run |
+| Duel | Pick 1 of 3 cards + Tips |
+| Elite | Card + **Kitchen Tool** (relic) + a chance at a Recipe Book |
+| Shop | Cards, Kitchen Tools, **Recipe Books**, card removal |
+| Boss | Win the run |
 
-Penawaran reward memakai stream RNG `offers` (reproducible dari satu seed run).
+Reward offers use the `offers` RNG stream (reproducible from a single run seed).
 
-### 5.3 Recipe Book
-- Tiap buku berisi **2–3 resep bertema**. Membeli buku berarti menguasai semua resepnya.
-- Pemain mulai dengan **Basics Cookbook**. Buku lain dibeli di Shop (75–150 Tips) atau didapat dari Elite.
+### 5.3 Recipe Books
+- Each book holds **2–3 themed recipes**. Buying a book means mastering all of its recipes.
+- The player starts with the **Basics Cookbook**. Other books are bought in the Shop (75–150 Tips) or earned from Elites.
 
-| Buku | Arah build | Status |
+| Book | Build direction | Status |
 |---|---|---|
-| Basics Cookbook | Serba bisa (starter) | ✅ |
-| Grill Master's Notes | Pressure besar | ✅ |
+| Basics Cookbook | All-rounder (starter) | ✅ |
+| Grill Master's Notes | Big Pressure | ✅ |
 | Spice Route Journal | Stack Spicy | ✅ |
 | Comfort Food Diary | Sustain/Composure | ✅ |
-| Pâtisserie Secrets | Combo panjang, skala Quality | Stretch |
-| Speed Kitchen Manual | Resep 2 bahan, Serve tiap giliran | Stretch |
+| Pâtisserie Secrets | Long combos, Quality scaling | Stretch |
+| Speed Kitchen Manual | 2-ingredient recipes, Serve every turn | Stretch |
 
 ### 5.4 Practice Kitchen (rest site)
-Pilih satu: **Rest** (pulihkan 30% Confidence), **Upgrade** satu kartu, atau **Master a Recipe** (efek dasar resep naik).
+Pick one: **Rest** (restore 30% Confidence), **Upgrade** one card, or **Master a Recipe** (raises the recipe's base effect).
 
-## 6. Konten versi jam
+## 6. Jam-version content
 
 ### 6.1 Starter Deck (10) ✅
-| Kartu | Tipe | Biaya | Efek |
+| Card | Type | Cost | Effect |
 |---|---|---|---|
 | Egg ×2 | `PROTEIN` | 0 | Q1 |
 | Bread | `CARB` | 0 | Q1 |
@@ -179,176 +179,176 @@ Pilih satu: **Rest** (pulihkan 30% Confidence), **Upgrade** satu kartu, atau **M
 | Quick Chop ×3 | Technique | 1 | 6 Pressure |
 | Deep Breath ×2 | Technique | 1 | 5 Composure |
 
-### 6.2 Pool reward (target ±30 kartu total; **22 ada, 7 belum**)
-| Kartu | Tipe | Biaya | Efek | Status |
+### 6.2 Reward pool (target ±30 cards total; **22 exist, 7 missing**)
+| Card | Type | Cost | Effect | Status |
 |---|---|---|---|---|
 | Chicken | `PROTEIN` | 1 | Q2 | ✅ |
-| Beef | `PROTEIN` | 1 | Q2, bahan kunci steak | ✅ |
+| Beef | `PROTEIN` | 1 | Q2, steak key ingredient | ✅ |
 | Fish | `PROTEIN` | 1 | Q2, +3 Composure | ✅ |
 | Rice | `CARB` | 0 | Q1, draw 1 | ✅ |
 | Pasta | `CARB` | 1 | Q2 | ✅ |
-| Onion | `VEGGIE` | 0 | Q1, lawan Flustered 1 | ✅ |
+| Onion | `VEGGIE` | 0 | Q1, opponent Flustered 1 | ✅ |
 | Mushroom | `VEGGIE` | 1 | Q2 | ✅ |
-| Chili | `SPICE` | 0 | Q1, lawan Spicy 2 | ✅ |
+| Chili | `SPICE` | 0 | Q1, opponent Spicy 2 | ✅ |
 | Garlic | `SPICE` | 0 | Q1, +2 Composure | ✅ |
 | Cheese | `DAIRY` | 1 | Q2 | ✅ |
-| Cream | `DAIRY` | 1 | Q1, +1 Quality ke bahan lain di Station | ⏳ |
+| Cream | `DAIRY` | 1 | Q1, +1 Quality to other ingredients on the Station | ⏳ |
 | Stock | `SAUCE` | 0 | Q1 | ✅ |
 | Tomato Sauce | `SAUCE` | 1 | Q2 | ✅ |
-| Olive Oil | `FAT` | 0 | Q1, +1 Heat giliran berikutnya | ⏳ |
-| Sauté | Technique | 1 | +1 Quality untuk semua bahan di Station | ⏳ |
+| Olive Oil | `FAT` | 0 | Q1, +1 Heat next turn | ⏳ |
+| Sauté | Technique | 1 | +1 Quality to all ingredients on the Station | ⏳ |
 | Flambé | Technique | 2 | 12 Pressure, Hype +10 | ✅ |
 | Mise en Place | Technique | 0 | Draw 2 | ✅ |
-| Taste Test | Technique | 1 | Lihat 3 kartu teratas, ambil 1 Ingredient | ⏳ |
-| Stare Down | Technique | 1 | Lawan Rattled 2 | ✅ |
-| Plating Art | Technique | 1 | Serve berikutnya Hype ×2 | ⏳ |
-| Second Helping | Technique | 2 | Kembalikan 1 bahan dari Serve terakhir ke tangan | ⏳ |
-| Clean Station | Technique | 0 | Buang 1 bahan dari Station, draw 1 | ⏳ |
+| Taste Test | Technique | 1 | Look at the top 3 cards, take 1 Ingredient | ⏳ |
+| Stare Down | Technique | 1 | Opponent Rattled 2 | ✅ |
+| Plating Art | Technique | 1 | Next Serve has Hype ×2 | ⏳ |
+| Second Helping | Technique | 2 | Return 1 ingredient from the last Serve to hand | ⏳ |
+| Clean Station | Technique | 0 | Discard 1 ingredient from the Station, draw 1 | ⏳ |
 | Crowd Pleaser | Technique | 1 | Hype +20 | ✅ |
 
-(Quick Chop, Deep Breath, Egg, Bread, Tomato, Butter dari starter deck juga ✅.)
+(Egg, Bread, Tomato, Butter, Quick Chop and Deep Breath from the starter deck are also ✅.)
 
-### 6.3 Resep ✅ (13, semuanya ada di `godot/data/recipes`)
-| Resep | Buku | Butuh (tag/bahan kunci) | Efek dasar |
+### 6.3 Recipes ✅ (13, all in `godot/data/recipes`)
+| Recipe | Book | Needs (tag/key ingredient) | Base effect |
 |---|---|---|---|
 | **Omelette** | Basics | `FAT` → *Egg* → `VEGGIE` | 10 Pressure, 5 Composure |
 | **Toast** | Basics | `CARB` → `FAT` | 6 Pressure, draw 1 |
-| **Fresh Salad** | Basics | `VEGGIE` → `VEGGIE` | 8 Composure, hapus 1 debuff |
-| **Sandwich** *(baru)* | Basics | *Bread* → `PROTEIN` → `VEGGIE` → *Bread* | 12 Pressure, 6 Composure |
+| **Fresh Salad** | Basics | `VEGGIE` → `VEGGIE` | 8 Composure, remove 1 debuff |
+| **Sandwich** *(new)* | Basics | *Bread* → `PROTEIN` → `VEGGIE` → *Bread* | 12 Pressure, 6 Composure |
 | **Classic Steak** | Grill Master | `FAT` → *Beef* → `SPICE` | 20 Pressure |
 | **Skewers** | Grill Master | `PROTEIN` → `SPICE` | 8 Pressure, Focus 1 |
-| **Mixed Grill** | Grill Master | `FAT` → `PROTEIN` → `PROTEIN` | 16 Pressure, lawan Rattled 1 |
-| **Burger** *(baru)* | Grill Master | *Bread* → *Beef* → *Cheese* → `VEGGIE` → *Bread* | 22 Pressure, 6 Composure |
+| **Mixed Grill** | Grill Master | `FAT` → `PROTEIN` → `PROTEIN` | 16 Pressure, opponent Rattled 1 |
+| **Burger** *(new)* | Grill Master | *Bread* → *Beef* → *Cheese* → `VEGGIE` → *Bread* | 22 Pressure, 6 Composure |
 | **Arrabbiata** | Spice Route | `SPICE` → `SAUCE` → `CARB` | 8 Pressure, Spicy 4 |
 | **Hot Wings** | Spice Route | *Chicken* → `SPICE` → `SPICE` | 6 Pressure, Spicy 6 |
-| **Warm Soup** | Comfort Food | `VEGGIE` → `PROTEIN` → `SAUCE` | Pulihkan 5 Confidence, 8 Composure |
+| **Warm Soup** | Comfort Food | `VEGGIE` → `PROTEIN` → `SAUCE` | Restore 5 Confidence, 8 Composure |
 | **Mac & Cheese** | Comfort Food | *Pasta* → `FAT` → `DAIRY` | 8 Pressure, 8 Composure |
 | **Mushroom Risotto** | Comfort Food | *Rice* → *Mushroom* → `DAIRY` | 10 Composure, Inspired |
 
-*Semua efek ditambah total Quality di Station, lalu dikali pengali Perfect (×1.5).*
+*All effects add the total Quality on the Station, then multiply by the Perfect multiplier (×1.5).*
 
 ### 6.4 Kitchen Tools (±8) ⏳
-Reward run (bukan per duel, beda dari modifier Flow). Perlu dicocokkan dengan Station Stack.
-- **Grandma's Pan**: Serve resep pertama tiap duel +5 Pressure.
-- **Sharp Santoku**: Technique yang memberi Pressure +2.
-- **Bigger Plate**: Station menampung 7 kartu (dari 6).
-- **Lucky Apron**: mulai duel dengan Hype 25.
-- **Spice Rack**: setiap memainkan `SPICE`, +1 Composure.
-- **Butter Dish**: bahan `FAT` +1 Quality.
-- **Cast-Iron Lid**: Station yang ditahan ke giliran berikutnya memberi +3 Composure.
+Run rewards (unlike the Flow modifiers, which are per duel). They need to be matched to the Station Stack.
+- **Grandma's Pan**: the first recipe Served each duel gets +5 Pressure.
+- **Sharp Santoku**: Techniques that deal Pressure get +2.
+- **Bigger Plate**: a Station holds 7 cards (up from 6).
+- **Lucky Apron**: start each duel with 25 Hype.
+- **Spice Rack**: each `SPICE` played gives +1 Composure.
+- **Butter Dish**: `FAT` ingredients get +1 Quality.
+- **Cast-Iron Lid**: a Station held into the next turn gives +3 Composure.
 - **Food Critic's Pen**: Signature Dish +50%.
 
-### 6.5 Lawan (Market Street)
-Skala Confidence mengikuti pemain 100 (fase G, 23 Nov). Angka ✅ sudah dituning dengan `tests/balance.gd`.
+### 6.5 Opponents (Market Street)
+Confidence scales to a player at 100 (phase G, 23 Nov). ✅ values were tuned with `tests/balance.gd`.
 
-| Lawan | Tipe | Confidence | Profil AI | Gimmick | Status |
+| Opponent | Type | Confidence | AI profile | Gimmick | Status |
 |---|---|---|---|---|---|
-| **Tony**, street noodle cook | Duel | **45** | `greedy`, Heat 2, tangan 4 | Serve begitu ada resep. Lawan tutorial. | ✅ data + model 3D + animasi |
-| **Rosa**, taco truck queen | Duel | **50** | `trickster`, Heat 3, tangan 4 | Deck Onion/Stare Down, sering memberi Flustered/Rattled. | ✅ data, ⏳ model 3D |
-| **Marco**, pizza showman | Duel | ±42 *(belum dituning)* | `showman` | Menahan stack 2 giliran untuk hidangan besar; mood Confident muncul sebelumnya. Mengajarkan pentingnya Composure. | ⏳ |
-| **Élodie**, rival patissière | Elite | ±60 *(skala lama)* | `patient` | Kalau Station pemain berisi ≥ 5 kartu di awal giliran rival, pemain Rattled 1 (membaca *jumlah* kartu, publik). | ⏳ |
-| **"Iron" Bruno**, butcher-turned-grill master | Boss | ±110 *(skala lama)*, 2 fase | `boss` | Fase 1: Burnt tiap 2 giliran. Fase 2 (≤50%): Heat +1 dan Focus +1 tiap giliran. | ⏳ |
+| **Tony**, street noodle cook | Duel | **45** | `greedy`, Heat 2, hand 4 | Serves as soon as a recipe is available. Tutorial opponent. | ✅ data + 3D model + animations |
+| **Rosa**, taco truck queen | Duel | **50** | `trickster`, Heat 3, hand 4 | Onion/Stare Down deck, often applies Flustered/Rattled. | ✅ data, ⏳ 3D model |
+| **Marco**, pizza showman | Duel | ±42 *(not tuned yet)* | `showman` | Holds a stack for 2 turns for a big dish; the Confident mood shows a turn earlier. Teaches the importance of Composure. | ⏳ |
+| **Élodie**, rival pâtissière | Elite | ±60 *(old scale)* | `patient` | If a player Station holds ≥ 5 cards at the start of the rival's turn, the player is Rattled 1 (reads the card *count*, which is public). | ⏳ |
+| **"Iron" Bruno**, butcher-turned-grill master | Boss | ±110 *(old scale)*, 2 phases | `boss` | Phase 1: Burnt every 2 turns. Phase 2 (≤50%): Heat +1 and Focus +1 each turn. | ⏳ |
 
-Hasil balancing (300 duel, deck starter): Tony kalah ±80% dari pemain sederhana (98% dari bot pintar), Rosa 38% / 87%, duel ±4.7–7.5 giliran, rival ±4.2–4.8 aksi per giliran. Detail: [GRAND_DESIGN.md §8.2](GRAND_DESIGN.md). Marco, Élodie, dan Bruno perlu dituning ulang untuk skala 100.
+Balancing results (300 duels, starter deck): Tony loses ±80% of the time to a simple player (98% to the smart bot), Rosa 38% / 87%, duels last ±4.7–7.5 turns, the rival takes ±4.2–4.8 actions per turn. Details: [GRAND_DESIGN.md §8.2](GRAND_DESIGN.md). Marco, Élodie and Bruno need re-tuning for the 100-Confidence scale.
 
-### 6.6 Event (3) ⏳
-Pilihan teks singkat dengan portrait. Contohnya: pedagang bahan misterius, kritikus makanan meminta cicip, dan bantu pedagang yang kewalahan.
+### 6.6 Events (3) ⏳
+Short text choices with a portrait. Examples: a mysterious ingredient merchant, a food critic asking for a taste, helping an overwhelmed vendor.
 
-## 7. Visual & presentasi
-Arah visual lengkap, palet 24 warna, pipeline pixel, HUD, emote, announcer, dan daftar aset ada di [ART_DIRECTION.md](ART_DIRECTION.md). Ringkasannya:
+## 7. Visuals & presentation
+The full visual direction, 24-color palette, pixel pipeline, HUD, emotes, announcer and asset list are in [ART_DIRECTION.md](ART_DIRECTION.md). In short:
 
-- **Diorama pixel hangat:** dunia 3D low-poly dirender ke 640×360 (SubViewport, nearest) lalu di-scale ×3. Filter pixel **on by default** (`P` untuk toggle). Palet "Market Street": kayu, krem, aksen merah/oranye.
-- **Kamera fix, sudut tinggi ala diorama.** Dua meja masak berhadapan, rival di kanan, penonton berupa blok siluet.
-- **Meja adalah panggung.** HUD terasa fisik (papan kayu, kertas, pita), dengan lencana diamond untuk portrait dan gauge bersegmen untuk Hype.
-- **Wajah yang bicara.** Rival bereaksi lewat emote (Smug, Shocked, Angry, Sad, Confident, Wary).
-- **Setiap momen punya cap.** Announcer: 3·2·1 → ROUND N → FIGHT! → FINISHED → **YOU WINS!** / **LOSER**.
+- **Warm pixel diorama:** the low-poly 3D world is rendered at 640×360 (SubViewport, nearest) then scaled ×3. The pixel filter is **on by default** (`P` toggles it). "Market Street" palette: wood, cream, red/orange accents.
+- **Fixed, high-angle diorama camera.** Two cooking tables facing each other, the rival on the right, the audience as silhouette blocks.
+- **The table is the stage.** The HUD feels physical (wooden boards, paper, ribbons), with diamond badges for portraits and a segmented gauge for Hype.
+- **Faces that talk.** The rival reacts through emotes (Smug, Shocked, Angry, Sad, Confident, Wary).
+- **Every moment has a stamp.** Announcer: 3·2·1 → ROUND N → FIGHT! → FINISHED → **YOU WINS!** / **LOSER**.
 
-**Prinsip UX:** semua pilihan berbentuk kartu (encounter, reward, tool, buku resep); state terbaca sekilas (selesai = centang, sekarang = terang berbingkai, terkunci = gelap + gembok); reveal itu momen (overlay, animasi, suara); tooltip keyword di mana-mana.
+**UX principles:** every choice is a card (encounter, reward, tool, recipe book); state reads at a glance (done = checkmark, current = bright with a frame, locked = dark + padlock); reveals are moments (overlay, animation, sound); keyword tooltips everywhere.
 
-| Layar | Status |
+| Screen | Status |
 |---|---|
 | Duel (HUD v2, Card v2, Recipe Book v2, Station Stack, Almanac) | ✅ |
-| Course Path | ⏳ kartu encounter besar, strip progres |
-| Reward / reveal Recipe Book | ⏳ overlay gelap, kartu reveal, "Click anywhere to continue" |
-| Pilih kartu / Kitchen Tool | ⏳ 3 pilihan, bingkai tebal, tooltip keyword |
-| Tutorial | ⏳ modal berhalaman, muncul kontekstual saat fitur pertama muncul, bisa dibuka ulang |
-| Deck & resep viewer | ⏳ read-only (Almanac sudah mencakup sebagian) |
+| Course Path | ⏳ large encounter cards, progress strip |
+| Reward / Recipe Book reveal | ⏳ dark overlay, card reveal, "Click anywhere to continue" |
+| Pick a card / Kitchen Tool | ⏳ 3 choices, thick frames, keyword tooltips |
+| Tutorial | ⏳ paged modal, shown contextually the first time a feature appears, can be reopened |
+| Deck & recipe viewer | ⏳ read-only (the Almanac already covers part of it) |
 
-### 7.1 Aset (track fal)
-- **3D:** panggung Market Street, MC, 5 chef, dan ±13 model hidangan yang muncul saat Serve. Karakter: GLB dengan rig Mixamo. ✅ **Apis** dan **Tony** (animasi idle, chop, busy, victory, lose). ⏳ Rosa, Marco, Élodie, Bruno, panggung, hidangan. Dibuat lewat image-to-3D di **fal** dari concept art, lalu dirapikan, atau dimodel low-poly sederhana kalau hasilnya kurang.
-- **2D:** ilustrasi kartu, ikon modifier, dan portrait dialog dari **fal** / Nano Banana, dengan style reference tetap supaya konsisten. Prompt sheet sudah ada di repo. Ikon SVG putih untuk tag dan status ✅.
-- **Animasi minimal per chef:** idle, chop, busy, victory, lose. Kalau rigging terlalu mahal, pakai animasi prosedural.
-- **Momen wajib:** cut-in Signature Dish (render 3D close-up + overlay 2D speed lines), reaksi lawan saat Confidence habis, VS screen sebelum Bruno.
+### 7.1 Assets (fal track)
+- **3D:** the Market Street stage, the MC, 5 chefs, and ±13 dish models that appear on Serve. Characters: GLBs with a Mixamo rig. ✅ **Apis** and **Tony** (idle, chop, busy, victory, lose animations). ⏳ Rosa, Marco, Élodie, Bruno, the stage, the dishes. Made through image-to-3D on **fal** from concept art, then cleaned up, or modeled as simple low-poly if the result falls short.
+- **2D:** card illustrations, modifier icons and dialogue portraits from **fal** / Nano Banana, with a fixed style reference for consistency. The prompt sheets are already in the repo. White SVG icons for tags and statuses ✅.
+- **Minimum animations per chef:** idle, chop, busy, victory, lose. If rigging is too expensive, use procedural animation.
+- **Required moments:** Signature Dish cut-in (3D close-up render + 2D speed-line overlay), the opponent's reaction when Confidence hits zero, a VS screen before Bruno.
 
-## 8. Audio (track ElevenLabs)
-- ✅ Autoload `Audio`: musik loop dan SFX dasar sudah terpasang.
-- ⏳ **Voice line pendek** tiap chef (taunt, kena Serve besar, menyerah), MC (teriakan Signature Dish), dan announcer cooking show ("SERVE!", "INCREDIBLE!").
-- **SFX:** desis wajan, potong, piring, sorakan penonton, cut-in whoosh. Musik: tema duel upbeat dan tema boss.
-- Semua audio dibuat saat development dan disimpan sebagai file di build. **Tidak ada API key di game.**
+## 8. Audio (ElevenLabs track)
+- ✅ `Audio` autoload: looping music and basic SFX are already wired in.
+- ⏳ **Short voice lines** for each chef (taunt, hit by a big Serve, giving up), the MC (Signature Dish shout), and the cooking-show announcer ("SERVE!", "INCREDIBLE!").
+- **SFX:** pan sizzle, chopping, plates, crowd cheers, cut-in whoosh. Music: an upbeat duel theme and a boss theme.
+- All audio is generated during development and stored as files in the build. **No API keys in the game.**
 
-## 9. Arsitektur teknis (Godot 4.7)
+## 9. Technical architecture (Godot 4.7)
 
 ```
 godot/
-  project.godot, export_presets.cfg (preset Web → build/web/index.html)
+  project.godot, export_presets.cfg (Web preset → build/web/index.html)
   data/        Resource .tres, 1 file per item: cards, recipes, enemies, books, decks, modifiers
   scripts/
-    data/      class Resource: CardDef, RecipeDef, EffectDef, EnemyDef, AiProfile, BookDef, DeckDef, ModifierDef, StatusDefs
-    core/      logika murni, tanpa node: Duel, Kitchen, RecipeMatch, RivalAI, SeededRng, Almanac, CardInstance
-    stage/     chef, stage (panggung 3D)
+    data/      Resource classes: CardDef, RecipeDef, EffectDef, EnemyDef, AiProfile, BookDef, DeckDef, ModifierDef, StatusDefs
+    core/      pure logic, no nodes: Duel, Kitchen, RecipeMatch, RivalAI, SeededRng, Almanac, CardInstance
+    stage/     chef, stage (3D stage)
     ui/        duel_ui, card_view, hud, turn_director, announcer, emote_bubble, almanac_view, keywords
-    audio/     autoload Audio
-  scenes/      main.tscn (node sistem), stage/, ui/duel_ui.tscn (HUD, node unique-name)
+    audio/     Audio autoload
+  scenes/      main.tscn (system nodes), stage/, ui/duel_ui.tscn (HUD, unique-name nodes)
   tests/       sim.gd, balance.gd, audio_check.gd, glb_check.gd, ui_drive.gd, chef_drive.gd, hit_probe.gd
 ```
 
-- **Data-driven:** menambah konten = menambah file `.tres`, bukan menulis logika baru.
-- **Logika terpisah dari visual:** `scripts/core/` tidak memakai node. Visual mendengarkan sinyal `Duel` (`card_played(side, …)`, `dish_served(side, …)`, `flow_offer`, dst.), jadi duel bisa disimulasikan headless (`tests/sim.gd`, `tests/balance.gd`).
-- **Sistem = node di scene,** bukan di-spawn dari kode. Nilai tuning pakai `@export` supaya terlihat di Inspector.
-- **Satu save run** di `user://` (⏳). Almanac sudah punya save sendiri.
+- **Data-driven:** adding content = adding a `.tres` file, not writing new logic.
+- **Logic separated from visuals:** `scripts/core/` uses no nodes. Visuals listen to `Duel` signals (`card_played(side, …)`, `dish_served(side, …)`, `flow_offer`, etc.), so duels can be simulated headless (`tests/sim.gd`, `tests/balance.gd`).
+- **Systems are nodes in scenes,** not spawned from code. Tunable values use `@export` so they show in the Inspector.
+- **One run save** in `user://` (⏳). The Almanac already has its own save.
 
-**Checklist syarat jam**
-- [ ] Build statis Web, `index.html` di root (preset Web sudah ada, belum diuji di browser)
-- [ ] Frame pertama < 10 detik, download awal < 50 MB, 45+ fps di 1080p
-- [ ] Responsif di 1920×1080, 1366×768, 2560×1440, 3440×1440, 1024×640 (`tests/hit_probe.gd` sudah ada)
-- [ ] Tanpa login, iklan, tracking, atau API key di build
-- [ ] Sinyal `og:ready` via SDK OpenGame
-- [ ] Credit dan cek terms fal & ElevenLabs
-- [ ] Bisa dimainkan penuh dengan mouse
-- [x] Git sejak hari pertama (bukti riwayat pengembangan)
+**Jam requirements checklist**
+- [ ] Static Web build, `index.html` at the root (Web preset exists, not yet tested in a browser)
+- [ ] First frame < 10 seconds, initial download < 50 MB, 45+ fps at 1080p
+- [ ] Responsive at 1920×1080, 1366×768, 2560×1440, 3440×1440, 1024×640 (`tests/hit_probe.gd` already exists)
+- [ ] No login, ads, tracking or API keys in the build
+- [ ] `og:ready` signal via the OpenGame SDK
+- [ ] Credits and a check of the fal & ElevenLabs terms
+- [ ] Fully playable with a mouse
+- [x] Git from day one (proof of development history)
 
-## 10. Jadwal
+## 10. Schedule
 
-| Minggu | Tanggal | Fokus | Milestone | Status |
+| Week | Dates | Focus | Milestone | Status |
 |---|---|---|---|---|
-| 1 | 22–28 Nov | Combat inti, Station Stack, rival AI, RNG, Flow, Almanac, audio dasar, HUD, 2 chef | **Duel penuh bisa dimainkan** | ✅ tercapai lebih cepat (23 Nov) |
-| 2 | 29 Nov–5 Des | RunState, Course Path, reward, Shop + Recipe Book, Practice Kitchen, Kitchen Tools, event, save, Marco/Élodie/Bruno, 7 kartu sisa | **Satu run penuh graybox** | ⏳ |
-| 3 | 6–12 Des | Aset (panggung, chef, hidangan, kartu), UI final, cut-in, VS screen, voice ElevenLabs, balancing run | **Vertical slice Market Street** | ⏳ |
-| 4 | 13–18 Des | Tutorial, juice, tes 5 ukuran window, export Web, **upload pertama 14 Des**, perbaikan dari review. Final paling lambat 17 Des | **Submit** | ⏳ |
+| 1 | 22–28 Nov | Core combat, Station Stack, rival AI, RNG, Flow, Almanac, basic audio, HUD, 2 chefs | **A full duel is playable** | ✅ reached early (23 Nov) |
+| 2 | 29 Nov–5 Dec | RunState, Course Path, rewards, Shop + Recipe Books, Practice Kitchen, Kitchen Tools, events, save, Marco/Élodie/Bruno, the 7 remaining cards | **One full graybox run** | ⏳ |
+| 3 | 6–12 Dec | Assets (stage, chefs, dishes, cards), final UI, cut-in, VS screen, ElevenLabs voices, run balancing | **Market Street vertical slice** | ⏳ |
+| 4 | 13–18 Dec | Tutorial, juice, test 5 window sizes, Web export, **first upload 14 Dec**, fixes from review. Final no later than 17 Dec | **Submit** | ⏳ |
 
-**Kalau jadwal mundur, yang dipotong berurutan:** event → Marco → Kitchen Tools 8 → 5 → animasi rig (ganti prosedural) → fase 2 Bruno.
+**If the schedule slips, cut in this order:** events → Marco → Kitchen Tools 8 → 5 → rigged animation (replace with procedural) → Bruno phase 2.
 
-## 11. Perubahan dari versi sebelumnya
+## 11. Changes from earlier versions
 
-| Fitur | Keputusan | Alasan |
+| Feature | Decision | Reason |
 |---|---|---|
-| Vite + TypeScript + Three.js | **Diganti: Godot 4.7** (22 Nov) | Pipeline pixel 3D, animasi, dan audio lebih mudah. Versi lama tetap di `src/` sebagai referensi |
-| Plate 5 slot | **Diganti: Station Stack** | Resep berurutan, bisa menyiapkan dua hidangan, terbaca seperti solitaire |
-| 3 Station | **Diganti: 2 Station** (23 Nov) | Layar lebih lega dan duel lebih jelas dibaca |
-| Intent lawan | **Diganti: rival drafting** | Lawan bermain dengan aturan yang sama, lebih adil dan lebih hidup |
-| "Tanpa hint resep" | **Diubah:** Order Ticket boleh memberi hint | Pemain baru perlu tahu urutan yang benar |
-| 3 distrik (Gourmet Avenue, Grand Arena) | **Stretch:** Gourmet Avenue + Madame Céleste kalau run 1 sudah selesai di minggu 3 | Scope 4 minggu |
-| Meta-progression (Chef Rank, Kitchen Prep, Challenges) | ✂️ **Dipotong** | Juri bermain 1–2 run. Pengecualian: discovery Almanac (pengetahuan, bukan kekuatan) |
-| Secret Seasoning (consumable) | ✂️ **Dipotong** | Sistem tambahan, nilai kecil untuk jam |
-| Settings resolusi/fullscreen | **Diganti:** hanya volume | Game berjalan di browser |
-| Build Windows / itch.io | **Diganti:** web-only OpenGame | Aturan jam |
-| "Tanpa voice acting" | **Diubah:** voice line pendek via ElevenLabs | Track sponsor |
+| Vite + TypeScript + Three.js | **Replaced: Godot 4.7** (22 Nov) | The 3D pixel pipeline, animation and audio are easier. The old version stays in `src/` as reference |
+| 5-slot Plate | **Replaced: Station Stack** | Ordered recipes, two dishes can be prepared at once, reads like solitaire |
+| 3 Stations | **Replaced: 2 Stations** (23 Nov) | More room on screen and duels are easier to read |
+| Opponent Intent | **Replaced: rival drafting** | The opponent plays by the same rules, which is fairer and livelier |
+| "No recipe hints" | **Changed:** the Order Ticket may give hints | New players need to know the right order |
+| 3 districts (Gourmet Avenue, Grand Arena) | **Stretch:** Gourmet Avenue + Madame Céleste if run 1 is finished in week 3 | 4-week scope |
+| Meta-progression (Chef Rank, Kitchen Prep, Challenges) | ✂️ **Cut** | Judges play 1–2 runs. Exception: Almanac discovery (knowledge, not power) |
+| Secret Seasoning (consumable) | ✂️ **Cut** | An extra system with little value for a jam |
+| Resolution/fullscreen settings | **Replaced:** volume only | The game runs in a browser |
+| Windows build / itch.io | **Replaced:** web-only OpenGame | Jam rules |
+| "No voice acting" | **Changed:** short voice lines via ElevenLabs | Sponsor track |
 
-## 12. Pertanyaan terbuka
-- [x] ~~Judul~~ → **Finale** (sementara).
-- [x] ~~Nama MC~~ → **Apis Tetrarch** (Apis), sementara.
-- [x] ~~Pixel filter~~ → **dipakai**, on by default.
-- [x] ~~Jumlah Station~~ → **2**.
-- [ ] **Juri sebagai modifier per duel** (mis. juri suka pedas: resep `SPICE` +30%)? Kandidat stretch.
-- [ ] **Telegraph tanpa Intent cukup?** Mood + jumlah kartu di station rival harus cukup untuk keputusan bertahan. Dicek di playtest pertama; kalau kurang, tambahkan "ready glow" di station rival yang bisa di-Serve.
-- [ ] **Skala Confidence Élodie dan Bruno** untuk pemain 100: tuning dengan `tests/balance.gd` saat dibuat.
+## 12. Open questions
+- [x] ~~Title~~ → **Finale** (working title).
+- [x] ~~MC name~~ → **Apis Tetrarch** (Apis), placeholder.
+- [x] ~~Pixel filter~~ → **used**, on by default.
+- [x] ~~Number of Stations~~ → **2**.
+- [ ] **Judges as a per-duel modifier** (e.g. a judge who likes spice: `SPICE` recipes +30%)? Stretch candidate.
+- [ ] **Is telegraphing enough without Intent?** Mood + the card count on the rival's stations must be enough for defensive decisions. Check in the first playtest; if not, add a "ready glow" on rival stations that can be Served.
+- [ ] **Élodie's and Bruno's Confidence scale** for a 100-Confidence player: tune with `tests/balance.gd` when they are built.
