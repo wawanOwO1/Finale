@@ -53,9 +53,9 @@ sudah ada** (`pixel_post.gdshader`) lewat beberapa uniform, jadi tidak menambah 
 
 ### 2.2 Catatan dari kode yang ada
 
-- `StageViewport` sekarang dirender **1920×1080** dengan `msaa_3d = 2`. ART_DIRECTION §2.1 merencanakan **640×360**.
-  Untuk web ini **penghematan terbesar yang tersedia** (±9× lebih sedikit pixel 3D + MSAA bisa dimatikan karena
-  pixel filter sudah menghaluskan). Disarankan selesai **sebelum** FX ditambah, supaya FX diukur di kondisi akhir.
+- `StageViewport` sudah diperkecil saat pixel filter menyala (`Main.pixel_height = 270`, lewat `stretch_shrink`,
+  MSAA dimatikan). Hanya mode tanpa filter (tombol P) yang render 3D penuh 1080p + MSAA 2×. Untuk build Web,
+  pertimbangkan filter selalu menyala, atau shrink ×2 juga saat filter mati.
 - `TurnDirector._process` **menimpa `Engine.time_scale` setiap frame** (fast-forward). Hitstop yang memakai
   `Engine.time_scale` akan langsung dibatalkan. Solusi: `FxDirector` menjadi **satu-satunya pemilik time scale**
   (lihat §4.2), TurnDirector hanya meminta faktor fast-forward.
@@ -169,7 +169,15 @@ Engine.time_scale = fast_forward_factor × hitstop_factor × cutscene_factor
 
 ## 5. Teknik efek (resep murah)
 
-### 5.1 Uniform FX di `pixel_post.gdshader` (tanpa pass tambahan)
+### 5.1 Efek layar penuh
+
+> **Keputusan F0:** flash dan desaturasi **tidak** dimasukkan ke `pixel_post`, tapi ke overlay `%FxScreen`
+> (`fx_screen.gdshader`, ColorRect di atas HUD). Alasannya: `pixel_post` hanya aktif saat filter pixel menyala
+> dan hanya mengenai dunia 3D, sementara flash harus menutup HUD juga. Overlay ini `visible = false` saat
+> nilainya 0, jadi biaya salinan layarnya hanya ada selama efek berjalan. Efek yang memang khusus dunia 3D
+> (impact frame berbasis depth, `fx_zoom`) tetap direncanakan di `pixel_post` (F2).
+
+Rencana awal (uniform di `pixel_post.gdshader`):
 
 Shader post sudah membaca `screen_texture` dan `depth_texture` di Compatibility. Tambahkan:
 
@@ -310,7 +318,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 
 | Fase | Isi | Perkiraan | Hasil yang terlihat |
 |---|---|---|---|
-| **F0 Fondasi** | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
+| **F0 Fondasi** ✅ | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
 | **F1 Juice T0–T2** | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
 | **F2 Impact frame** | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
 | **F3 Cutscene Signature** | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |

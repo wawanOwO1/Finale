@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="FxCue" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/fx_cue.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier = 2
+hitstop = 0.1
+trauma = 0.5
+flash = 0.3
+flash_color = Color(1, 0.945, 0.839, 1)
+flash_time = 0.12
+desat = 0.0
+desat_hold = 0.0
+desat_fade = 0.4

@@ -25,6 +25,8 @@ extends Node
 @onready var director: TurnDirector = $TurnDirector
 ## Discovery + save (GRAND_DESIGN §6); the window is the Almanac node in duel_ui.tscn.
 @onready var almanac_keeper: AlmanacKeeper = $AlmanacKeeper
+## Hitstop, shake, flash (FX_MASTERPLAN.md); cues are in its Inspector.
+@onready var fx: FxDirector = $FxDirector
 
 var duel: Duel
 var pixelated := false
@@ -38,6 +40,8 @@ func _ready() -> void:
 	view.resized.connect(func() -> void: _set_pixel(pixelated))
 	_set_pixel(pixel_on_start)
 	director.ui = ui
+	director.hit_stop = fx.hit_stop
+	fx.setup(stage.camera, ui)
 	ui.director = director
 	ui.almanac_keeper = almanac_keeper
 	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))
@@ -84,6 +88,7 @@ func _start_duel() -> void:
 	almanac_keeper.watch(duel)
 	ui.bind(duel)
 	Audio.bind(duel)
+	fx.bind(duel)
 	_sync_plate()
 
 

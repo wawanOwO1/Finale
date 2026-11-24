@@ -31,19 +31,25 @@ signal rival_acted(action: Dictionary)
 
 ## Set by main.gd.
 var ui: DuelUI
+## Owns Engine.time_scale (FX_MASTERPLAN.md §4.2); this node only sets its fast_forward.
+var hit_stop: HitStop
 ## True from End Turn until the player's next turn starts (or the duel ends).
 var running := false
 
 
 func _process(_delta: float) -> void:
 	var fast := running and (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_SPACE))
-	Engine.time_scale = fast_scale if fast else 1.0
+	var speed := fast_scale if fast else 1.0
+	if hit_stop:
+		hit_stop.fast_forward = speed
+	else:
+		Engine.time_scale = speed
 	if ui:
 		ui.speed_hint().modulate.a = 1.0 if fast else 0.75
 
 
 func is_fast() -> bool:
-	return Engine.time_scale > 1.0
+	return (hit_stop.fast_forward if hit_stop else Engine.time_scale) > 1.0
 
 
 ## Opening banner after the 3 · 2 · 1 FIGHT! intro (hand is already dealt).
