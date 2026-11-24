@@ -26,6 +26,10 @@ const TAG_COLORS := {
 @onready var camera: Camera3D = $Camera3D
 ## Pixel filter post-process quad (assets/shaders/pixel_post.gdshader); main.gd toggles it.
 @onready var pixel_post: MeshInstance3D = $Camera3D/PixelPost
+## Close-up camera for cutscenes (SignatureCutscene moves it between CutMarkers), with its own
+## copy of the pixel filter quad.
+@onready var cut_camera: Camera3D = $CutCamera
+@onready var cut_pixel_post: MeshInstance3D = $CutCamera/CutPixelPost
 @onready var player: Chef = $Player
 @onready var rival: Chef = $Rival
 @onready var plate_items: Node3D = $Plate/Items

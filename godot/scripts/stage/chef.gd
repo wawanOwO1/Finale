@@ -40,6 +40,13 @@ func has_model() -> bool:
 	return _anim != null
 
 
+## Animation speed multiplier. A cutscene sets 1 / Engine.time_scale so this chef keeps moving at
+## real speed while the rest of the world is frozen.
+func set_anim_speed(k: float) -> void:
+	if _anim:
+		_anim.speed_scale = k
+
+
 ## Clip playing now ("" without a model).
 func current_clip() -> String:
 	return _anim.current_animation if _anim else ""

@@ -208,11 +208,20 @@ func _initialize() -> void:
 	_key(KEY_ESCAPE)
 	await _wait(0.2)
 	_check("Esc closes it", not alm.visible and not paused)
-	# Signature Dish cut-in
-	ui._play_cutin("player", "Omelette")
-	await _wait(0.5)
+	# Signature Dish cutscene (FX_MASTERPLAN.md §6.2): cut-in, close-up, back to the duel.
+	# The close-up freezes game time, so these waits are on real time.
+	duel.signature_served.emit("player", "Omelette")
+	await _real_wait(0.15)
 	_shot("8_cutin")
-	await _wait(1.4)
+	_check("Signature starts the cutscene", main.signature_cutscene.playing)
+	await _real_wait(0.55)
+	_shot("8a_closeup")
+	_check("close-up camera during the cutscene", main.stage.cut_camera.current)
+	var t3 := Time.get_ticks_msec()
+	while main.signature_cutscene.playing and Time.get_ticks_msec() - t3 < 6000:
+		await _real_wait(0.1)
+	_check("cutscene ends, duel camera and input back", not main.signature_cutscene.playing
+			and main.stage.camera.current and not ui._locked())
 	# Emote
 	ui._emote.pop("smug")
 	await _wait(0.4)
@@ -262,6 +271,10 @@ func _card_point(v: CardView) -> Vector2:
 
 func _wait(t: float) -> void:
 	await create_timer(t).timeout
+
+
+func _real_wait(t: float) -> void:
+	await create_timer(t, true, false, true).timeout
 
 
 func _move(p: Vector2) -> void:

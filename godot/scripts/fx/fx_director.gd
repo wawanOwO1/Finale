@@ -44,6 +44,11 @@ extends Node
 @onready var shake: Shake = $Shake
 
 var duel: Duel
+## Signature Dish cutscene (main.tscn); null = cut-in + cue only.
+var cutscene: SignatureCutscene
+## While true (a cutscene's close-up), play() queues cues; release() plays them at the impact.
+var hold := false
+var _pending: Array = []
 var stage: Stage
 var ui: DuelUI
 var hud: FxHud
@@ -88,6 +93,7 @@ func setup(stage_: Stage, ui_: DuelUI) -> void:
 	hud = ui.fx_hud()
 	shake.camera = stage.camera
 	shake.hud = ui
+	shake.extra_layers = [ui.fx_layer()]
 	screen = ui.fx_screen()
 	_mat = screen.material as ShaderMaterial
 	_lines = ui.fx_lines()
@@ -104,12 +110,15 @@ func bind(d: Duel) -> void:
 	_lines_peak = 0.0
 	_chroma_peak = 0.0
 	_impact_phase = -1
+	hold = false
+	_pending.clear()
+	if cutscene:
+		cutscene.abort()
 	d.card_played.connect(_on_card_played)
 	d.dish_revealed.connect(_on_dish_revealed)
 	d.dish_served.connect(_on_dish_served)
 	d.confidence_lost.connect(_on_confidence_lost)
-	d.signature_served.connect(func(side: String, _dish: String) -> void:
-		play(signature, _serve_point(side)))
+	d.signature_served.connect(_on_signature)
 	d.duel_ended.connect(func(winner: String) -> void:
 		var loser := "enemy" if winner == "player" else "player"
 		play(win if winner == "player" else lose, _hit_point(loser), Color.WHITE, loser))
@@ -123,6 +132,30 @@ func bind(d: Duel) -> void:
 func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> void:
 	if cue == null:
 		return
+	if hold:
+		_pending.append([cue, at, tint, target])
+		return
+	play_now(cue, at, tint, target)
+
+
+## Play the cues held during a cutscene close-up, all in one frame (they merge as usual).
+func release() -> void:
+	hold = false
+	var cues := _pending.duplicate()
+	_pending.clear()
+	for c: Array in cues:
+		play_now(c[0], c[1], c[2], c[3])
+
+
+## Cues queued by hold (tests).
+func pending() -> int:
+	return _pending.size()
+
+
+## Like play(), but ignores hold (the cutscene's own opening beat).
+func play_now(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> void:
+	if cue == null:
+		return
 	last_cue = cue
 	var now := Time.get_ticks_msec()
 	hit_stop.request(cue.hitstop)
@@ -133,7 +166,7 @@ func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> v
 	if hud and at != Vector2.INF:
 		hud.burst(cue.burst, at, tint)
 		hud.burst(cue.burst_2, at, Color.WHITE)
-		hud.word(cue.word, at - Vector2(0, Pal.em(3.0)), cue.word_color, maxi(1, cue.tier))
+		hud.word(cue.word, at - Vector2(0, Pal.em(3.0)), cue.word_color, cue.tier)
 	if cue.crack and ui and target != "":
 		_crack(ui.hp_bar(target))
 	var peak := cue.flash * (reduce_flash_scale if reduce_flashing else 1.0)
@@ -323,6 +356,18 @@ func _desat_value(now: int) -> float:
 	if t < _desat_hold:
 		return _desat_peak
 	return _desat_peak * (1.0 - float(t - _desat_hold) / _desat_fade)
+
+
+## Apis's Signature: the cutscene takes over (it holds every cue until its impact beat);
+## without one, the old cut-in banner and the signature cue right away.
+func _on_signature(side: String, dish: String) -> void:
+	if side == "player" and cutscene and cutscene.enabled:
+		cutscene.play(dish)
+		play(signature, _serve_point(side))
+		return
+	if side == "player" and ui:
+		ui.play_cutin(dish)
+	play(signature, _serve_point(side))
 
 
 func _on_card_played(side: String, card: CardInstance) -> void:

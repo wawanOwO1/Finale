@@ -205,6 +205,14 @@ minimal 1/60 s dan 1 frame tergambar. Dengan *Reduce Flashing* diganti desaturas
 | Signature Dish | `signature` | T3 | **impact frame**, speed lines, chromatic, flash emas, percikan + uap, punch zoom, crowd penuh |
 | Menang / kalah | `win` / `lose` | T3 | **impact frame** + speed lines + serpihan + retak bar lawan / asap + desaturasi panjang |
 
+**Cutscene Signature Dish** (`SignatureCutscene` di `main.tscn`, `scripts/fx/signature_cutscene.gd`): beat-nya adalah
+method key di `AnimationPlayer` anaknya (`long` 2.3 s, `short` 1.0 s); geser key di editor animasi untuk mengatur
+tempo. Versi panjang sekali per sesi (`long_once`), lalu versi pendek. Urutan panjang: cut-in + letterbox, dunia
+dibekukan (`HitStop.cutscene_factor`) → kamera close-up `CutCamera` bergerak dari `CutMarkers/SigFrom` ke `SigTo`
+(atur posisinya di `stage.tscn`), HUD memudar, "SLASH!" ×2 → impact frame, kembali ke kamera duel, semua cue yang
+ditahan `FxDirector` (damage, KO) mendarat bersamaan → letterbox keluar. Klik / Space / Esc = lompat ke impact.
+Cut-in, letterbox, dan semua overlay FX ada di `%FxLayer` (CanvasLayer di atas HUD) supaya HUD bisa memudar sendiri.
+
 Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
 Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel
 (≤ 150 hidup), satu kata per frame, retak, punch zoom, crowd, dan angka slam.

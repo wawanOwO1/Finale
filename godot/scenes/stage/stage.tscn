@@ -114,6 +114,26 @@ cast_shadow = 0
 extra_cull_margin = 16384.0
 mesh = SubResource("pixel_post_quad")
 
+[node name="CutCamera" type="Camera3D" parent="."]
+transform = Transform3D(0.9524, 0.0232, 0.3039, 0, 0.9971, -0.076, -0.3048, 0.0724, 0.9497, 1.6, 2, 7)
+fov = 34.0
+
+[node name="CutPixelPost" type="MeshInstance3D" parent="CutCamera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+visible = false
+material_override = SubResource("pixel_post_mat")
+cast_shadow = 0
+extra_cull_margin = 16384.0
+mesh = SubResource("pixel_post_quad")
+
+[node name="CutMarkers" type="Node3D" parent="."]
+
+[node name="SigFrom" type="Marker3D" parent="CutMarkers"]
+transform = Transform3D(0.9524, 0.0232, 0.3039, 0, 0.9971, -0.076, -0.3048, 0.0724, 0.9497, 1.6, 2, 7)
+
+[node name="SigTo" type="Marker3D" parent="CutMarkers"]
+transform = Transform3D(0.9785, 0.0185, 0.2052, 0, 0.996, -0.0898, -0.206, 0.0878, 0.9746, 0.8, 2.5, 5.8)
+
 [node name="Floor" type="MeshInstance3D" parent="."]
 mesh = SubResource("floor_mesh")
 

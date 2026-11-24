@@ -56,25 +56,29 @@ func burst(kind: String, at: Vector2, color := Color.WHITE, size := 1.0) -> CPUP
 
 
 ## Slam a manga word (tier 1..3 → size). Two words can overlap; a third reuses the oldest.
-func word(text: String, at: Vector2, color: Color, tier: int) -> Label:
-	if text == "":
-		return null
+## Called for every cue, also those without a word (text ""): a stronger cue with no word still
+## owns its frame, so a Signature does not come with the "CLANG!" of the plain Serve under it.
+## real_time: the word moves while the world is frozen (cutscene close-up).
+func word(text: String, at: Vector2, color: Color, tier: int, real_time := false) -> Label:
 	var f := Engine.get_process_frames()
-	var slot := _word_i
-	if f == _word_frame:
-		if tier <= _word_tier:
-			return null
-		slot = _word_slot  # a stronger cue in the same frame takes over its word
-	else:
-		_word_i = (_word_i + 1) % 2
+	var same := f == _word_frame
+	if same and tier <= _word_tier:
+		return null
+	# A stronger cue in the same frame replaces the weaker one's word (or just hides it).
+	if same and _word_slot >= 0:
+		_hide_word(_word_slot)
 	_word_frame = f
 	_word_tier = tier
+	if text == "":
+		_word_slot = -1
+		return null
+	var slot := _word_slot if same and _word_slot >= 0 else (_word_i + 1) % 2
+	_word_i = slot
 	_word_slot = slot
 	var l := get_node_or_null("Word%d" % (slot + 1)) as Label
 	if l == null:
 		return null
-	if _word_tw[slot] and _word_tw[slot].is_valid():
-		_word_tw[slot].kill()
+	_hide_word(slot)
 	l.text = text
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", roundi(Pal.em(word_em[clampi(tier - 1, 0, 2)])))
@@ -88,7 +92,7 @@ func word(text: String, at: Vector2, color: Color, tier: int) -> Label:
 	l.rotation = deg_to_rad(randf_range(-10.0, 10.0))
 	l.scale = Vector2.ONE * 1.9
 	l.modulate.a = 1.0
-	var tw := create_tween()
+	var tw := create_tween().set_ignore_time_scale(real_time)
 	_word_tw[slot] = tw
 	tw.tween_property(l, "scale", Vector2.ONE * 0.92, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(l, "scale", Vector2.ONE, 0.08)
@@ -97,6 +101,20 @@ func word(text: String, at: Vector2, color: Color, tier: int) -> Label:
 	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.3).set_ease(Tween.EASE_IN)
 	tw.tween_callback(l.hide)
 	return l
+
+
+## Hide every word now (a cutscene cuts back to the duel).
+func clear_words() -> void:
+	for i in 2:
+		_hide_word(i)
+
+
+func _hide_word(slot: int) -> void:
+	if _word_tw[slot] and _word_tw[slot].is_valid():
+		_word_tw[slot].kill()
+	var l := get_node_or_null("Word%d" % (slot + 1)) as Label
+	if l:
+		l.hide()
 
 
 ## Particles alive right now (budget check, F3 overlay later).

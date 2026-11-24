@@ -19,6 +19,7 @@ func _initialize() -> void:
 	root.add_child(main)
 	await process_frame
 	var fx: FxDirector = main.fx
+	_check("SignatureCutscene is wired", fx.cutscene != null and fx.cutscene == main.signature_cutscene)
 	for slot in ["place", "serve", "serve_big", "serve_burnt", "big_hit", "signature", "win", "lose"]:
 		_check("FxDirector.%s is set" % slot, fx.get(slot) is FxCue)
 	_check("TurnDirector goes through HitStop", main.director.hit_stop == fx.hit_stop)
@@ -37,6 +38,7 @@ func _initialize() -> void:
 	await _hud(fx, main)
 	await _impact(fx)
 	await _real_serve(fx, duel)
+	await _cutscene(fx, main, duel)
 	_end()
 
 
@@ -79,6 +81,8 @@ func _hitstop(fx: FxDirector) -> void:
 
 
 func _mapping(fx: FxDirector, duel: Duel) -> void:
+	# Plain cue mapping; the Signature cutscene has its own test (_cutscene).
+	fx.cutscene.enabled = false
 	var expect := func(what: String, cue: FxCue) -> void:
 		_check(what, fx.last_cue == cue)
 		fx.last_cue = null
@@ -115,6 +119,7 @@ func _mapping(fx: FxDirector, duel: Duel) -> void:
 	_check("Reduce Flashing lowers the flash", fx.flash_value() <= fx.signature.flash * fx.reduce_flash_scale + 0.001)
 	fx.reduce_flashing = false
 	fx.hit_stop.clear()
+	fx.cutscene.enabled = true
 
 
 func _shake(fx: FxDirector) -> void:
@@ -169,6 +174,14 @@ func _hud(fx: FxDirector, main: Node) -> void:
 		if l.visible:
 			shown.append(l.text)
 	_check("one word per frame, the strongest: %s" % [shown], shown == [fx.serve_big.word])
+	await process_frame
+	fx.play(fx.serve, at)
+	fx.play(fx.signature, at)
+	var any := false
+	for i in 2:
+		var l: Label = hud.get_node("Word%d" % (i + 1))
+		any = any or (l.visible and l.text == fx.serve.word)
+	_check("a stronger cue without a word hides the weaker word", not any)
 	# Crack on the hit side's bar, then it fades.
 	fx.play(fx.big_hit, at, Color.WHITE, "enemy")
 	_check("big hit cracks the rival bar", main.ui.hp_bar("enemy").crack == 1.0 and main.ui.hp_bar("player").crack == 0.0)
@@ -260,6 +273,55 @@ func _real_serve(fx: FxDirector, duel: Duel) -> void:
 		var l := floaters.get_child(i) as Label
 		big = big or (l != null and l.text == "-%d" % (fx.ui.slam_number_at + 5))
 	_check("big hit slams its number", big)
+	fx.hit_stop.clear()
+
+
+## F3: the Signature cutscene freezes the world, holds every cue until its impact beat, cuts to the
+## close-up camera and back, can be skipped, and always leaves the duel playable.
+func _cutscene(fx: FxDirector, main: Node, duel: Duel) -> void:
+	var cut: SignatureCutscene = fx.cutscene
+	var ui: DuelUI = main.ui
+	var stage: Stage = main.stage
+	await _real_wait(1.5)
+	fx.hit_stop.clear()
+	cut._long_done = false
+	duel.signature_served.emit("player", "Omelette")
+	duel.dish_served.emit("player", null, 40, 0, 4)
+	duel.confidence_lost.emit("enemy", 40, "pressure")
+	_check("cutscene starts, long version first", cut.playing and cut.version == "long")
+	_check("cues wait for the impact: %d held" % fx.pending(), fx.hold and fx.pending() >= 3)
+	_check("input locked", ui._busy)
+	await _real_wait(0.05)
+	_check("world frozen", is_equal_approx(Engine.time_scale, cut.hold_scale))
+	await _real_wait(0.45)
+	_check("close-up camera on", stage.cut_camera.current)
+	_check("HUD faded out, letterbox in", ui.hud_root().modulate.a < 0.2 and ui.letterbox().visible)
+	await _real_wait(cut.beat_time("_beat_impact") - 0.5 + 0.1)
+	_check("impact: duel camera back", stage.camera.current and not stage.cut_camera.current)
+	_check("impact: held cues played", not fx.hold and fx.pending() == 0 and fx.last_cue != null)
+	_check("impact: world runs again", fx.hit_stop.cutscene_factor == 1.0)
+	await _real_wait(cut.beat_time("_beat_close") - cut.beat_time("_beat_impact") + 0.4)
+	_check("cutscene over, HUD back, bars gone", not cut.playing and ui.hud_root().modulate.a > 0.99 and not ui.letterbox().visible)
+	_check("input unlocked", not ui._busy)
+	fx.hit_stop.clear()
+	# Second Signature: short version; Space skips straight to the impact.
+	duel.signature_served.emit("player", "Omelette")
+	_check("second time: short version", cut.version == "short")
+	var key := InputEventKey.new()
+	key.keycode = KEY_SPACE
+	key.pressed = true
+	cut._input(key)
+	_check("skip jumps to the impact", cut._impacted and not fx.hold and stage.camera.current)
+	await _real_wait(1.2)
+	_check("skipped cutscene finishes", not cut.playing)
+	# A new duel in the middle of the close-up puts everything back at once.
+	cut._long_done = false
+	fx.hit_stop.clear()
+	duel.signature_served.emit("player", "Omelette")
+	await _real_wait(0.4)
+	fx.bind(Duel.new(GameDB.deck("dev"), GameDB.enemy("tony"), GameDB.book_recipes(GameDB.ALL_BOOKS), {seed = 3}))
+	_check("abort: stopped, camera, HUD and time restored", not cut.playing and stage.camera.current
+			and ui.hud_root().modulate.a == 1.0 and fx.hit_stop.cutscene_factor == 1.0 and not ui.letterbox().visible)
 	fx.hit_stop.clear()
 
 

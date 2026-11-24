@@ -152,7 +152,6 @@ func bind(d: Duel) -> void:
 	d.duel_ended.connect(_on_duel_ended)
 	%VenueSub.text = "vs %s" % d.enemy_def.name
 	d.changed.connect(_refresh)
-	d.signature_served.connect(_play_cutin)
 	d.dish_revealed.connect(_show_dish)
 	d.mise_en_place.connect(func(side: String, _drawn: CardInstance, _given: CardInstance) -> void: show_mise(side))
 	d.flow_offer.connect(_on_flow_offer)
@@ -210,6 +209,21 @@ func speed_hint() -> Label:
 ## Full-screen flash / desaturate overlay, driven by FxDirector.
 func fx_screen() -> ColorRect:
 	return %FxScreen
+
+
+## Layer above the HUD holding the cut-in, letterbox and every FX overlay: a cutscene can fade the
+## HUD (%Root) out and keep these.
+func fx_layer() -> CanvasLayer:
+	return %FxLayer
+
+
+## The HUD root (a cutscene fades its modulate).
+func hud_root() -> Control:
+	return %Root
+
+
+func letterbox() -> Control:
+	return %Letterbox
 
 
 ## Procedural speed lines / shockwave ring, driven by FxDirector.
@@ -1418,10 +1432,9 @@ func _dish_tag(icon_name: String, text: String, bg: Color, fg: Color) -> Control
 
 
 ## Signature Dish cut-in (GDD §4.5): spinning rays, slammed ink banner, fade out.
-## Apis only: the Signature Dish is the MC's move (GDD §4.5).
-func _play_cutin(side: String, dish: String) -> void:
-	if side != "player":
-		return
+## Apis only: the Signature Dish is the MC's move (GDD §4.5). Played by FxDirector / SignatureCutscene.
+## Runs on real time, so it keeps moving while a cutscene freezes the world.
+func play_cutin(dish: String) -> void:
 	%CutInDish.text = dish
 	var c: Control = %CutIn
 	c.show()
@@ -1436,13 +1449,25 @@ func _play_cutin(side: String, dish: String) -> void:
 	bar.scale = Vector2.ONE
 	if _cutin_tw and _cutin_tw.is_valid():
 		_cutin_tw.kill()
-	_cutin_tw = create_tween()
+	_cutin_tw = create_tween().set_ignore_time_scale(true)
 	_cutin_tw.tween_method(func(v: float) -> void:
 		(%CutInRays.material as ShaderMaterial).set_shader_parameter("spin", v), 0.0, 25.0, 1.6)
 	_cutin_tw.parallel().tween_property(bar, "position", center, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_cutin_tw.parallel().tween_property(bar, "scale", Vector2.ONE * 1.08, 0.32)
 	_cutin_tw.parallel().tween_property(bar, "scale", Vector2.ONE, 0.16).set_delay(0.32)
 	_cutin_tw.parallel().tween_property(c, "modulate:a", 0.0, 0.32).set_delay(1.28)
+	_cutin_tw.tween_callback(c.hide)
+
+
+## Fade the cut-in out early (a cutscene cuts to its close-up). Real time.
+func end_cutin(time := 0.15) -> void:
+	var c: Control = %CutIn
+	if not c.visible:
+		return
+	if _cutin_tw and _cutin_tw.is_valid():
+		_cutin_tw.kill()
+	_cutin_tw = create_tween().set_ignore_time_scale(true)
+	_cutin_tw.tween_property(c, "modulate:a", 0.0, time)
 	_cutin_tw.tween_callback(c.hide)
 
 

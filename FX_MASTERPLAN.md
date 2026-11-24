@@ -256,6 +256,12 @@ Semua partikel: `one_shot`, `explosiveness` tinggi, `lifetime` ≤ 0.8 s, `fixed
 
 ### 6.2 Signature Dish (T3, ±2.5 s penuh / ±1.2 s pendek)
 
+> **Keputusan F3:** versi panjang 2.3 s, pendek 1.0 s, panjang **sekali per sesi**. Dunia dibekukan selama close-up
+> (`HitStop.cutscene_factor = 0.02`), sementara `AnimationPlayer` cutscene (mode manual), Apis (`Chef.set_anim_speed`),
+> cut-in, dan kata SLASH berjalan di waktu nyata. `FxDirector.hold` menahan cue damage/KO sampai beat impact, jadi angka
+> dan reaksi rival mendarat tepat di impact frame. Kamera kembali ke duel **di** impact frame (siluet dua warna menutupi
+> potongannya). Voice line belum ada (menunggu aset).
+
 | t (s) | Kamera / dunia | Overlay 2D | Audio |
 |---|---|---|---|
 | 0.00 | Hitstop, dunia desaturasi, letterbox masuk | Speed lines radial, teks "SIGNATURE!" slam | whoosh |
@@ -330,7 +336,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 | **F0 Fondasi** ✅ | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
 | **F1 Juice T0–T2** ✅ | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
 | **F2 Impact frame** ✅ | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
-| **F3 Cutscene Signature** | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
+| **F3 Cutscene Signature** ✅ | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
 | **F4 Finish + Intro VS** | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
 | **F5 Optimasi & QA** | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
 | **Stretch** | Bruno fase 2, crowd wave, ilustrasi impact frame pre-drawn | — | — |

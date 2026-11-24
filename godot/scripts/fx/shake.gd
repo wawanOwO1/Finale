@@ -23,6 +23,8 @@ extends Node
 
 var camera: Camera3D
 var hud: CanvasLayer
+## More layers that shake with the HUD (the FX layer: particles and words stay on their spot).
+var extra_layers: Array[CanvasLayer] = []
 var trauma := 0.0
 var _noise := FastNoiseLite.new()
 var _last_ms := 0
@@ -82,6 +84,8 @@ func _process(_delta: float) -> void:
 	if hud:
 		var o := Vector2(nx, ny) * max_hud * k
 		hud.offset = (o / hud_grid).round() * hud_grid if hud_grid > 0.0 else o
+		for l in extra_layers:
+			l.offset = hud.offset
 
 
 func offset() -> Vector2:
