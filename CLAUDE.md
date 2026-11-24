@@ -1,7 +1,7 @@
 # CLAUDE.md — FINALE
 
 Game jam deckbuilder, Godot 4.7 project in `godot/` (the old Vite/TS version in `src/` is reference only).
-Design docs: `GDD.md`, `ART_DIRECTION.md`, `GRAND_DESIGN.md` (Indonesian). In-game text is English.
+Design docs: `GDD.md`, `ART_DIRECTION.md`, `GRAND_DESIGN.md`, `MODIFIERS.md` (all English). In-game text is English too.
 
 ## Workflow: always merge into main when an implementation is done
 

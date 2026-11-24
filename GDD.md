@@ -4,8 +4,7 @@
 > Upload deadline: **18 Dec 2026, 23:59 PT** (≈ 19 Dec 14:59 WIB) · First upload target: **14 Dec**
 > In-game language: **full English** · Tech: **Godot 4.7** (Compatibility renderer, Web export) in `godot/`
 
-> **Updated 24 Nov 2026** to match the code. Big changes from the 18 Nov version: **Godot** replaces Vite/TS/Three.js (the old web version in `src/` is reference only), **Station Stack** replaces the Plate, **rival drafting** replaces Intent, and there are new systems (Chef's Flow, Almanac, fair RNG). Companion docs: [GRAND_DESIGN.md](GRAND_DESIGN.md) (turns, rival AI, RNG, Flow, Almanac), [ART_DIRECTION.md](ART_DIRECTION.md) (visuals, HUD, Station Stack), [MODIFIERS.md](MODIFIERS.md). Those three are still written in Indonesian.
-> Status marks: ✅ in the code · ⏳ not done yet · ✂️ cut.
+> **Updated 24 Nov 2026** to match the code. Big changes from the 18 Nov version: **Godot** replaces Vite/TS/Three.js (the old web version in `src/` is reference only), **Station Stack** replaces the Plate, **rival drafting** replaces Intent, and there are new systems (Chef's Flow, Almanac, fair RNG). Companion docs: [GRAND_DESIGN.md](GRAND_DESIGN.md) (turns, rival AI, RNG, Flow, Almanac), [ART_DIRECTION.md](ART_DIRECTION.md) (visuals, HUD, Station Stack), [MODIFIERS.md](MODIFIERS.md).> Status marks: ✅ in the code · ⏳ not done yet · ✂️ cut.
 
 > **Origin (important for the jam rules):** this design is derived from the older *Cooking Show Deckbuilder* GDD (v0.1, 1 Nov 2026), which contained only documents, references and a paper prototype. There was no code or assets. The jam rules allow reusing **ideas and mechanics**. All code, 3D assets, images and audio are **made from 18 Nov 2026 onward** and logged in git from the first commit as proof of development history. Reference images are used only as guidance for structure and feel, never copied.
 

@@ -1,160 +1,160 @@
-# MODIFIERS — Daftar & Aturan Chef's Flow Modifier
+# MODIFIERS — List & Rules of Chef's Flow Modifiers
 
-Dokumen referensi semua **modifier** di FINALE. Sumber kebenaran angka ada di `godot/data/modifiers/*.tres`
-(bisa diubah di Inspector); efeknya dikodekan per `id` di `godot/scripts/core/duel.gd`.
-Rancangan awal ada di `GRAND_DESIGN.md` §5. Teks di dalam game memakai bahasa Inggris.
+A reference document for every **modifier** in FINALE. The source of truth for the numbers is `godot/data/modifiers/*.tres`
+(editable in the Inspector); the effects are coded per `id` in `godot/scripts/core/duel.gd`.
+The initial design is in `GRAND_DESIGN.md` §5. In-game text is in English.
 
 ---
 
-## 1. Apa itu modifier
+## 1. What a modifier is
 
-- Power-up **sementara per duel**, bukan permanen antar duel. Modifier dan Chef's Flow di-reset tiap duel baru
-  (Kitchen dibuat baru tiap duel). Yang permanen sepanjang run adalah Kitchen Tool (GDD §6.4), bukan modifier.
-- Didapat dari **Chef's Flow**: tiap Serve **Perfect Order** = +1 Flow. Serve Cooked atau Improvised = +0.
-- Saat Flow mencapai threshold, Flow kembali ke 0 dan muncul **pilih 1 dari 3 modifier**.
-- Pemain dan rival sama-sama bisa mendapat modifier. Rival memilih otomatis lewat `RivalAI.pick_modifier`.
-- Modifier tidak ada RNG di efeknya: damage, Quality, dan buff selalu pasti. RNG hanya ada di **penawaran**
-  (stream `offers` / `offers_enemy`, ikut seed duel, jadi bisa direproduksi).
+- A **temporary power-up per duel**, not permanent between duels. Modifiers and Chef's Flow reset every new duel
+  (the Kitchen is created anew each duel). What is permanent for the whole run is the Kitchen Tool (GDD §6.4), not the modifier.
+- Obtained through **Chef's Flow**: every **Perfect Order** Serve = +1 Flow. A Cooked or Improvised Serve = +0.
+- When Flow reaches the threshold, Flow returns to 0 and a **pick 1 of 3 modifiers** appears.
+- Both the player and the rival can get modifiers. The rival picks automatically through `RivalAI.pick_modifier`.
+- There is no RNG in a modifier's effect: damage, Quality and buffs are always certain. RNG exists only in the **offers**
+  (streams `offers` / `offers_enemy`, following the duel seed, so they can be reproduced).
 
-### Threshold Flow
+### Flow thresholds
 
-| Pihak | Threshold (Serve Perfect per modifier) | Tempat mengubah |
+| Side | Threshold (Perfect Serves per modifier) | Where to change |
 |---|---|---|
-| Pemain (Apis) | **1 → 2 → 3**, lalu tetap 3 | `Duel.PLAYER_FLOW`, Inspector `Main` → Balance |
-| Rival (default) | **3 → 4 → 5**, lalu tetap 5 | `EnemyDef.flow_thresholds` (`data/enemies/*.tres`) |
+| Player (Apis) | **1 → 2 → 3**, then stays at 3 | `Duel.PLAYER_FLOW`, `Main` Inspector → Balance |
+| Rival (default) | **3 → 4 → 5**, then stays at 5 | `EnemyDef.flow_thresholds` (`data/enemies/*.tres`) |
 
-Threshold awal desain adalah 2 → 3 → 4. Fase G (balancing) menurunkannya jadi 1 → 2 → 3 karena Flow hampir tidak
-pernah aktif (GRAND_DESIGN §8.2). Rival yang sudah ada (Tony, Rosa) memakai default. Marco, Élodie, dan Bruno belum
-ada di data, jadi threshold di GRAND_DESIGN §5.4 baru berlaku saat mereka dibuat.
+The design's initial threshold was 2 → 3 → 4. Phase G (balancing) lowered it to 1 → 2 → 3 because Flow almost
+never triggered (GRAND_DESIGN §8.2). The existing rivals (Tony, Rosa) use the default. Marco, Élodie and Bruno are not
+in the data yet, so the thresholds in GRAND_DESIGN §5.4 only apply once they are built.
 
 ---
 
-## 2. Daftar modifier (10)
+## 2. Modifier list (10)
 
-Teks kartu memakai `X` sebagai pengganti angka. Angka `X` = `amount` × jumlah stack.
+Card text uses `X` in place of a number. The number `X` = `amount` × the number of stacks.
 
 ### Common (7)
 
-| Modifier | id | Teks di game | Amount | Stack | Tag build |
+| Modifier | id | In-game text | Amount | Stack | Build tag |
 |---|---|---|---|---|---|
-| **Hot Pan** | `hot_pan` | Every Serve deals +X Pressure. | 3 | Ya (+3 / stack) | — |
-| **Steady Hands** | `steady_hands` | +X Composure each time you place an ingredient. | 1 | Ya (+1 / stack) | — |
-| **Encore** | `encore` | Perfect Order multiplier +X. | 0.25 | Ya (+0.25 / stack) | — |
-| **Extra Burner** | `extra_burner` | After a Perfect Order Serve, +X Heat next turn. | 1 | Tidak | — |
-| **Prep Cook** | `prep_cook` | Draw +X card at the start of each turn. | 1 | Tidak | — |
-| **Crowd Favorite** | `crowd_favorite` | +X Hype on every Serve. | 10 | Ya (+10 / stack) | — |
-| **Spice Whisperer** | `spice_whisperer` | Placing a SPICE ingredient gives the rival Spicy X. | 1 | Ya (+1 / stack) | `SPICE` |
+| **Hot Pan** | `hot_pan` | Every Serve deals +X Pressure. | 3 | Yes (+3 / stack) | — |
+| **Steady Hands** | `steady_hands` | +X Composure each time you place an ingredient. | 1 | Yes (+1 / stack) | — |
+| **Encore** | `encore` | Perfect Order multiplier +X. | 0.25 | Yes (+0.25 / stack) | — |
+| **Extra Burner** | `extra_burner` | After a Perfect Order Serve, +X Heat next turn. | 1 | No | — |
+| **Prep Cook** | `prep_cook` | Draw +X card at the start of each turn. | 1 | No | — |
+| **Crowd Favorite** | `crowd_favorite` | +X Hype on every Serve. | 10 | Yes (+10 / stack) | — |
+| **Spice Whisperer** | `spice_whisperer` | Placing a SPICE ingredient gives the rival Spicy X. | 1 | Yes (+1 / stack) | `SPICE` |
 
 ### Rare (3)
 
-| Modifier | id | Teks di game | Amount | Stack | Tag build |
+| Modifier | id | In-game text | Amount | Stack | Build tag |
 |---|---|---|---|---|---|
-| **Free Move** | `free_move` | Move a top card up to X times per turn. | 2 | Tidak | — |
-| **Mise Master** | `mise_master` | Mise en Place also helps when your hand has only 1 ingredient. | 1 | Tidak | — |
-| **Plating Pro** | `plating_pro` | Garnish gives xX Quality. | 2 | Tidak | — |
+| **Free Move** | `free_move` | Move a top card up to X times per turn. | 2 | No | — |
+| **Mise Master** | `mise_master` | Mise en Place also helps when your hand has only 1 ingredient. | 1 | No | — |
+| **Plating Pro** | `plating_pro` | Garnish gives xX Quality. | 2 | No | — |
 
-Ikon: Hot Pan `heat`, Steady Hands `composure`, Encore `check`, Extra Burner `heat`, Prep Cook `draw`,
+Icons: Hot Pan `heat`, Steady Hands `composure`, Encore `check`, Extra Burner `heat`, Prep Cook `draw`,
 Crowd Favorite `hype`, Spice Whisperer `spicy`, Free Move `arrow`, Mise Master `inspired`, Plating Pro `crown`.
 
 ---
 
-## 3. Cara kerja tiap modifier
+## 3. How each modifier works
 
-| Modifier | Kapan aktif | Efek persis | Kode |
+| Modifier | When it is active | Exact effect | Code |
 |---|---|---|---|
-| **Hot Pan** | Setiap Serve, sesudah dish diresolusi | Menambah Pressure flat ke lawan: `3 × stack`. Berlaku di **setiap** Serve (di desain awal "Serve pertama tiap giliran"; sama saja karena Serve hanya sekali per giliran). Tidak jalan kalau duel sudah selesai. | `Duel.serve_bonus`, `serve()` |
-| **Steady Hands** | Tiap menaruh bahan di station | +`1 × stack` Composure. Teknik tidak memicunya. | `play_card` |
-| **Encore** | Menghitung multiplier Serve | Multiplier Perfect Order jadi `1.5 + 0.25 × stack` (stack 1 = ×1.75, stack 2 = ×2.0). | `Duel.perfect_mult` |
-| **Extra Burner** | Serve Perfect, dipakai di awal giliran berikutnya | Heat giliran berikutnya +1 di atas maksimum. Hanya satu kali pakai per pemicu, tidak menumpuk. | `serve()`, `_start_turn` |
-| **Prep Cook** | Awal tiap giliran | Draw +1 kartu di atas ukuran tangan normal. | `_start_turn` |
-| **Crowd Favorite** | Setiap Serve | +`10 × stack` Hype, ditambah Hype dari resep. Mempercepat Signature Dish. | `serve()` |
-| **Spice Whisperer** | Tiap menaruh bahan ber-tag `SPICE` | Lawan mendapat status Spicy `1 × stack`. Hanya ditawarkan ke deck yang punya build `SPICE`. | `play_card` |
-| **Free Move** | Aksi pindah kartu teratas | Jatah pindah per giliran jadi 2 (bukan 1). | `Duel._move_left` |
-| **Mise Master** | Setelah draw awal giliran | Mise en Place (bad-luck protection) juga aktif kalau tangan punya ≤ 1 bahan yang bisa ditaruh, bukan hanya 0. Tetap maksimal 1× per giliran. | `Duel._mise_en_place` |
-| **Plating Pro** | Menghitung Quality dish | Quality dari kartu Garnish (kartu di plate melebihi bahan resep) dikali 2. Di desain awal "Garnish maks +2 → +4", tapi aturan belum punya batas Garnish, jadi diganti ×2. | `Duel.dish_quality` |
+| **Hot Pan** | Every Serve, after the dish is resolved | Adds flat Pressure to the opponent: `3 × stack`. Applies on **every** Serve (the initial design said "the first Serve each turn"; the same thing, since Serve is only once per turn). Does not run if the duel is already over. | `Duel.serve_bonus`, `serve()` |
+| **Steady Hands** | Each time an ingredient is placed on a station | +`1 × stack` Composure. Techniques do not trigger it. | `play_card` |
+| **Encore** | When computing the Serve multiplier | The Perfect Order multiplier becomes `1.5 + 0.25 × stack` (stack 1 = ×1.75, stack 2 = ×2.0). | `Duel.perfect_mult` |
+| **Extra Burner** | A Perfect Serve, used at the start of the next turn | Next turn's Heat +1 above the maximum. One use per trigger, does not stack. | `serve()`, `_start_turn` |
+| **Prep Cook** | The start of every turn | Draw +1 card above the normal hand size. | `_start_turn` |
+| **Crowd Favorite** | Every Serve | +`10 × stack` Hype, on top of the recipe's Hype. Speeds up the Signature Dish. | `serve()` |
+| **Spice Whisperer** | Each time a `SPICE`-tagged ingredient is placed | The opponent gets Spicy `1 × stack`. Only offered to decks that have a `SPICE` build. | `play_card` |
+| **Free Move** | The move-top-card action | The per-turn move allowance becomes 2 (instead of 1). | `Duel._move_left` |
+| **Mise Master** | After the turn-start draw | Mise en Place (bad-luck protection) also triggers when the hand has ≤ 1 placeable ingredient, not only 0. Still max 1× per turn. | `Duel._mise_en_place` |
+| **Plating Pro** | When computing the dish's Quality | The Quality from Garnish cards (cards on the plate beyond the recipe's ingredients) is multiplied by 2. The initial design said "Garnish max +2 → +4", but the rules have no Garnish cap yet, so it was replaced by ×2. | `Duel.dish_quality` |
 
 ---
 
-## 4. Penawaran (pick 1 dari 3)
+## 4. Offers (pick 1 of 3)
 
-Dibuat di `Duel._make_offer(side)`:
+Made in `Duel._make_offer(side)`:
 
-1. **Komposisi**: 2 slot Common + 1 slot ketiga (Rare 25%, Common 75%).
-2. **Pity rarity**: setelah 3 penawaran berturut-turut tanpa Rare (`RARE_PITY`), slot ketiga dijamin Rare.
-3. **Tanpa duplikat** dalam satu penawaran.
-4. **Non-stackable yang sudah dimiliki** tidak ditawarkan lagi. Yang stackable boleh muncul lagi dan menambah stack.
-5. **Cocok build**: build = tag ingredient yang punya ≥ 3 kartu di deck. Modifier ber-tag (saat ini hanya
-   Spice Whisperer, tag `SPICE`) hanya muncul kalau deck memakai tag itu. Kalau ada yang cocok, minimal 1 dari 3
-   adalah modifier ber-tag tersebut (mengisi slot Common pertama).
-6. **Pool menipis**: kalau kandidat kurang dari 3, sisanya diisi dari apa yang tersisa. Kalau kosong total,
-   tidak ada penawaran dan Flow tetap di-reset.
+1. **Composition**: 2 Common slots + a 3rd slot (Rare 25%, Common 75%).
+2. **Rarity pity**: after 3 consecutive offers without a Rare (`RARE_PITY`), the 3rd slot is guaranteed to be Rare.
+3. **No duplicates** within one offer.
+4. **Already-owned non-stackables** are not offered again. Stackable ones may reappear and add a stack.
+5. **Build match**: a build = an ingredient tag with ≥ 3 cards in the deck. A tagged modifier (currently only
+   Spice Whisperer, tag `SPICE`) only appears if the deck uses that tag. If one matches, at least 1 of the 3
+   is that tagged modifier (filling the first Common slot).
+6. **Thin pool**: if there are fewer than 3 candidates, the rest is filled from whatever remains. If it is empty,
+   there is no offer and Flow is still reset.
 
-Alur UI untuk pemain: overlay `FlowPick` muncul ±1.2 detik setelah Serve (sesudah dish reveal). Selama overlay
-terbuka semua aksi ditolak dengan pesan "Pick a modifier first." dan input HUD terkunci.
+UI flow for the player: the `FlowPick` overlay appears ±1.2 seconds after the Serve (after the dish reveal). While the overlay
+is open all actions are rejected with the message "Pick a modifier first." and HUD input is locked.
 
 ---
 
-## 5. Rival & modifier
+## 5. Rival & modifiers
 
-- Rival memilih modifier otomatis. Nilai tiap modifier dihitung `RivalAI.modifier_value` dari bobot profilnya:
+- The rival picks modifiers automatically. Each modifier's value is computed by `RivalAI.modifier_value` from its profile's weights:
 
-| Modifier | Nilai bagi rival |
+| Modifier | Value to the rival |
 |---|---|
 | Hot Pan | `amount × w_attack` |
 | Steady Hands | `amount × 2.5 × w_defend × 2` |
 | Encore | `amount × 10 × w_attack` |
 | Extra Burner | 2.0 |
 | Prep Cook | 2.5 |
-| Crowd Favorite | 0.3 (untuk pemain 1.5) |
+| Crowd Favorite | 0.3 (1.5 for the player) |
 | Spice Whisperer | `amount × 2 × w_debuff` |
-| Free Move | 0.1 (untuk pemain 1.0) |
+| Free Move | 0.1 (1.0 for the player) |
 | Mise Master | 1.5 |
-| Plating Pro | `1.5 + ukuran tangan × 0.1` |
+| Plating Pro | `1.5 + hand size × 0.1` |
 
-- Free Move bernilai rendah bagi rival karena AI belum memakai aksi pindah kartu.
-- Saat rival mengambil modifier, Turn Director menampilkan banner (contoh **"TONY GOT / HOT PAN!"**, 1 detik)
-  dan ikon masuk ke baris modifier rival di HUD.
-
----
-
-## 6. Tampilan di HUD
-
-- Baris `PlayerFlow` / `EnemyFlow` di `scenes/ui/duel_ui.tscn`: pip FLOW (●●○) di bawah bar Hype, lalu chip
-  modifier berisi ikon, angka stack, dan tooltip (`ModifierDef.describe(stacks)`).
-- Ikon diambil dari `res://assets/icons` dan di-tint.
-- Overlay pilih modifier (`FlowPick`): 3 pilihan, teksnya dari `ModifierDef.describe()`.
+- Free Move is low-value for the rival because the AI does not use the move-card action yet.
+- When the rival takes a modifier, the Turn Director shows a banner (e.g. **"TONY GOT / HOT PAN!"**, 1 second)
+  and the icon enters the rival's modifier row in the HUD.
 
 ---
 
-## 7. Menambah atau mengubah modifier
+## 6. HUD display
 
-**Mengubah angka** (tanpa kode): buka `godot/data/modifiers/<id>.tres` di Inspector, ubah `amount`, `rarity`,
-`stackable`, `icon`, `text`, atau `tag`.
-
-**Menambah modifier baru:**
-1. Buat `.tres` baru di `godot/data/modifiers/` dengan script `ModifierDef` (salin salah satu yang ada). `id` harus unik.
-   `GameDB` memuat semua file di folder itu dan mengurutkannya per `id`, jadi urutan penawaran tetap deterministik.
-2. Kodekan efeknya di `duel.gd` dengan `mods(side, "<id>")` di titik yang tepat (lihat tabel §3).
-3. Tambahkan nilai AI di `RivalAI.modifier_value`. Tanpa ini modifier bernilai 0 dan rival tidak akan memilihnya.
-4. Kalau modifier hanya berguna untuk build tertentu, isi `tag` dengan tag ingredient (misalnya `SPICE`).
-5. Tambahkan test di `godot/tests/sim.gd` dan jalankan; setelah itu cek dampaknya ke balance dengan `tests/balance.gd`.
-
-Catatan: `ModifierDef.describe()` mengganti `X` di `text` dengan `amount × stack`. Untuk Plating Pro, teks "xX"
-berarti "×2" (huruf `x` kecil lalu angka).
+- The `PlayerFlow` / `EnemyFlow` rows in `scenes/ui/duel_ui.tscn`: FLOW pips (●●○) under the Hype bar, then a modifier
+  chip with an icon, stack count and tooltip (`ModifierDef.describe(stacks)`).
+- Icons come from `res://assets/icons` and are tinted.
+- The modifier-pick overlay (`FlowPick`): 3 choices, with text from `ModifierDef.describe()`.
 
 ---
 
-## 8. Catatan balance
+## 7. Adding or changing a modifier
 
-Dari GRAND_DESIGN §8.2 (300 duel, deck starter, threshold pemain 1 → 2 → 3):
+**Changing numbers** (no code): open `godot/data/modifiers/<id>.tres` in the Inspector and change `amount`, `rarity`,
+`stackable`, `icon`, `text` or `tag`.
 
-| Rival | Bot | Menang | Modifier Apis / duel |
+**Adding a new modifier:**
+1. Create a new `.tres` in `godot/data/modifiers/` with the `ModifierDef` script (copy an existing one). The `id` must be unique.
+   `GameDB` loads every file in that folder and sorts them by `id`, so the offer order stays deterministic.
+2. Code its effect in `duel.gd` with `mods(side, "<id>")` at the right point (see the §3 table).
+3. Add the AI value in `RivalAI.modifier_value`. Without this the modifier is worth 0 and the rival will never pick it.
+4. If the modifier is only useful for a certain build, set `tag` to the ingredient tag (for example `SPICE`).
+5. Add a test in `godot/tests/sim.gd` and run it; after that check the impact on balance with `tests/balance.gd`.
+
+Note: `ModifierDef.describe()` replaces `X` in `text` with `amount × stack`. For Plating Pro, the text "xX"
+means "×2" (a lowercase `x` followed by the number).
+
+---
+
+## 8. Balance notes
+
+From GRAND_DESIGN §8.2 (300 duels, starter deck, player threshold 1 → 2 → 3):
+
+| Rival | Bot | Win | Apis modifiers / duel |
 |---|---|---|---|
 | Tony | simple | 76% | 0.30 |
 | Tony | smart | 98% | 1.00 |
 | Rosa | simple | 38% | 0.30 |
 | Rosa | smart | 87% | 0.99 |
 
-Pemain yang hati-hati mendapat ±1 modifier per duel. Tuas utama frekuensi modifier adalah threshold Flow
-(`Duel.PLAYER_FLOW`), bukan angka per modifier. Balancing per modifier (misalnya stack tinggi Encore atau Hot Pan)
-belum dilakukan; yang diukur `tests/balance.gd` baru jumlah modifier per duel.
+A careful player gets ±1 modifier per duel. The main lever for modifier frequency is the Flow threshold
+(`Duel.PLAYER_FLOW`), not the per-modifier numbers. Per-modifier balancing (for example high stacks of Encore or Hot Pan)
+has not been done; what `tests/balance.gd` has measured so far is only the number of modifiers per duel.

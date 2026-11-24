@@ -1,100 +1,100 @@
 # Grand Design — Turn Sequence, Rival AI, RNG, Chef's Flow, Almanac
 
-> Disusun 22 Nov 2026 dari diskusi sesi *gameplay-mechanics-phase-timing*. Dokumen ini **menggantikan GDD §4.6 (Intent lawan)** dan menambah sistem baru di atas Station Stack ([ART_DIRECTION.md §6](ART_DIRECTION.md#6-station-stack--resep-berurutan-usulan-grand-design)).
-> Kode yang dirujuk: Godot 4 di `godot/` (`scripts/core/duel.gd`, `scripts/ui/duel_ui.gd`, `scripts/data/enemy_def.gd`).
+> Written 22 Nov 2026 from the *gameplay-mechanics-phase-timing* session discussion. This document **replaces GDD §4.6 (opponent Intent)** and adds new systems on top of the Station Stack ([ART_DIRECTION.md §6](ART_DIRECTION.md#6-station-stack--ordered-recipes-grand-design-proposal)).
+> Referenced code: Godot 4 in `godot/` (`scripts/core/duel.gd`, `scripts/ui/duel_ui.gd`, `scripts/data/enemy_def.gd`).
 
-## 0. Keputusan (22 Nov)
+## 0. Decisions (22 Nov)
 
-| # | Topik | Keputusan |
+| # | Topic | Decision |
 |---|---|---|
-| 1 | Tempo giliran | Urutan tetap: **YOUR TURN banner → giliran pemain → RIVAL TURN banner → rival drafting (dianimasikan) → loop**, sampai menang/kalah. |
-| 2 | Logika vs tempo | `Duel` tetap logika murni. Tempo diatur **Turn Director** di lapisan UI. |
-| 3 | Rival | Rival **drafting dengan aturan yang sama** dengan pemain: deck, tangan, Heat, 2 station, Serve. Tidak ada lagi pola Intent. |
-| 4 | Informasi | Kartu rival **blind**. Pemain melihat **punggung kartu** di station rival (jumlahnya), animasi, damage, buff/debuff, dan stats. |
-| 5 | Intent | Dihapus. Diganti **mood** rival (emote samar). |
-| 6 | Almanac | Model **discovered**, bisa dibuka saat duel (game pause). Resep yang disajikan rival ikut tercatat. |
-| 7 | Fast-forward | Tahan klik/Space = giliran rival ×3. |
-| 8 | Tingkat AI | Rival awal serakah → Elite sabar → Boss dengan gimmick. |
-| 9 | RNG | Output **deterministik**. Input random dengan pseudo-random ringan (anti-clump + Mise en Place). AI memakai aturan RNG yang sama. |
-| 10 | Power-up | **Chef's Flow**: Perfect Order → pilih 1 dari 3 modifier, threshold naik 1 → 2 → 3 (fase G; awalnya 2 → 3 → 4), **per duel**, bisa di-stack. |
-| 11 | Rival & modifier | Rival juga bisa mendapat modifier (threshold lebih tinggi untuk rival awal), tampil sebagai ikon buff. |
-| 12 | Pity diberi tanda | Bad-luck protection **terlihat**: "✨ Mise en place!". |
+| 1 | Turn pacing | Fixed order: **YOUR TURN banner → player turn → RIVAL TURN banner → rival drafting (animated) → loop**, until someone wins or loses. |
+| 2 | Logic vs pacing | `Duel` stays pure logic. Pacing is handled by a **Turn Director** in the UI layer. |
+| 3 | Rival | The rival **drafts by the same rules** as the player: deck, hand, Heat, 2 stations, Serve. No more Intent patterns. |
+| 4 | Information | Rival cards are **blind**. The player sees **card backs** (the count) on the rival's stations, animations, damage, buffs/debuffs and stats. |
+| 5 | Intent | Removed. Replaced by the rival's **mood** (vague emotes). |
+| 6 | Almanac | A **discovered** model, openable during a duel (the game pauses). Recipes the rival serves are recorded too. |
+| 7 | Fast-forward | Hold click/Space = rival turn ×3. |
+| 8 | AI level | Early rivals are greedy → Elite is patient → Boss has gimmicks. |
+| 9 | RNG | **Deterministic** outputs. Random inputs use light pseudo-randomness (anti-clump + Mise en Place). The AI uses the same RNG rules. |
+| 10 | Power-ups | **Chef's Flow**: Perfect Order → pick 1 of 3 modifiers, threshold rises 1 → 2 → 3 (phase G; originally 2 → 3 → 4), **per duel**, stackable. |
+| 11 | Rival & modifiers | The rival can also get modifiers (higher threshold for early rivals), shown as buff icons. |
+| 12 | Marked pity | Bad-luck protection is **visible**: "✨ Mise en place!". |
 
 ---
 
-## 1. Turn Sequence — ✅ selesai 22 Nov (fase A)
+## 1. Turn Sequence — ✅ done 22 Nov (phase A)
 
-### 1.1 Urutan
+### 1.1 Order
 
 ```
 ┌──────────────┐   ┌────────────────┐   ┌────────────────┐   ┌──────────────────────┐
-│ YOUR TURN    │ → │ Giliran pemain │ → │ TONY'S TURN    │ → │ Rival drafting       │
-│ banner       │   │ (bebas, tanpa  │   │ banner         │   │ (aksi satu per satu, │
-│              │   │  batas waktu)  │   │                │   │  kartu tertutup)     │
+│ YOUR TURN    │ → │ Player turn    │ → │ TONY'S TURN    │ → │ Rival drafting       │
+│ banner       │   │ (free, no time │   │ banner         │   │ (one action at a     │
+│              │   │  limit)        │   │                │   │  time, face-down)    │
 └──────────────┘   └────────────────┘   └────────────────┘   └──────────────────────┘
         ↑                                                               │
-        └───────────────────── loop sampai menang / kalah ──────────────┘
+        └───────────────────── loop until win / lose ───────────────────┘
 ```
 
-Kemenangan/kekalahan bisa memotong urutan di titik mana pun (Spicy tick, Serve, dll). Director langsung pindah ke urutan hasil (ART_DIRECTION §7).
+A win/loss can cut the sequence at any point (Spicy tick, Serve, etc.). The Director jumps straight to the result sequence (ART_DIRECTION §7).
 
-### 1.2 Timing (kecepatan normal)
+### 1.2 Timing (normal speed)
 
-| Langkah | Isi | Durasi |
+| Step | Content | Duration |
 |---|---|---|
-| **P1** Banner | "YOUR TURN" slam + SFX *Turn change* | 1.0 s |
-| **P2** Awal giliran | Composure → 0, Spicy tick (angka melayang), lalu draw (kartu terbang satu per satu, 0.08 s/kartu) | 0.5–1.0 s |
-| **P3** Giliran pemain | Input terbuka. Tidak ada timer. | bebas |
-| **P4** End Turn | Tangan dibuang (animasi ke discard) | 0.4 s |
-| **E1** Banner | "TONY'S TURN" (warna rival) | 1.0 s |
-| **E2** Awal giliran rival | Composure → 0, Spicy tick, punggung kartu terbang ke tangan rival | 0.5 s |
-| **E3** Aksi rival (loop) | *Think* (bubble "…", 0.35 s) → aksi (lihat 1.3) | 0.6–1.8 s/aksi |
-| **E4** Akhir giliran rival | Tangan rival dibuang, jeda | 0.4 s |
+| **P1** Banner | "YOUR TURN" slam + *Turn change* SFX | 1.0 s |
+| **P2** Turn start | Composure → 0, Spicy tick (floating number), then draw (cards fly in one by one, 0.08 s/card) | 0.5–1.0 s |
+| **P3** Player turn | Input open. No timer. | free |
+| **P4** End Turn | Hand is discarded (animation to the discard pile) | 0.4 s |
+| **E1** Banner | "TONY'S TURN" (rival color) | 1.0 s |
+| **E2** Rival turn start | Composure → 0, Spicy tick, card backs fly to the rival's hand | 0.5 s |
+| **E3** Rival actions (loop) | *Think* (a "…" bubble, 0.35 s) → action (see 1.3) | 0.6–1.8 s/action |
+| **E4** Rival turn end | Rival's hand is discarded, a pause | 0.4 s |
 
-Target giliran rival: **4–7 detik** dengan 3–6 aksi. Lebih dari itu terasa lambat bagi juri.
+Target rival turn length: **4–7 seconds** with 3–6 actions. Longer feels slow to the judges.
 
-### 1.3 Animasi aksi rival
+### 1.3 Rival action animations
 
-| Aksi | Yang terlihat | Durasi |
+| Action | What is seen | Duration |
 |---|---|---|
-| Taruh bahan | Punggung kartu meluncur ke station rival, tumpukan bertambah | 0.5 s |
-| Technique | Kartu dibalik sebentar **hanya untuk efeknya** (ikon efek, bukan nama kartu), lalu angka/status melayang | 0.7 s |
-| Pindah kartu teratas | Punggung kartu bergeser antar station | 0.4 s |
-| Clear station | Tumpukan disapu ke discard | 0.4 s |
-| **Serve** | Station rival menyala → **dish reveal** (nama + ikon hidangan, PERFECT/COOKED) → damage ke pemain | 1.8 s |
+| Place an ingredient | A card back slides to the rival's station, the stack grows | 0.5 s |
+| Technique | The card flips briefly **only for its effect** (effect icon, not the card name), then a number/status floats up | 0.7 s |
+| Move the top card | A card back shifts between stations | 0.4 s |
+| Clear a station | The stack is swept to the discard pile | 0.4 s |
+| **Serve** | The rival's station lights up → **dish reveal** (dish name + icon, PERFECT/COOKED) → damage to the player | 1.8 s |
 
-> Saat Serve, hidangannya **terungkap** (informasi setelah aksi, sama seperti pemain melihat damage). Bahan penyusunnya tetap tidak ditampilkan satu per satu, tapi resepnya tercatat di Almanac (§5).
+> On Serve the dish is **revealed** (information after the action, just like the player sees damage). The individual ingredients are still not shown one by one, but the recipe is recorded in the Almanac (§5).
 
 ### 1.4 Fast-forward
-- **Tahan klik kiri atau Space** selama fase rival = semua tween ×3, *think* dilewati.
-- Banner tetap muncul (diperpendek ke 0.4 s) supaya pemain tidak kehilangan orientasi.
-- Toggle "Rival speed: Normal / Fast" di menu volume (opsional, kalau sempat).
+- **Hold left click or Space** during the rival phase = all tweens ×3, *think* is skipped.
+- Banners still appear (shortened to 0.4 s) so the player does not lose orientation.
+- A "Rival speed: Normal / Fast" toggle in the volume menu (optional, if there is time).
 
-### 1.5 Arsitektur
+### 1.5 Architecture
 
-**`Duel` (logika)** mendapat fase `"enemy"` dan API langkah demi langkah:
+**`Duel` (logic)** gets an `"enemy"` phase and a step-by-step API:
 
 ```gdscript
-duel.end_turn()               # P4: buang tangan, phase = "enemy". Tidak lagi memanggil giliran rival.
-duel.begin_enemy_turn()       # E2: Composure rival → 0, Spicy tick, antre aksi giliran ini.
+duel.end_turn()               # P4: discard the hand, phase = "enemy". No longer calls the rival's turn.
+duel.begin_enemy_turn()       # E2: rival Composure → 0, Spicy tick, queue this turn's actions.
 duel.enemy_step() -> Dictionary
-    # Menerapkan SATU aksi, memancarkan sinyal, lalu mengembalikan { kind, … }.
-    # Fase A (pola Intent): "attack" | "block" | "status" | "end". Fase C (AI): "place" | "technique" | "move" | "clear" | "serve" | "end".
-    # "end" = E4 (decay akhir giliran rival). enemy_actions_left() = sisa aksi.
+    # Applies ONE action, emits signals, then returns { kind, … }.
+    # Phase A (Intent pattern): "attack" | "block" | "status" | "end". Phase C (AI): "place" | "technique" | "move" | "clear" | "serve" | "end".
+    # "end" = E4 (end-of-rival-turn decay). enemy_actions_left() = remaining actions.
 duel.start_player_turn()      # P2: phase = "player", Composure, Spicy, draw.
-duel.run_enemy_turn()         # loop sinkron untuk tests/sim.gd (tanpa animasi).
+duel.run_enemy_turn()         # synchronous loop for tests/sim.gd (no animation).
 ```
 
-**`TurnDirector` (UI, `scripts/ui/turn_director.gd`)** memegang urutan 1.1:
+**`TurnDirector` (UI, `scripts/ui/turn_director.gd`)** owns the sequence in 1.1:
 
 ```gdscript
 func _rival_turn() -> void:
     _lock_input()
     await _banner(rival_name + "'S TURN")
     while duel.phase == "enemy":
-        await _think()                      # bubble "…" (dilewati saat fast-forward)
+        await _think()                      # "…" bubble (skipped during fast-forward)
         var a := duel.enemy_step()
-        await _play_action(a)               # tween sesuai tabel 1.3
+        await _play_action(a)               # tween per the table in 1.3
         if a.kind == "end": break
     if duel.phase == "enemy":
         duel.finish_enemy_turn()
@@ -103,347 +103,347 @@ func _rival_turn() -> void:
     _unlock_input()
 ```
 
-- Semua tween lewat satu `speed` global (1.0 normal, 3.0 fast-forward).
-- `_busy` yang sudah ada di `duel_ui.gd` dipakai sebagai input lock.
-- Intro duel (3·2·1 FIGHT) yang sekarang langsung masuk ke "YOUR TURN" banner.
+- All tweens go through one global `speed` (1.0 normal, 3.0 fast-forward).
+- The existing `_busy` in `duel_ui.gd` is used as the input lock.
+- The duel intro (3·2·1 FIGHT) that currently exists now flows straight into the "YOUR TURN" banner.
 
 ---
 
-## 2. Kitchen simetris (refactor inti) — ✅ selesai 22 Nov (fase B)
+## 2. Symmetric Kitchen (core refactor) — ✅ done 22 Nov (phase B)
 
-Sekarang `Duel` menyimpan tangan, draw pile, station, Hype, dan Heat **hanya untuk pemain**. Rival yang drafting butuh semua itu juga. Refactor:
+`Duel` currently keeps the hand, draw pile, stations, Hype and Heat **for the player only**. A drafting rival needs all of that too. Refactor:
 
 ```gdscript
-class Kitchen:              # satu per sisi: duel.kitchen["player"], duel.kitchen["enemy"]
-    var fighter: Fighter    # Confidence, Composure, Heat, statuses (sudah ada)
+class Kitchen:              # one per side: duel.kitchen["player"], duel.kitchen["enemy"]
+    var fighter: Fighter    # Confidence, Composure, Heat, statuses (already exist)
     var draw_pile / hand / discard / exhausted
     var stations            # 3 × Array[CardInstance]
-    var recipes             # dari Recipe Book sisi itu
+    var recipes             # from that side's Recipe Book
     var hype, flow, flow_threshold_index
     var modifiers: Array[ModifierDef]
     var served_this_turn, moved_this_turn
     var rng_shuffle: SeededRng
 ```
 
-- `play / serve / move_top / clear_station / can_*` menerima `side` (default `"player"` supaya UI lama tetap jalan).
-- `_apply_effects`, `_do_serve`, status, Signature: semuanya berbasis `side`, jadi aturan rival = aturan pemain.
-- Sinyal dapat argumen `side`: `card_played(side, card)`, `dish_served(side, …)`, dst.
-- `Fighter.heat` sudah ada ("Player only"), sekarang dipakai keduanya.
+- `play / serve / move_top / clear_station / can_*` take a `side` (default `"player"` so the old UI keeps working).
+- `_apply_effects`, `_do_serve`, statuses, Signature: all `side`-based, so the rival's rules = the player's rules.
+- Signals carry a `side` argument: `card_played(side, card)`, `dish_served(side, …)`, etc.
+- `Fighter.heat` already exists ("Player only"), now used by both.
 
 ---
 
-## 3. Rival AI — ✅ inti selesai 22 Nov (fase C), lihat §3.7
+## 3. Rival AI — ✅ core done 22 Nov (phase C), see §3.7
 
-### 3.1 Data (`EnemyDef` baru)
+### 3.1 Data (new `EnemyDef`)
 
-| Field | Isi | Contoh Tony |
+| Field | Content | Tony example |
 |---|---|---|
-| `deck` | `DeckDef` rival | 10 kartu sederhana |
-| `books` | Recipe Book yang dikuasai | Basics |
-| `max_heat` | Heat per giliran | **2** |
-| `hand_size` | Draw per giliran | **4** |
+| `deck` | The rival's `DeckDef` | 10 simple cards |
+| `books` | Mastered Recipe Books | Basics |
+| `max_heat` | Heat per turn | **2** |
+| `hand_size` | Draw per turn | **4** |
 | `profile` | `AiProfile` (3.3) | `greedy` |
-| `flow_thresholds` | Threshold Chef's Flow | `[3, 4, 5]` |
-| `gimmicks` | Daftar aturan khusus (3.5) | — |
+| `flow_thresholds` | Chef's Flow thresholds | `[3, 4, 5]` |
+| `gimmicks` | List of special rules (3.5) | — |
 
-`pattern: Array[IntentDef]` dihapus setelah AI jalan. `IntentDef` dipertahankan sementara hanya untuk fallback saat refactor.
+`pattern: Array[IntentDef]` is removed once the AI works. `IntentDef` is kept temporarily only as a fallback during the refactor.
 
-### 3.2 Cara berpikir (satu aksi per `enemy_step`)
+### 3.2 How it thinks (one action per `enemy_step`)
 
-1. Kumpulkan **kandidat aksi** yang legal: taruh tiap bahan di tiap station, mainkan Technique, pindah kartu, clear, Serve tiap station, End Turn.
-2. Beri **skor** tiap kandidat memakai **preview** logika yang sama dengan pemain (`RecipeMatch`, `preview_serve(side, station)` tanpa menerapkan efek).
-3. Ambil skor tertinggi. Skor seri → pakai `rng_ai` (stream terpisah, §4.3).
-4. Kalau skor terbaik < `end_threshold` profil atau Heat habis → `End Turn`.
+1. Gather the **legal candidate actions**: place each ingredient on each station, play a Technique, move a card, clear, Serve each station, End Turn.
+2. **Score** each candidate using a **preview** of the same logic the player uses (`RecipeMatch`, `preview_serve(side, station)` without applying effects).
+3. Take the highest score. Ties → use `rng_ai` (a separate stream, §4.3).
+4. If the best score is < the profile's `end_threshold`, or Heat is spent → `End Turn`.
 
-**Rumus skor (garis besar):**
+**Scoring formula (outline):**
 
-| Kandidat | Skor |
+| Candidate | Score |
 |---|---|
-| Serve station s | `pressure_preview × w_attack + composure_preview × w_defend`; **+1000 kalau lethal**; −`w_patience` × nilai resep lebih besar yang tinggal 1 langkah lagi di station itu |
-| Taruh bahan | Kemajuan menuju resep terbaik yang bisa dicapai station itu; bonus kalau urutan masih Perfect; penalti kalau merusak resep yang hampir jadi |
-| Technique Pressure | `pressure × w_attack` (+ bonus lethal) |
-| Technique Composure | `composure × w_defend × danger` |
-| Debuff | nilai tetap × `w_debuff` |
+| Serve station s | `pressure_preview × w_attack + composure_preview × w_defend`; **+1000 if lethal**; −`w_patience` × the value of a bigger recipe that is 1 step away on that station |
+| Place an ingredient | Progress toward the best recipe that station can reach; bonus if the order is still Perfect; penalty for breaking a nearly finished recipe |
+| Pressure Technique | `pressure × w_attack` (+ lethal bonus) |
+| Composure Technique | `composure × w_defend × danger` |
+| Debuff | fixed value × `w_debuff` |
 
-`danger` = estimasi ancaman pemain dari **informasi publik saja**: jumlah kartu di station pemain, Hype pemain, Confidence rival sendiri. **AI tidak membaca isi station atau tangan pemain.** Informasinya simetris dengan pemain.
+`danger` = an estimate of the player's threat from **public information only**: the number of cards on the player's stations, the player's Hype, and the rival's own Confidence. **The AI does not read station or hand contents.** The information is symmetric with the player's.
 
-### 3.3 Profil
+### 3.3 Profiles
 
-| Profil | Perilaku | `w_attack` | `w_defend` | `w_patience` | Dipakai |
+| Profile | Behavior | `w_attack` | `w_defend` | `w_patience` | Used by |
 |---|---|---|---|---|---|
-| `greedy` | Serve begitu ada resep cocok, jarang bertahan | 1.0 | 0.3 | 0 | Tony |
-| `trickster` | Suka debuff, Serve sedang | 0.8 | 0.5 | 0.2 | Rosa |
-| `showman` | Menahan stack untuk hidangan besar, Perfect | 1.0 | 0.6 | 0.8 | Marco |
-| `patient` | Perfect Order, bertahan saat Confidence < 40% | 0.9 | 0.9 | 0.6 | Élodie (Elite) |
-| `boss` | `patient` + gimmick fase | 1.1 | 0.8 | 0.5 | Bruno |
+| `greedy` | Serves as soon as a recipe matches, rarely defends | 1.0 | 0.3 | 0 | Tony |
+| `trickster` | Likes debuffs, medium Serves | 0.8 | 0.5 | 0.2 | Rosa |
+| `showman` | Holds a stack for a big dish, Perfect | 1.0 | 0.6 | 0.8 | Marco |
+| `patient` | Perfect Order, defends when Confidence < 40% | 0.9 | 0.9 | 0.6 | Élodie (Elite) |
+| `boss` | `patient` + phase gimmicks | 1.1 | 0.8 | 0.5 | Bruno |
 
-### 3.4 Mood (pengganti Intent)
+### 3.4 Mood (replaces Intent)
 
-Emote yang sudah ada (ART_DIRECTION §5) dipicu dari **niat AI di awal giliran**, bukan dari isi kartu:
+The existing emotes (ART_DIRECTION §5) are triggered by the **AI's intent at the start of the turn**, not by the card contents:
 
-| Mood | Pemicu (dari perencanaan AI) | Emote |
+| Mood | Trigger (from the AI's planning) | Emote |
 |---|---|---|
-| Confident | Ada station yang bisa di-Serve ≥ 12 Pressure giliran ini | Kedip `> ●` |
-| Wary | AI memilih bertahan (`danger` tinggi) | Mata menyipit, keringat |
-| Smug | Confidence pemain ≤ 30% | sudah ada |
-| Angry | Confidence rival ≤ 25% | sudah ada |
+| Confident | A station can be Served for ≥ 12 Pressure this turn | Wink `> ●` |
+| Wary | The AI chooses to defend (high `danger`) | Narrowed eyes, sweat |
+| Smug | Player Confidence ≤ 30% | already exists |
+| Angry | Rival Confidence ≤ 25% | already exists |
 
-Mood samar: pemain tahu "akan ada serangan besar", tapi tidak tahu berapa dan dari bahan apa.
+The mood is vague: the player knows "a big attack is coming" but not how much or from which ingredients.
 
-### 3.5 Tabel visibilitas
+### 3.5 Visibility table
 
-| Informasi | Pemain melihat? |
+| Information | Does the player see it? |
 |---|---|
-| Jumlah kartu di tangan rival | ✅ (punggung kartu) |
-| Jumlah kartu per station rival | ✅ (tumpukan punggung kartu) |
-| Isi kartu di tangan/station rival | ❌ |
-| Heat rival (pip) | ✅ |
-| Efek Technique rival (ikon + angka) | ✅ saat dimainkan |
-| Nama hidangan rival + PERFECT/COOKED | ✅ saat Serve |
-| Damage, Composure, buff, debuff, Hype, Chef's Flow, modifier rival | ✅ |
-| Mood rival | ✅ |
-| Resep yang dikuasai rival | ❌ sampai disajikan (lalu tercatat di Almanac) |
+| Number of cards in the rival's hand | ✅ (card backs) |
+| Number of cards per rival station | ✅ (stack of card backs) |
+| Contents of rival hand/station cards | ❌ |
+| Rival Heat (pips) | ✅ |
+| Rival Technique effect (icon + number) | ✅ when played |
+| Rival dish name + PERFECT/COOKED | ✅ on Serve |
+| Damage, Composure, buffs, debuffs, Hype, Chef's Flow, rival modifiers | ✅ |
+| Rival mood | ✅ |
+| Recipes the rival has mastered | ❌ until served (then recorded in the Almanac) |
 
-### 3.6 Gimmick lama, diterjemahkan
+### 3.6 Old gimmicks, translated
 
-| Rival | GDD lama | Versi drafting |
+| Rival | Old GDD | Drafting version |
 |---|---|---|
-| Tony | Pola sederhana | `greedy`, Heat 2, tangan 4. Lawan tutorial. |
-| Rosa | Sering Taunt | Deck banyak Onion/Stare Down, `trickster`. |
-| Marco | Cooking 2 turn | `showman`: menahan stack 2 giliran untuk Mixed Grill/Classic Steak. Mood Confident muncul satu giliran sebelumnya. |
-| Élodie | Plate penuh → Rattled | Gimmick: kalau station pemain mana pun berisi ≥ 5 kartu di awal giliran rival, pemain Rattled 1. |
-| Bruno | Burnt tiap 2 giliran, Focus fase 2 | Gimmick: Burnt tiap 2 giliran. Fase 2 (≤ 50%): Heat +1 dan Focus +1 per giliran. |
+| Tony | Simple pattern | `greedy`, Heat 2, hand 4. Tutorial opponent. |
+| Rosa | Often Taunts | Deck full of Onion/Stare Down, `trickster`. |
+| Marco | 2-turn Cooking | `showman`: holds a stack for 2 turns for Mixed Grill/Classic Steak. The Confident mood appears one turn earlier. |
+| Élodie | Full Plate → Rattled | Gimmick: if any player station holds ≥ 5 cards at the start of the rival's turn, the player is Rattled 1. |
+| Bruno | Burnt every 2 turns, Phase 2 Focus | Gimmick: Burnt every 2 turns. Phase 2 (≤ 50%): Heat +1 and Focus +1 per turn. |
 
-### 3.7 Status implementasi (fase C, 22 Nov)
+### 3.7 Implementation status (phase C, 22 Nov)
 
-- ✅ `AiProfile` (Inspector) + `EnemyDef.deck / books / max_heat / hand_size / ai`. Rival tanpa deck/AI tetap memakai pola Intent lama.
-- ✅ `RivalAI` (`scripts/core/rival_ai.gd`): taruh bahan, Technique, Serve; lookahead "jalur yang bisa diselesaikan dengan tangan ini"; ambil lethal; tahan Heat untuk Serve; bisa memainkan sisi mana pun (dipakai bot pintar di `tests/sim.gd`).
-- ✅ HUD: station rival tertutup + Hand + Heat di atas meja rival (`%RivalKitchen` di `duel_ui.tscn`, anchor `RivalStationsAnchor` di `stage.tscn`), banner hidangan rival saat Serve, mood Confident/Wary.
-- ✅ Signature Dish hanya untuk Apis (GDD §4.5); Hype rival hanya meter penonton.
-- ✅ Data: Tony (`greedy`, Heat 2, tangan 4, Basics), Rosa (`trickster`, Heat 3, tangan 4, Basics + Spice).
-- Balancing awal (bot pintar, deck starter): Tony 98% menang, ±2.8 giliran, sisa Confidence ±44/60. Rosa 85% menang, ±3.5 giliran, sisa ±36/60.
-- ⏳ Belum: pindah/clear station oleh AI, gimmick Élodie/Bruno (rival-nya belum ada di data), profil `showman`/`patient`/`boss`. Tie-break RNG: ✅ fase D (§4.5).
+- ✅ `AiProfile` (Inspector) + `EnemyDef.deck / books / max_heat / hand_size / ai`. A rival without a deck/AI still uses the old Intent pattern.
+- ✅ `RivalAI` (`scripts/core/rival_ai.gd`): place ingredients, Techniques, Serve; "paths that can be finished with this hand" lookahead; takes lethal; saves Heat for Serve; can play either side (used by the smart bot in `tests/sim.gd`).
+- ✅ HUD: face-down rival stations + Hand + Heat above the rival's table (`%RivalKitchen` in `duel_ui.tscn`, anchor `RivalStationsAnchor` in `stage.tscn`), rival dish banner on Serve, Confident/Wary mood.
+- ✅ Signature Dish only for Apis (GDD §4.5); rival Hype is just an audience meter.
+- ✅ Data: Tony (`greedy`, Heat 2, hand 4, Basics), Rosa (`trickster`, Heat 3, hand 4, Basics + Spice).
+- Initial balancing (smart bot, starter deck): Tony 98% win, ±2.8 turns, ±44/60 Confidence left. Rosa 85% win, ±3.5 turns, ±36/60 left.
+- ⏳ Not yet: the AI moving/clearing stations, Élodie/Bruno gimmicks (those rivals are not in the data yet), `showman`/`patient`/`boss` profiles. RNG tie-break: ✅ phase D (§4.5).
 
 ---
 
-## 4. RNG — ✅ inti selesai 22 Nov (fase D), lihat §4.5
+## 4. RNG — ✅ core done 22 Nov (phase D), see §4.5
 
-### 4.1 Peta
+### 4.1 Map
 
-| | Input random (sebelum aksi) | Output random (setelah aksi) |
+| | Random input (before an action) | Random output (after an action) |
 |---|---|---|
-| Duel | Shuffle, draw, tie-break AI | **Tidak ada.** Damage, Quality, efek resep, modifier: semuanya pasti. |
-| Run | Penawaran modifier, reward kartu, Course Path | Tidak ada |
+| Duel | Shuffle, draw, AI tie-break | **None.** Damage, Quality, recipe effects, modifiers: all certain. |
+| Run | Modifier offers, card rewards, Course Path | None |
 
-Prinsip: **apa yang terjadi setelah pemain bertindak selalu bisa dihitung dari tiket dan tooltip.** RNG hanya menentukan "kartu apa yang kamu dapat", bukan "berhasil atau tidak".
+Principle: **what happens after the player acts can always be computed from the ticket and tooltips.** RNG only decides "which cards you get", never "whether it works".
 
-### 4.2 Pseudo-random (ringan)
+### 4.2 Pseudo-random (light)
 
-| Aturan | Isi | Berlaku untuk |
+| Rule | Content | Applies to |
 |---|---|---|
-| **Anti-clump shuffle** | Setelah Fisher–Yates, kalau 4+ Technique berurutan di 5 kartu teratas, shuffle ulang (maks 3 kali, lalu terima apa adanya) | Pemain + rival |
-| **Mise en Place** (bad-luck protection) | Setelah draw awal giliran, kalau tangan **tidak berisi satu pun bahan yang bisa ditaruh**, 1 Technique ditukar dengan bahan teratas di draw pile. Maks 1× per giliran. Tampil "✨ Mise en place!" | Pemain + rival |
-| **Pity rarity** (penawaran modifier) | 3 penawaran berturut-turut tanpa Rare → penawaran berikutnya dijamin berisi 1 Rare | Pemain |
+| **Anti-clump shuffle** | After Fisher–Yates, if 4+ Techniques are in a row among the top 5 cards, reshuffle (max 3 times, then accept it as is) | Player + rival |
+| **Mise en Place** (bad-luck protection) | After the turn-start draw, if the hand **contains no ingredient that can be placed**, 1 Technique is swapped with the top ingredient of the draw pile. Max 1× per turn. Shown as "✨ Mise en place!" | Player + rival |
+| **Rarity pity** (modifier offers) | 3 offers in a row without a Rare → the next offer is guaranteed to contain 1 Rare | Player |
 
-Tidak ada pity lain. Membentuk peluang adalah tugas deckbuilding (membuang kartu, memilih bahan, memilih buku).
+No other pity. Shaping the odds is deckbuilding's job (removing cards, choosing ingredients, choosing books).
 
-### 4.3 Stream terpisah
+### 4.3 Separate streams
 
-Satu seed run → diturunkan ke stream independen:
+One run seed → derived into independent streams:
 
 ```
 run_seed ─┬─ shuffle_player
           ├─ shuffle_enemy
           ├─ ai_tiebreak
-          └─ offers (modifier, reward)
+          └─ offers (modifiers, rewards)
 ```
 
-Keputusan AI tidak menggeser kartu yang akan didraw pemain. Run tetap bisa direproduksi dari satu seed (debug, sim, daily seed nanti).
+AI decisions do not shift the cards the player will draw. A run can still be reproduced from a single seed (debug, sim, a daily seed later).
 
-### 4.4 Janji fair (ditulis juga di tutorial/credit)
-- Rival memakai deck, shuffle, dan aturan pity yang sama.
-- Rival tidak melihat tangan dan isi station pemain.
-- Draw rival tidak dicurangi berdasarkan kondisi pemain.
+### 4.4 Fairness promise (also written in the tutorial/credits)
+- The rival uses the same deck, shuffle and pity rules.
+- The rival does not see the player's hand or station contents.
+- The rival's draws are not rigged based on the player's state.
 
-### 4.5 Status implementasi (fase D)
-- ✅ `SeededRng.stream(seed, name)`: stream bernama dari satu `Duel.duel_seed` (FNV-1a nama sebagai salt). Shuffle pemain/rival tetap `seed` / `seed ^ ENEMY_RNG_SALT`; tie-break AI `ai_player` / `ai_enemy` di `Kitchen.ai_rng`. Stream `offers` siap dipakai fase E.
-- ✅ Anti-clump (`Duel._shuffle`): 4+ Technique di 5 kartu teratas → shuffle ulang, maks 3×. Berlaku untuk shuffle awal dan reshuffle discard. Deck berat-Technique: clump pembuka turun dari 95/400 ke 2/400.
-- ✅ Mise en Place (`Duel._mise_en_place`): setelah draw awal giliran, tangan tanpa bahan yang bisa ditaruh → 1 Technique ditukar dengan bahan teratas draw pile (Technique masuk ke posisi itu, jumlah kartu tetap). Maks 1× per giliran, pemain + rival, signal `mise_en_place`. HUD: "Mise en place!" melayang di atas station (rival: di atas station tertutupnya; kartunya tetap rahasia).
-- ✅ Tie-break AI (`RivalAI._consider`): skor dalam 0.05 = seri, dipilih acak merata dari `ai_rng`. Rival tidak lagi selalu mengisi station 1 dulu; test memastikan stream ini tidak menggeser draw Apis.
-- Konstanta di `duel.gd` (`CLUMP_*`), bukan `@export`: ini aturan inti (pure logic), bukan tuning per scene.
-- ⏳ Pity rarity penawaran modifier → fase E.
+### 4.5 Implementation status (phase D)
+- ✅ `SeededRng.stream(seed, name)`: named streams from one `Duel.duel_seed` (FNV-1a of the name as a salt). Player/rival shuffles stay `seed` / `seed ^ ENEMY_RNG_SALT`; AI tie-breaks `ai_player` / `ai_enemy` in `Kitchen.ai_rng`. The `offers` stream is ready for phase E.
+- ✅ Anti-clump (`Duel._shuffle`): 4+ Techniques among the top 5 cards → reshuffle, max 3×. Applies to the initial shuffle and discard reshuffles. Technique-heavy decks: opening clumps dropped from 95/400 to 2/400.
+- ✅ Mise en Place (`Duel._mise_en_place`): after the turn-start draw, a hand with no placeable ingredient → 1 Technique swapped with the top ingredient of the draw pile (the Technique goes into that position, card count unchanged). Max 1× per turn, player + rival, `mise_en_place` signal. HUD: "Mise en place!" floats above the station (rival: above its face-down station; the card stays secret).
+- ✅ AI tie-break (`RivalAI._consider`): scores within 0.05 count as a tie, picked uniformly from `ai_rng`. The rival no longer always fills station 1 first; a test makes sure this stream does not shift Apis's draws.
+- Constants in `duel.gd` (`CLUMP_*`), not `@export`: these are core rules (pure logic), not per-scene tuning.
+- ⏳ Modifier-offer rarity pity → phase E.
 
 ---
 
-## 5. Chef's Flow & Modifier — ✅ inti selesai 22 Nov (fase E), lihat §5.5
+## 5. Chef's Flow & Modifiers — ✅ core done 22 Nov (phase E), see §5.5
 
-### 5.1 Aturan
-- Setiap Serve **Perfect Order** = +1 Flow. Serve Cooked/Improvised = +0.
-- Threshold: **1 → 2 → 3** (lalu tetap 3). Diturunkan dari 2 → 3 → 4 di fase G (§8.2). Saat tercapai, Flow kembali 0 dan muncul **pilih 1 dari 3 modifier**.
-- **Per duel**: modifier dan Flow reset di awal duel berikutnya. Kitchen Tool tetap reward run (GDD §6.4).
-- Pemain: overlay pilih kartu (ref Gambar 3) muncul **setelah Serve selesai diresolusi**. Game pause.
-- Rival: memilih otomatis sesuai profil. Announcer chip **"TONY GOT HOT PAN!"** (1 s) + ikon di baris modifier rival.
+### 5.1 Rules
+- Every **Perfect Order** Serve = +1 Flow. Cooked/Improvised Serve = +0.
+- Thresholds: **1 → 2 → 3** (then stays at 3). Lowered from 2 → 3 → 4 in phase G (§8.2). When reached, Flow returns to 0 and a **pick 1 of 3 modifiers** appears.
+- **Per duel**: modifiers and Flow reset at the start of the next duel. Kitchen Tools remain a run reward (GDD §6.4).
+- Player: a card-pick overlay (ref Image 3) appears **after the Serve finishes resolving**. The game pauses.
+- Rival: picks automatically according to its profile. Announcer chip **"TONY GOT HOT PAN!"** (1 s) + an icon in the rival's modifier row.
 
-| Meter | Naik dari | Hadiah | Sifat |
+| Meter | Rises from | Reward | Nature |
 |---|---|---|---|
-| Hype | Serve resep apa pun | Signature Dish | Ledakan sekali pakai |
-| **Chef's Flow** | Serve **Perfect Order** | Modifier | Permanen dalam duel, bertumpuk |
+| Hype | Serving any recipe | Signature Dish | One-shot burst |
+| **Chef's Flow** | Serving a **Perfect Order** | Modifier | Permanent within the duel, stacks |
 
-### 5.2 Aturan penawaran
-1. Tidak ada modifier non-stackable yang sudah dimiliki.
-2. Minimal 1 dari 3 **cocok dengan build** (tag dominan di deck atau buku yang dikuasai).
-3. Pity rarity (4.2).
-4. Komposisi: 2 Common + 1 slot (Common 75% / Rare 25%).
+### 5.2 Offer rules
+1. No non-stackable modifier that is already owned.
+2. At least 1 of the 3 **matches the build** (dominant tag in the deck or a mastered book).
+3. Rarity pity (4.2).
+4. Composition: 2 Common + 1 slot (Common 75% / Rare 25%).
 
-### 5.3 Pool awal (±10)
+### 5.3 Starting pool (±10)
 
-| Modifier | Rarity | Efek | Stack |
+| Modifier | Rarity | Effect | Stack |
 |---|---|---|---|
-| Hot Pan | Common | Serve pertama tiap giliran +3 Pressure | +3 per stack |
-| Steady Hands | Common | +1 Composure tiap menaruh bahan | +1 |
-| Encore | Common | Multiplier Perfect Order ×1.5 → +0.25 | +0.25 |
-| Extra Burner | Common | +1 Heat di giliran setelah Serve Perfect | ✗ |
-| Prep Cook | Common | Draw +1 di awal giliran | ✗ |
-| Crowd Favorite | Common | Hype +10 tiap Serve | +10 |
-| Spice Whisperer | Common | Bahan `SPICE` memberi Spicy 1 ke lawan | +1 |
-| Free Move | Rare | Pindah kartu teratas 2× per giliran | ✗ |
-| Mise Master | Rare | Mise en Place juga aktif kalau tangan punya ≤ 1 bahan | ✗ |
-| Plating Pro | Rare | Garnish maks +2 → +4 Quality | ✗ |
+| Hot Pan | Common | The first Serve each turn +3 Pressure | +3 per stack |
+| Steady Hands | Common | +1 Composure each time you place an ingredient | +1 |
+| Encore | Common | Perfect Order multiplier ×1.5 → +0.25 | +0.25 |
+| Extra Burner | Common | +1 Heat on the turn after a Perfect Serve | ✗ |
+| Prep Cook | Common | Draw +1 at the start of the turn | ✗ |
+| Crowd Favorite | Common | Hype +10 each Serve | +10 |
+| Spice Whisperer | Common | `SPICE` ingredients give the opponent Spicy 1 | +1 |
+| Free Move | Rare | Move the top card 2× per turn | ✗ |
+| Mise Master | Rare | Mise en Place also triggers if the hand has ≤ 1 ingredient | ✗ |
+| Plating Pro | Rare | Garnish max +2 → +4 Quality | ✗ |
 
-### 5.4 Threshold rival
+### 5.4 Rival thresholds
 
 | Rival | Threshold |
 |---|---|
 | Tony, Rosa | 3 → 4 → 5 |
 | Marco | 2 → 4 → 5 |
-| Élodie, Bruno | 2 → 3 → 4 (sama dengan pemain) |
+| Élodie, Bruno | 2 → 3 → 4 (same as the player) |
 
-### 5.5 Status implementasi (fase E)
-- ✅ Data: `ModifierDef` (Resource) + 10 file di `data/modifiers/`. Angka (`amount`), rarity, ikon, teks, `stackable`, dan `tag` build bisa diatur di Inspector; efeknya dikodekan per `id` di `Duel`.
-- ✅ Logika (`Duel` + `Kitchen`): Flow +1 hanya dari Serve Perfect Order (setelah sinyal `dish_served`), threshold pemain `Duel.PLAYER_FLOW` 2→3→4, rival `EnemyDef.flow_thresholds` (Tony/Rosa default 3→4→5). Semua per duel (Kitchen baru tiap duel).
-- ✅ Penawaran (`Duel._make_offer`, stream `offers`/`offers_enemy`): 2 Common + 1 slot (Rare 25%), pity 3 penawaran tanpa Rare → slot 3 Rare, tanpa duplikat, tanpa non-stackable yang sudah dimiliki. **Build** = tag dengan ≥3 bahan di deck: modifier ber-tag hanya muncul kalau deck memakai tag itu, dan kalau ada, selalu mengisi 1 slot.
-- ✅ Pemain: sinyal `flow_offer`, overlay `FlowPick` di `duel_ui.tscn` muncul 1.2 s setelah Serve (sesudah dish reveal). Selama terbuka, semua aksi ditolak ("Pick a modifier first.") dan input HUD terkunci. `pick_modifier(id)`.
-- ✅ Rival: `RivalAI.pick_modifier` memilih sesuai profil; langkah Serve-nya membawa `modifier`, lalu Turn Director menampilkan banner **"TONY GOT / HOT PAN!"**.
-- ✅ HUD: baris `PlayerFlow` / `EnemyFlow` (FLOW ●●○ + chip modifier dengan angka stack dan tooltip).
-- Penyesuaian terhadap tabel §5.3:
-  - **Hot Pan** berlaku di setiap Serve, karena Serve memang hanya sekali per giliran.
-  - **Plating Pro**: belum ada batas Garnish di aturan, jadi efeknya "Quality Garnish ×2".
-  - **Free Move**: AI belum memakai pindah kartu, jadi nilainya rendah untuk rival.
-- ✅ Balancing (fase G, §8.2): threshold pemain diturunkan ke 1 → 2 → 3. Pemain hati-hati kini mendapat ±1 modifier per duel (dulu 0.06–0.22).
+### 5.5 Implementation status (phase E)
+- ✅ Data: `ModifierDef` (Resource) + 10 files in `data/modifiers/`. Numbers (`amount`), rarity, icon, text, `stackable` and build `tag` can be set in the Inspector; the effects are coded per `id` in `Duel`.
+- ✅ Logic (`Duel` + `Kitchen`): Flow +1 only from a Perfect Order Serve (after the `dish_served` signal), player threshold `Duel.PLAYER_FLOW` 2→3→4, rival `EnemyDef.flow_thresholds` (Tony/Rosa default 3→4→5). All per duel (a new Kitchen every duel).
+- ✅ Offers (`Duel._make_offer`, streams `offers`/`offers_enemy`): 2 Common + 1 slot (Rare 25%), pity 3 offers without a Rare → slot 3 Rare, no duplicates, no already-owned non-stackables. **Build** = a tag with ≥3 ingredients in the deck: a tagged modifier only appears if the deck uses that tag, and when one exists it always fills 1 slot.
+- ✅ Player: `flow_offer` signal, the `FlowPick` overlay in `duel_ui.tscn` appears 1.2 s after Serve (after the dish reveal). While open, all actions are rejected ("Pick a modifier first.") and HUD input is locked. `pick_modifier(id)`.
+- ✅ Rival: `RivalAI.pick_modifier` chooses according to its profile; its Serve step carries the `modifier`, then the Turn Director shows the banner **"TONY GOT / HOT PAN!"**.
+- ✅ HUD: `PlayerFlow` / `EnemyFlow` rows (FLOW ●●○ + modifier chips with stack count and tooltip).
+- Adjustments to the §5.3 table:
+  - **Hot Pan** applies on every Serve, since Serve is only once per turn anyway.
+  - **Plating Pro**: the rules have no Garnish cap yet, so the effect is "Garnish Quality ×2".
+  - **Free Move**: the AI does not use card moves yet, so it is low-value for the rival.
+- ✅ Balancing (phase G, §8.2): the player threshold was lowered to 1 → 2 → 3. A careful player now gets ±1 modifier per duel (was 0.06–0.22).
 
 ---
 
-## 6. Almanac — ✅ selesai 23 Nov (fase F), lihat §6.5
+## 6. Almanac — ✅ done 23 Nov (phase F), see §6.5
 
-### 6.1 Isi
+### 6.1 Contents
 
-| Tab | Entri | Data per entri |
+| Tab | Entries | Data per entry |
 |---|---|---|
-| **Ingredients** | Semua bahan (±15) | Tag, Quality, efek, resep yang memakainya |
-| **Techniques** | Semua teknik | Biaya, efek |
-| **Recipes** | Semua resep (±13) | **Urutan Perfect** (ikon bahan bawah → atas), efek dasar, buku asal, status dikuasai |
-| **Rivals** | 5 rival | Portrait, gimmick (terbuka setelah dilawan), resep yang pernah mereka sajikan |
-| **Keywords** | Status + Perfect/Cooked/Garnish/Improvised | Teks tooltip yang sudah ada (`keywords.gd`) |
+| **Ingredients** | All ingredients (±15) | Tag, Quality, effect, recipes that use it |
+| **Techniques** | All techniques | Cost, effect |
+| **Recipes** | All recipes (±13) | **Perfect order** (ingredient icons bottom → top), base effect, source book, mastered status |
+| **Rivals** | 5 rivals | Portrait, gimmick (unlocked after fighting them), recipes they have served |
+| **Keywords** | Statuses + Perfect/Cooked/Garnish/Improvised | The existing tooltip text (`keywords.gd`) |
 
 ### 6.2 Discovery
 
-| Entri terbuka saat… | |
+| An entry unlocks when… | |
 |---|---|
-| Bahan/teknik | Kartunya pernah ada di deckmu, atau ditawarkan sebagai reward/shop |
-| Resep | Bukunya kamu kuasai (terbuka penuh), **atau** rival menyajikannya (terbuka, tag "Seen from Tony"), atau bukunya dilihat di Shop |
-| Rival | Saat duel dimulai (gimmick terbuka setelah duel selesai) |
+| Ingredient/technique | The card has been in your deck, or was offered as a reward/shop item |
+| Recipe | You master its book (fully unlocked), **or** a rival serves it (unlocked, tagged "Seen from Tony"), or its book was seen in the Shop |
+| Rival | When the duel starts (gimmick unlocks after the duel ends) |
 
-Entri yang belum terbuka: siluet + "???" + petunjuk ("Found in Spice Route Journal").
+Locked entries: a silhouette + "???" + a hint ("Found in Spice Route Journal").
 
-**Persistensi:** discovery disimpan lintas run (`user://almanac.save`). Ini **pengetahuan, bukan kekuatan**, jadi tidak bertentangan dengan keputusan "tanpa meta-progression" (GDD §11).
+**Persistence:** discovery is saved across runs (`user://almanac.save`). This is **knowledge, not power**, so it does not contradict the "no meta-progression" decision (GDD §11).
 
 ### 6.3 Combination finder
-Di tab Recipes: klik 1–3 ikon tag/bahan → daftar resep yang memakainya, dengan langkah yang masih kurang disorot. Hanya menampilkan resep yang sudah terbuka.
+In the Recipes tab: click 1–3 tag/ingredient icons → a list of recipes that use them, with the missing steps highlighted. Only shows recipes that are already unlocked.
 
-### 6.4 Akses
-- Tombol buku (ikon `book.svg`) di HUD + tombol **Tab**.
-- Di duel: membuka Almanac **mem-pause** game. Tidak bisa dibuka di tengah animasi giliran rival (antre sampai giliran pemain).
-- Di Course Path / Shop: selalu bisa dibuka.
+### 6.4 Access
+- A book button (`book.svg` icon) in the HUD + the **Tab** key.
+- In a duel: opening the Almanac **pauses** the game. It cannot be opened in the middle of the rival's turn animations (queued until the player's turn).
+- In the Course Path / Shop: always openable.
 
-### 6.5 Status implementasi (fase F, 23 Nov)
-- ✅ Logika: `Almanac` (`scripts/core/almanac.gd`, murni) menyimpan kartu, resep (sumber `mastered` atau id rival), rival (bertemu / gimmick terbuka) dan hidangan yang disajikan rival. `prepare(deck, buku)` sebelum Recipe Book, `watch(duel)` selama duel: rival tercatat saat duel dimulai, resep rival saat Serve-nya ("Seen from Tony"), gimmick saat duel selesai. Buku yang dikuasai selalu menang atas "Seen from".
-- ✅ Persistensi: node `AlmanacKeeper` di `main.tscn` (Inspector: `save_path` = `user://almanac.save`, `persist`, `reveal_all` untuk dev). Disimpan setiap ada discovery baru dan saat duel selesai (JSON).
-- ✅ UI: node `Almanac` di `duel_ui.tscn` (skrip `almanac_view.gd`). Tab Ingredients / Techniques / Recipes / Rivals / Keywords, panel detail di kanan, siluet "???" + petunjuk untuk yang belum terbuka, badge NEW (dan titik merah di tombol HUD) sampai entri dilihat.
-- ✅ Combination finder di tab Recipes: pilih sampai 3 tag atau bahan kunci yang sudah ditemukan. Hanya resep yang sudah terbuka; langkah yang diisi pilihanmu berbingkai hijau, yang masih kurang berbingkai oranye.
-- ✅ Akses: tombol buku di HUD (sebelah tombol pixel), tombol **Tab**, dan tombol "Almanac (Tab)" di Recipe Book sebelum duel. Membuka Almanac mem-pause game (`get_tree().paused`). Di giliran rival, Tab hanya mengantre: Almanac terbuka begitu giliran pemain dimulai. Tab / Esc / Close menutupnya.
-- ✅ Data: `EnemyDef.gimmick` (teks gimmick di tab Rivals), diisi untuk Tony dan Rosa.
-- Penyesuaian: Course Path dan Shop belum ada, jadi discovery "ditawarkan sebagai reward/shop" dan "buku dilihat di Shop" belum terpakai. Tab Rivals hanya berisi rival yang ada di data (Tony, Rosa). Keyword tambahan (Perfect Order, Cooked, Garnish, Improvised Dish, Chef's Flow) ditulis di `AlmanacView.EXTRA_KEYWORDS`.
+### 6.5 Implementation status (phase F, 23 Nov)
+- ✅ Logic: `Almanac` (`scripts/core/almanac.gd`, pure) stores cards, recipes (source `mastered` or a rival id), rivals (met / gimmick unlocked) and dishes served by rivals. `prepare(deck, books)` before the Recipe Book, `watch(duel)` during a duel: a rival is recorded when the duel starts, its recipes on Serve ("Seen from Tony"), its gimmick when the duel ends. A mastered book always beats "Seen from".
+- ✅ Persistence: an `AlmanacKeeper` node in `main.tscn` (Inspector: `save_path` = `user://almanac.save`, `persist`, `reveal_all` for dev). Saved on every new discovery and when a duel ends (JSON).
+- ✅ UI: the `Almanac` node in `duel_ui.tscn` (script `almanac_view.gd`). Ingredients / Techniques / Recipes / Rivals / Keywords tabs, a detail panel on the right, "???" silhouettes + hints for locked entries, a NEW badge (and a red dot on the HUD button) until the entry is viewed.
+- ✅ Combination finder in the Recipes tab: choose up to 3 tags or key ingredients you have discovered. Only unlocked recipes; steps filled by your choice have a green frame, missing ones an orange frame.
+- ✅ Access: a book button in the HUD (next to the pixel button), the **Tab** key, and an "Almanac (Tab)" button in the Recipe Book before a duel. Opening the Almanac pauses the game (`get_tree().paused`). On the rival's turn, Tab only queues: the Almanac opens when the player's turn begins. Tab / Esc / Close closes it.
+- ✅ Data: `EnemyDef.gimmick` (gimmick text in the Rivals tab), filled in for Tony and Rosa.
+- Adjustments: the Course Path and Shop do not exist yet, so "offered as a reward/shop" and "book seen in the Shop" discovery are unused. The Rivals tab only holds rivals that exist in the data (Tony, Rosa). Extra keywords (Perfect Order, Cooked, Garnish, Improvised Dish, Chef's Flow) are written in `AlmanacView.EXTRA_KEYWORDS`.
 
 ---
 
-## 7. Perubahan HUD
+## 7. HUD changes
 
-| Elemen | Posisi | Catatan |
+| Element | Position | Notes |
 |---|---|---|
-| Station rival (3 tumpukan punggung kartu) | Meja rival, sejajar station pemain | Tidak bisa di-hover isinya. Tooltip: "3 cards" |
-| Tangan rival | Kipas kecil punggung kartu di atas meja rival | Jumlah saja |
-| Heat rival | Pip di samping portrait rival | |
-| Chef's Flow | Pip kecil (●●○) di bawah bar Hype, per sisi | |
-| Baris modifier | Di bawah status, per sisi | Ikon + angka stack, tooltip |
-| Mood | Bubble emote yang sudah ada | Menggantikan label Intent |
-| Tombol Almanac | Pojok kanan atas, dekat tombol pixel | |
-| Banner giliran | Pakai gaya announcer (strip gelap + teks slam) | |
+| Rival stations (3 stacks of card backs) | The rival's table, aligned with the player's stations | Contents cannot be hovered. Tooltip: "3 cards" |
+| Rival hand | A small fan of card backs above the rival's table | Count only |
+| Rival Heat | Pips next to the rival's portrait | |
+| Chef's Flow | Small pips (●●○) under the Hype bar, per side | |
+| Modifier row | Under the status row, per side | Icon + stack count, tooltip |
+| Mood | The existing emote bubble | Replaces the Intent label |
+| Almanac button | Top-right corner, near the pixel button | |
+| Turn banner | Uses the announcer style (dark strip + slam text) | |
 
-Aset tambahan untuk daftar ART_DIRECTION §8: punggung kartu versi rival (warna rival), 2 emote baru (Wary), ikon modifier ±10, frame Almanac + siluet "???".
+Extra assets for the ART_DIRECTION §8 list: a rival version of the card back (rival color), 2 new emotes (Wary), ±10 modifier icons, an Almanac frame + "???" silhouettes.
 
 ---
 
-## 8. Rencana implementasi — ✅ fase A–G selesai 23 Nov
+## 8. Implementation plan — ✅ phases A–G done 23 Nov
 
-| Fase | Isi | Tergantung | Perkiraan |
+| Phase | Content | Depends on | Estimate |
 |---|---|---|---|
-| **A. Turn Director** | Fase `"enemy"`, API `enemy_step`, banner, input lock, fast-forward. Rival sementara tetap memakai Intent lewat `enemy_step` | — | 1 hari |
-| **B. Kitchen simetris** | Refactor `Duel` ke `Kitchen` per sisi, sinyal dengan `side`, `sim.gd` tetap hijau | A | 1–1.5 hari |
-| **C. Rival AI** | `AiProfile`, skor kandidat, `preview_serve`, deck/buku rival, visual station tertutup, mood | B | 2 hari |
-| **D. RNG** | Stream terpisah, anti-clump, Mise en Place + tanda | B | 0.5 hari |
-| **E. Chef's Flow** | Meter, overlay pilih 3, pool modifier, AI memilih | B (C untuk rival) | 1.5 hari |
-| **F. Almanac** | Data dari `GameDB`, discovery + save, UI tab, combination finder | — (paralel) | 1.5 hari |
-| **G. Balancing** | `sim.gd`: AI vs AI ratusan duel per rival, cek panjang duel & win rate | C, D, E | 1 hari |
+| **A. Turn Director** | The `"enemy"` phase, `enemy_step` API, banners, input lock, fast-forward. The rival temporarily keeps using Intent through `enemy_step` | — | 1 day |
+| **B. Symmetric Kitchen** | Refactor `Duel` into a per-side `Kitchen`, signals with `side`, `sim.gd` stays green | A | 1–1.5 days |
+| **C. Rival AI** | `AiProfile`, candidate scoring, `preview_serve`, rival deck/books, face-down station visuals, mood | B | 2 days |
+| **D. RNG** | Separate streams, anti-clump, Mise en Place + indicator | B | 0.5 day |
+| **E. Chef's Flow** | Meter, pick-3 overlay, modifier pool, AI picks | B (C for the rival) | 1.5 days |
+| **F. Almanac** | Data from `GameDB`, discovery + save, tab UI, combination finder | — (parallel) | 1.5 days |
+| **G. Balancing** | `sim.gd`: AI vs AI hundreds of duels per rival, check duel length & win rate | C, D, E | 1 day |
 
-Total ±9 hari kerja, masuk ke minggu 2 jadwal GDD §10 (29 Nov–5 Des) dengan sebagian ke minggu 3. **F bisa dikerjakan paralel** sejak awal.
+Total ±9 working days, falling in week 2 of the GDD §10 schedule (29 Nov–5 Dec) with some spilling into week 3. **F can run in parallel** from the start.
 
-**Kalau jadwal mundur, potong berurutan:** combination finder → threshold Flow rival → profil `trickster`/`showman` (pakai `greedy`/`patient`) → tab Rivals di Almanac → modifier Rare.
+**If the schedule slips, cut in this order:** combination finder → rival Flow thresholds → `trickster`/`showman` profiles (use `greedy`/`patient`) → the Rivals tab in the Almanac → Rare modifiers.
 
-### 8.1 Tes
-- `tests/sim.gd`: `run_enemy_turn()` sinkron; duel deterministik untuk seed yang sama (snapshot hasil).
-- Tes visibilitas: UI tidak pernah membuat `CardView` berisi kartu rival (hanya punggung).
-- Tes fair: dua run dengan seed sama, keputusan pemain berbeda → urutan draw pemain tetap sama (stream terpisah).
-- Target balancing awal: Tony kalah dari deck starter ±80% (di tangan AI pemain sederhana), duel 5–8 giliran.
+### 8.1 Tests
+- `tests/sim.gd`: synchronous `run_enemy_turn()`; deterministic duels for the same seed (result snapshot).
+- Visibility test: the UI never creates a `CardView` holding a rival card (card backs only).
+- Fairness test: two runs with the same seed and different player decisions → the player's draw order stays the same (separate streams).
+- Initial balancing target: Tony loses to the starter deck ±80% of the time (in the hands of a simple player AI), duels of 5–8 turns.
 
-### 8.2 Status balancing (fase G, 23 Nov)
-Alat: `tests/balance.gd` (headless) memainkan ratusan duel per rival dengan dua bot (`tests/balance_runner.gd`): **simple** (kartu acak, Serve apa pun yang jadi = pemain baru) dan **smart** (`RivalAI` di sisi Apis = pemain hati-hati). `-- sweep` mencoba grid Confidence pemain × Confidence rival × threshold Flow. `tests/sim.gd` menjaga targetnya (`_balance()`).
+### 8.2 Balancing status (phase G, 23 Nov)
+Tool: `tests/balance.gd` (headless) plays hundreds of duels per rival with two bots (`tests/balance_runner.gd`): **simple** (random cards, Serve anything that works = a new player) and **smart** (`RivalAI` on Apis's side = a careful player). `-- sweep` tries a grid of player Confidence × rival Confidence × Flow threshold. `tests/sim.gd` guards the targets (`_balance()`).
 
-Masalah awal: duel terlalu pendek (smart ±2.7 giliran vs Tony), dan Chef's Flow hampir tidak pernah aktif. Menaikkan Confidence rival saja membuat pemain kalah di giliran ±6, karena kedua sisi memberi ±10 Pressure per giliran. Jadi kedua sisi dinaikkan.
+Initial problem: duels were too short (smart ±2.7 turns vs Tony), and Chef's Flow almost never triggered. Raising only the rival's Confidence made the player lose around turn ±6, because both sides deal ±10 Pressure per turn. So both sides were raised.
 
-| Nilai | Dulu | Sekarang | Tempat mengubah |
+| Value | Before | Now | Where to change |
 |---|---|---|---|
-| Confidence Apis | 60 | **100** | `Duel.PLAYER_CONFIDENCE`, Inspector `Main` → Balance |
-| Confidence Tony | 30 | **45** | `data/enemies/tony.tres` |
-| Confidence Rosa | 38 | **50** | `data/enemies/rosa.tres` |
-| Threshold Flow pemain | 2 → 3 → 4 | **1 → 2 → 3** | `Duel.PLAYER_FLOW`, Inspector `Main` → Balance |
+| Apis Confidence | 60 | **100** | `Duel.PLAYER_CONFIDENCE`, `Main` Inspector → Balance |
+| Tony Confidence | 30 | **45** | `data/enemies/tony.tres` |
+| Rosa Confidence | 38 | **50** | `data/enemies/rosa.tres` |
+| Player Flow threshold | 2 → 3 → 4 | **1 → 2 → 3** | `Duel.PLAYER_FLOW`, `Main` Inspector → Balance |
 
-Hasil (300 duel, deck starter):
+Results (300 duels, starter deck):
 
-| Rival | Bot | Menang | Giliran | Confidence sisa | Aksi rival/giliran | Modifier Apis/duel |
+| Rival | Bot | Win | Turns | Confidence left | Rival actions/turn | Apis modifiers/duel |
 |---|---|---|---|---|---|---|
-| Tony | simple | 76% | 7.5 | 38/100 | 4.8 (maks 7) | 0.30 |
+| Tony | simple | 76% | 7.5 | 38/100 | 4.8 (max 7) | 0.30 |
 | Tony | smart | 98% | 4.7 | 64/100 | 4.8 | 1.00 |
-| Rosa | simple | 38% | 6.3 | 34/100 | 4.2 (maks 6) | 0.30 |
+| Rosa | simple | 38% | 6.3 | 34/100 | 4.2 (max 6) | 0.30 |
 | Rosa | smart | 87% | 4.7 | 55/100 | 4.2 | 0.99 |
 
-- Target §8.1 tercapai: Tony kalah ±80% dari pemain sederhana, duel 5–8 giliran (pemain sungguhan ada di antara kedua bot). Rosa lebih sulit dari Tony untuk kedua bot.
-- Risiko §9 "panjang giliran rival": rata-rata 4.2–4.8 aksi, di bawah batas 6.
-- Belum: Marco, Élodie, dan Bruno belum ada di data. Confidence mereka di GDD §6.5 perlu disesuaikan dengan skala baru saat dibuat (cek dengan `balance.gd`).
+- The §8.1 target was met: Tony loses ±80% to a simple player, duels last 5–8 turns (a real player sits between the two bots). Rosa is harder than Tony for both bots.
+- The §9 "rival turn length" risk: an average of 4.2–4.8 actions, under the limit of 6.
+- Not yet: Marco, Élodie and Bruno are not in the data yet. Their Confidence in GDD §6.5 needs adjusting to the new scale when they are built (check with `balance.gd`).
 
 ---
 
-## 9. Risiko & pertanyaan terbuka
-- [x] **Panjang giliran rival.** (Fase G: rata-rata 4.2–4.8 aksi, lihat §8.2.) Kalau rival rata-rata > 6 aksi, giliran terasa lama. Mitigasi: Heat rival kecil, gabungkan "taruh 2 bahan" jadi satu animasi.
-- [ ] **AI terlalu pintar/bodoh.** Bobot profil perlu dituning lewat sim (fase G).
-- [ ] **Hilangnya telegraph.** Mood + jumlah kartu di station rival harus cukup untuk keputusan bertahan. Dicek di playtest pertama; kalau kurang, tambahkan "ready glow" pada station rival yang bisa di-Serve.
-- [ ] **Élodie & station pemain.** Gimmicknya membaca *jumlah* kartu station pemain (publik), jadi tetap sesuai janji fair.
+## 9. Risks & open questions
+- [x] **Rival turn length.** (Phase G: an average of 4.2–4.8 actions, see §8.2.) If the rival averages > 6 actions, the turn feels long. Mitigation: low rival Heat, merge "place 2 ingredients" into one animation.
+- [ ] **AI too smart/dumb.** The profile weights need tuning via the sim (phase G).
+- [ ] **Loss of telegraphing.** The mood + the card count on the rival's stations must be enough for defensive decisions. Check in the first playtest; if not enough, add a "ready glow" on rival stations that can be Served.
+- [ ] **Élodie & the player's stations.** Her gimmick reads the *count* of cards on the player's stations (public), so it still fits the fairness promise.
