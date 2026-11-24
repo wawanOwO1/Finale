@@ -12,6 +12,17 @@ extends Node
 @export_range(10, 300) var player_confidence := Duel.PLAYER_CONFIDENCE
 ## Chef's Flow: Perfect Serves needed for each modifier; the last value repeats.
 @export var player_flow: PackedInt32Array = Duel.PLAYER_FLOW
+@export_group("Cuisine (GDD §4.11)")
+## Flat Pressure added when your dish is the rival's weakness (after every multiplier).
+@export_range(0, 30) var weakness_bonus := Duel.WEAKNESS_BONUS
+## Flat Pressure taken off when your dish is their Specialty or your known Reputation.
+@export_range(0, 30) var specialty_penalty := Duel.SPECIALTY_PENALTY
+## Hype gained on a weakness hit.
+@export_range(0, 50) var weakness_hype := Duel.WEAKNESS_HYPE
+## Heat the rival loses on its next turn after a weakness hit (Stumped).
+@export_range(0, 3) var stumped_heat := Duel.STUMPED_HEAT
+## Serves of one cuisine before it becomes your run Reputation.
+@export_range(1, 20) var reputation_threshold := RunState.REPUTATION_THRESHOLD
 @export_group("")
 ## Run (RunState): after a win the next duel starts with the Confidence you have left.
 ## Off = every duel starts at full Confidence (handy for replaying one matchup).
@@ -86,6 +97,7 @@ func _process(_delta: float) -> void:
 func _new_run() -> void:
 	run = RunState.start(player_confidence, "dev" if dev_deck else RunState.START_DECK,
 			GameDB.ALL_BOOKS if dev_deck else RunState.START_BOOKS)
+	run.reputation_threshold = reputation_threshold
 
 
 func _start_duel() -> void:
@@ -105,7 +117,9 @@ func _start_duel() -> void:
 	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
 	ui.round_number = round_number
-	duel = run.new_duel(GameDB.enemy(enemy_id), {hype = start_hype, player_flow = player_flow})
+	duel = run.new_duel(GameDB.enemy(enemy_id), {hype = start_hype, player_flow = player_flow,
+			weakness_bonus = weakness_bonus, specialty_penalty = specialty_penalty,
+			weakness_hype = weakness_hype, stumped_heat = stumped_heat})
 	# Visuals listen to the duel's signals; the duel never knows about them (GDD §9).
 	duel.changed.connect(_sync_plate)
 	duel.confidence_lost.connect(func(target: String, _amount: int, _source: String) -> void:

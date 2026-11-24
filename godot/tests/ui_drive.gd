@@ -101,10 +101,21 @@ func _initialize() -> void:
 	# Serve
 	# Fill station 1 with a known dish to show the ticket, then serve it with its button.
 	duel.stations[0] = _inst(duel, ["bread", "beef", "cheese"])
+	# Cuisine (GDD §4.11): an Omelette on station 2 is French, Tony's weakness → WEAK! chip.
+	duel.stations[1] = _inst(duel, ["butter", "egg", "tomato"])
 	duel.changed.emit()
 	await _wait(0.3)
 	_shot("5b_stations")
 	_crop("5c_stations", Rect2(0.0, 0.15, 0.5, 0.75))
+	var chips := ui.get_node("%StationsRow").find_children("*", "Label", true, false) \
+			.filter(func(l: Label) -> bool: return l.text.begins_with("WEAK!"))
+	_check("Omelette ticket vs Tony shows the WEAK! chip", chips.size() == 1)
+	var badge := ui.get_node("%RivalCuisine").find_children("*", "Label", true, false) \
+			.map(func(l: Label) -> String: return l.text)
+	_check("rival badge: HOME ASIAN, WEAK ??? before discovery (%s)" % str(badge), badge == ["HOME ASIAN", "WEAK ???"])
+	duel.stations[1].clear()
+	duel.changed.emit()
+	await _wait(0.1)
 	if duel.can_serve(0).ok:
 		await _click(_serve_button(ui, 0).get_global_rect().get_center())
 		await _wait(0.35)

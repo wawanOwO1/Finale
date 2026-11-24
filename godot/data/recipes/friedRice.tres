@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="RecipeDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/recipe_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 0
+amount = 8
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+kind = 3
+amount = 1
+[resource]
+script = ExtResource("2")
+id = "friedRice"
+name = "Fried Rice"
+book = "basics"
+requires = PackedStringArray("card:rice", "card:egg", "card:soySauce")
+effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2")])
+hype = 25
+cuisine = "ASIAN"
+text = "8 Pressure, Draw 1"

@@ -21,4 +21,5 @@ book = "grill"
 requires = PackedStringArray("card:bread", "card:beef", "card:cheese", "VEGGIE", "card:bread")
 effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2")])
 hype = 40
+cuisine = "AMERICAN"
 text = "22 Pressure, 6 Composure"

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="RecipeDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/effect_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/recipe_def.gd" id="2"]
+
+[sub_resource type="Resource" id="sub_1"]
+script = ExtResource("1")
+kind = 0
+amount = 6
+[sub_resource type="Resource" id="sub_2"]
+script = ExtResource("1")
+kind = 2
+amount = 4
+[sub_resource type="Resource" id="sub_3"]
+script = ExtResource("1")
+kind = 1
+amount = 6
+[resource]
+script = ExtResource("2")
+id = "ramen"
+name = "Ramen"
+book = "comfort"
+requires = PackedStringArray("card:noodles", "SAUCE", "card:egg")
+effects = Array[ExtResource("1")]([SubResource("sub_1"), SubResource("sub_2"), SubResource("sub_3")])
+hype = 30
+cuisine = "ASIAN"
+text = "6 Pressure, Recover 4 Confidence, 6 Composure"

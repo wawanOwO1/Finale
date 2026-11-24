@@ -720,7 +720,8 @@ func _detail_recipe(box: VBoxContainer, r: RecipeDef) -> void:
 
 	var title := Ui.label("◆  %s  ◆" % r.name.to_upper(), 1.45, Pal.RED_DARK, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(title)
-	box.add_child(Ui.label(_source_text(r).to_upper(), 0.75, color.darkened(0.2), HORIZONTAL_ALIGNMENT_CENTER))
+	box.add_child(Ui.label(("%s · %s cuisine" % [_source_text(r), RecipeDef.cuisine_name(r.cuisine)]).to_upper(),
+			0.75, color.darkened(0.2), HORIZONTAL_ALIGNMENT_CENTER))
 
 	var cols := Ui.hbox(0.6)
 	cols.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -785,6 +786,17 @@ func _detail_rival(box: VBoxContainer, e: EnemyDef) -> void:
 	if e.boss:
 		facts.add_child(HudKit.tag("BOSS", Pal.INK, Pal.GOLD, 0.65))
 	box.add_child(facts)
+	# Cuisine (GDD §4.11): Specialty is public, the weakness shows once you have hit it.
+	box.add_child(_section("Cuisine"))
+	var weak := almanac.known_weaknesses(e.id)
+	var weak_text := "???"
+	if not weak.is_empty():
+		weak_text = ", then ".join(Array(weak).map(func(c: String) -> String: return RecipeDef.cuisine_name(c)))
+	elif e.weakness == RecipeDef.HOME:
+		weak_text = "None"
+	box.add_child(_body("Home: %s. Your %s dishes hit for less.\nWeak to: %s%s" % [
+			RecipeDef.cuisine_name(e.specialty), RecipeDef.cuisine_name(e.specialty), weak_text,
+			". Hit it and they are Stumped." if not weak.is_empty() else ". Serve the right dish to find out."], 0.8))
 	box.add_child(_section("Gimmick"))
 	if almanac.rival_finished(e.id):
 		box.add_child(_body(e.gimmick if e.gimmick != "" else "No tricks. Just cooking."))

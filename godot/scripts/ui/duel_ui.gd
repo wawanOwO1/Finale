@@ -156,6 +156,10 @@ func bind(d: Duel) -> void:
 	d.changed.connect(_refresh)
 	d.dish_revealed.connect(_show_dish)
 	d.mise_en_place.connect(func(side: String, _drawn: CardInstance, _given: CardInstance) -> void: show_mise(side))
+	d.cuisine_reacted.connect(_on_cuisine_reacted)
+	d.weakness_shifted.connect(func(reason: String, cuisine: String) -> void:
+		_toast("%s studied your trick!" % d.enemy_def.name if reason == "studied"
+				else "%s changes tactics: now weak to %s!" % [d.enemy_def.name, RecipeDef.cuisine_name(cuisine)]))
 	d.flow_offer.connect(_on_flow_offer)
 	d.modifier_gained.connect(_on_modifier_gained)
 	%FlowPick.hide()
@@ -466,6 +470,7 @@ func _refresh() -> void:
 		_refresh_rival_kitchen()
 	%RivalName.text = d.enemy_def.name
 	%RivalTitle.text = d.enemy_def.title
+	_fill_rival_cuisine()
 	%RivalHp.ratio = float(d.enemy.confidence) / d.enemy.max_confidence
 	%RivalHp.shield = d.enemy.composure
 	%RivalHp.text = "%d/%d" % [d.enemy.confidence, d.enemy.max_confidence]
@@ -742,6 +747,13 @@ func _ticket_view(i: int, tk: Dictionary) -> Control:
 		stamp.rotation_degrees = 8.0
 		head.add_child(stamp)
 	vb.add_child(head)
+	# Cuisine (GDD §4.11): the chip shows before you Serve, so the choice is always informed.
+	var reaction := duel.cuisine_reaction(recipe) if recipe else ""
+	if reaction != "":
+		var chip_row := Ui.hbox(0.2)
+		chip_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		chip_row.add_child(_cuisine_chip(reaction, 0.6))
+		vb.add_child(chip_row)
 
 	var steps := Ui.hbox(0.15)
 	steps.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -776,10 +788,87 @@ func _ticket_view(i: int, tk: Dictionary) -> Control:
 		var seq: PackedStringArray = []
 		for r in recipe.requires:
 			seq.append(_req_name(r))
-		_tip(p, recipe.name, "%s.\nOrder: %s." % [recipe.text, " > ".join(seq)], "book")
+		var tip := "%s.\nOrder: %s.\nCuisine: %s." % [recipe.text, " > ".join(seq), RecipeDef.cuisine_name(recipe.cuisine)]
+		if reaction != "":
+			tip += "\n" + _cuisine_line(reaction)
+		_tip(p, recipe.name, tip, "book")
 	if state == "empty":
 		p.modulate.a = 0.75
 	return p
+
+
+## WEAK! / HOME / KNOWN chip for a cuisine reaction (GDD §4.11).
+func _cuisine_chip(kind: String, size_em := 0.6) -> Control:
+	match kind:
+		"weak":
+			return HudKit.tag("WEAK! +%d" % duel.weakness_bonus, Pal.GREEN, Pal.CREAM, size_em)
+		"home":
+			return HudKit.tag("HOME -%d" % duel.specialty_penalty, Pal.HUD_EMPTY, Pal.CREAM, size_em)
+		"known":
+			return HudKit.tag("KNOWN -%d" % duel.specialty_penalty, Pal.PURPLE, Pal.CREAM, size_em)
+	return Control.new()
+
+
+func _cuisine_line(kind: String) -> String:
+	var n := duel.enemy_def.name
+	match kind:
+		"weak":
+			return "%s can't cook this: +%d Pressure, %s is Stumped (-%d Heat next turn), +%d Hype." % [
+					n, duel.weakness_bonus, n, duel.stumped_heat, duel.weakness_hype]
+		"home":
+			return "%s's home cuisine: -%d Pressure." % [n, duel.specialty_penalty]
+		"known":
+			return "%s came prepared for your Reputation: -%d Pressure." % [n, duel.specialty_penalty]
+	return ""
+
+
+## Rival cuisine badge (GDD §4.11): Home always, Weak once discovered ("???" before, with the
+## pre-duel hint as the tooltip), and whether they know your Reputation.
+func _fill_rival_cuisine() -> void:
+	var box: HBoxContainer = %RivalCuisine
+	for c in box.get_children():
+		box.remove_child(c)
+		c.queue_free()
+	var e := duel.enemy_def
+	box.visible = e.specialty != RecipeDef.HOME or e.weakness != RecipeDef.HOME
+	if not box.visible:
+		return
+	if e.specialty != RecipeDef.HOME:
+		var home := HudKit.tag("HOME %s" % RecipeDef.cuisine_name(e.specialty).to_upper(), Pal.HUD_EMPTY, Pal.CREAM, 0.75)
+		_tip(home, "Home: %s" % RecipeDef.cuisine_name(e.specialty), _cuisine_line("home"), "book")
+		box.add_child(home)
+	var w := duel.rival_weakness()
+	if duel.weakness_studied():
+		var st := HudKit.tag("STUDIED", Pal.INK, Pal.HUD_MUTED, 0.75)
+		_tip(st, "Studied", "%s has learned your trick: no weakness left this duel." % e.name, "book")
+		box.add_child(st)
+	elif w != "":
+		var known := almanac_keeper != null and almanac_keeper.almanac.knows_weakness(e.id, w)
+		var weak := HudKit.tag("WEAK %s" % (RecipeDef.cuisine_name(w).to_upper() if known else "???"), Pal.GREEN if known else Pal.INK, Pal.CREAM, 0.75)
+		_tip(weak, "Weakness", _cuisine_line("weak") if known else
+				("\"%s\"\nServe the right cuisine to find out." % e.weakness_hint if e.weakness_hint != "" else "Serve the right cuisine to find out."), "book")
+		box.add_child(weak)
+	var rep := duel.known_cuisine()
+	if rep != "":
+		var kn := HudKit.tag("KNOWS %s" % RecipeDef.cuisine_name(rep).to_upper(), Pal.PURPLE, Pal.CREAM, 0.75)
+		_tip(kn, "Your Reputation", "You are known for %s food. %s" % [RecipeDef.cuisine_name(rep), _cuisine_line("known")], "book")
+		box.add_child(kn)
+
+
+## A cuisine reaction lands: popup over the rival, a matching emote.
+func _on_cuisine_reacted(side: String, _recipe: RecipeDef, kind: String) -> void:
+	if side != "player":
+		return
+	match kind:
+		"weak":
+			_float(_anchor("enemy") + Vector2(0, -Pal.em(3.0)), "THEY'VE NEVER TASTED THIS!", Pal.GREEN, 1.3, "", 0.05)
+			_emote.pop("shocked")
+		"home":
+			_float(_anchor("enemy") + Vector2(0, -Pal.em(3.0)), "SEEN IT BEFORE.", Pal.HUD_MUTED, 1.2, "", 0.05)
+			_emote.pop("smug")
+		"known":
+			_float(_anchor("enemy") + Vector2(0, -Pal.em(3.0)), "THEY CAME PREPARED.", Pal.PURPLE, 1.2, "", 0.05)
+			_emote.pop("smug")
 
 
 func _req_name(req: String) -> String:
@@ -1418,6 +1507,13 @@ func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool,
 		%DishTags.add_child(_dish_tag("burnt", "Burnt -50%", Pal.RED, Color.WHITE))
 	if recipe and not perfect:
 		%DishTags.add_child(_dish_tag("", "Out of order", Color(1, 1, 1, 0.13), Pal.CREAM))
+	match duel.cuisine_reaction(recipe, side) if recipe else "":
+		"weak":
+			%DishTags.add_child(_dish_tag("", "Weakness +%d" % duel.weakness_bonus, Pal.GREEN, Pal.CREAM))
+		"home":
+			%DishTags.add_child(_dish_tag("", "Home cuisine -%d" % duel.specialty_penalty, Pal.HUD_EMPTY, Pal.CREAM))
+		"known":
+			%DishTags.add_child(_dish_tag("", "Known -%d" % duel.specialty_penalty, Pal.PURPLE, Pal.CREAM))
 	%DishTags.visible = %DishTags.get_child_count() > 0
 	var b: Control = %DishBanner
 	b.show()
@@ -1526,7 +1622,7 @@ func _show_book_page(i: int) -> void:
 	_book_page = wrapi(i, 0, _book_recipes.size())
 	var r := _book_recipes[_book_page]
 	%PageDishName.text = r.name
-	%PageDishBook.text = "%s · %d steps" % [r.book.capitalize(), r.requires.size()]
+	%PageDishBook.text = "%s · %d steps · %s" % [r.book.capitalize(), r.requires.size(), RecipeDef.cuisine_name(r.cuisine)]
 	%PageNum.text = "%d / %d" % [_book_page + 1, _book_recipes.size()]
 	for c in %PageDishArt.get_children():
 		c.queue_free()

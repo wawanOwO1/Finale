@@ -34,6 +34,7 @@ func _initialize() -> void:
 	_chefs_flow()
 	_almanac()
 	_run_state()
+	_cuisine()
 	_playthroughs("starter vs Tony", "starter", GameDB.enemy("tony"), basics)
 	_playthroughs("starter vs Rosa", "starter", GameDB.enemy("rosa"), basics)
 	_playthroughs("dev deck vs Rosa", "dev", GameDB.enemy("rosa"), all_recipes)
@@ -869,6 +870,153 @@ func _almanac() -> void:
 
 
 # ---------------------------------------------------------------- RunState (GDD §6)
+
+# ---------------------------------------------------------------- cuisine (GDD §4.11)
+
+## An idle rival with cuisine traits, so the numbers are exact.
+func cuisine_chef(specialty: String, weakness: String) -> EnemyDef:
+	var e: EnemyDef = dummy.duplicate()
+	e.specialty = specialty
+	e.weakness = weakness
+	return e
+
+
+func _cuisine() -> void:
+	print("\n-- Cuisine, weaknesses & Reputation")
+	# Data: every recipe has a valid cuisine, every book covers at least 2 non-HOME cuisines.
+	var bad := GameDB.all("recipes").filter(func(r: RecipeDef) -> bool: return not RecipeDef.CUISINES.has(r.cuisine))
+	check("every recipe has a valid cuisine", bad.is_empty(), str(bad.map(func(r: RecipeDef) -> String: return r.id)))
+	for id in GameDB.ALL_BOOKS:
+		var cs := {}
+		for r in GameDB.book(id).recipes:
+			if r.cuisine != RecipeDef.HOME:
+				cs[r.cuisine] = true
+		check("book %s covers >= 2 cuisines" % id, cs.size() >= 2, str(cs.keys()))
+	check("Tony: home Asian, weak to French", GameDB.enemy("tony").specialty == "ASIAN" and GameDB.enemy("tony").weakness == "FRENCH")
+	check("Rosa: home Mexican, weak to Asian", GameDB.enemy("rosa").specialty == "MEXICAN" and GameDB.enemy("rosa").weakness == "ASIAN")
+
+	# Weakness: Perfect Omelette (10 + 3 Quality) x1.5 = 19, +6 flat = 25; Stumped, +10 Hype.
+	var chef := cuisine_chef("ASIAN", "FRENCH")
+	var d := Duel.new(GameDB.deck("starter"), chef, all_recipes, {seed = 3, player_flow = [99]})
+	var seen := {kind = ""}
+	d.cuisine_reacted.connect(func(_s: String, _r: RecipeDef, kind: String) -> void: seen.kind = kind)
+	check("ticket reaction: Omelette vs a French-weak rival is weak", d.cuisine_reaction(GameDB.recipe("omelette")) == "weak")
+	d.stations[0] = inst(["butter", "egg", "tomato"])
+	var before := d.enemy.confidence
+	d.serve()
+	check("weakness: Perfect Omelette 19 + 6 = 25", lost(d, before) == 25, str(lost(d, before)))
+	check("weakness: cuisine_reacted says weak", seen.kind == "weak")
+	check("weakness: rival is Stumped", d.enemy.stacks("stumped") == Duel.STUMPED_HEAT)
+	check("weakness: +10 Hype on top of the recipe's 25", d.hype == 35, str(d.hype))
+	check("weakness: counted for Reputation", d.cuisine_serves.get("FRENCH", 0) == 1)
+	d.end_turn()
+	d.begin_enemy_turn()
+	check("Stumped: rival starts its turn with 1 less Heat", d.enemy.heat == d.kitchen("enemy").max_heat - 1)
+	check("Stumped: wears off after that turn", d.enemy.stacks("stumped") == 0)
+	d.run_enemy_turn()
+
+	# The rival's own Serves never react.
+	check("rival dishes never react", d.cuisine_reaction(GameDB.recipe("omelette"), "enemy") == "")
+
+	# Specialty: Perfect Skewers (8 + 2) x1.5 = 15, −6 = 9.
+	d = Duel.new(GameDB.deck("starter"), chef, all_recipes, {seed = 4, player_flow = [99]})
+	d.stations[0] = inst(["egg", "chili"])
+	before = d.enemy.confidence
+	d.serve_as("skewers")
+	check("specialty: Perfect Skewers 15 - 6 = 9", lost(d, before) == 9, str(lost(d, before)))
+	check("specialty: no Stumped", d.enemy.stacks("stumped") == 0)
+
+	# HOME is neutral: Perfect Toast (6 + 2) x1.5 = 12, as without cuisines.
+	d = Duel.new(GameDB.deck("starter"), cuisine_chef("HOME", "HOME"), all_recipes, {seed = 5, player_flow = [99]})
+	d.stations[0] = inst(["bread", "butter"])
+	before = d.enemy.confidence
+	d.serve()
+	check("HOME dish: no change (12)", lost(d, before) == 12)
+
+	# A weakness dish with no Pressure still lands the flat bonus: Mushroom Risotto vs Italian-weak.
+	d = Duel.new(GameDB.deck("starter"), cuisine_chef("HOME", "ITALIAN"), all_recipes, {seed = 6, player_flow = [99]})
+	d.stations[0] = inst(["rice", "mushroom", "cheese"])
+	before = d.enemy.confidence
+	d.serve_as("mushroomRisotto")
+	check("no-Pressure weakness dish deals the 6 on its own", lost(d, before) == 6, str(lost(d, before)))
+
+	# Tunables come through the opts (Main's Inspector).
+	d = Duel.new(GameDB.deck("starter"), chef, all_recipes, {seed = 7, player_flow = [99], weakness_bonus = 10})
+	d.stations[0] = inst(["butter", "egg", "tomato"])
+	before = d.enemy.confidence
+	d.serve()
+	check("weakness_bonus opt: 19 + 10 = 29", lost(d, before) == 29)
+
+	# Reputation: only rivals that know it; equal to their weakness = cancels out.
+	var elite := cuisine_chef("FRENCH", "MEXICAN")
+	elite.knows_reputation = true
+	d = Duel.new(GameDB.deck("starter"), elite, all_recipes, {seed = 8, player_flow = [99], reputation = "ITALIAN"})
+	check("known: Reputation cuisine vs an Elite is KNOWN", d.cuisine_reaction(GameDB.recipe("arrabbiata")) == "known")
+	d.stations[0] = inst(["chili", "tomatoSauce", "pasta"])
+	before = d.enemy.confidence
+	d.serve_as("arrabbiata")
+	# (8 + Q1+Q2+Q2) x1.5 = 19, −6 = 13
+	check("known: Perfect Arrabbiata 19 - 6 = 13", lost(d, before) == 13, str(lost(d, before)))
+	d = Duel.new(GameDB.deck("starter"), chef, all_recipes, {seed = 8, reputation = "ITALIAN"})
+	check("a regular duel ignores your Reputation", d.cuisine_reaction(GameDB.recipe("arrabbiata")) == "")
+	d = Duel.new(GameDB.deck("starter"), elite, all_recipes, {seed = 8, reputation = "MEXICAN"})
+	check("Reputation = their weakness: cancels out", d.cuisine_reaction(GameDB.recipe("tacos")) == "")
+
+	# Élodie studies her weakness after 2 hits.
+	var studier := cuisine_chef("HOME", "FRENCH")
+	studier.studies_weakness_after = 2
+	d = Duel.new(GameDB.deck("starter"), studier, all_recipes, {seed = 9, player_flow = [99]})
+	var shifts: Array[String] = []
+	d.weakness_shifted.connect(func(reason: String, _c: String) -> void: shifts.append(reason))
+	for i in 2:
+		d.stations[0] = inst(["butter", "egg", "tomato"])
+		d.serve()
+		d.end_turn(); d.run_enemy_turn()
+	check("studied: after 2 hits the weakness is gone", d.rival_weakness() == "" and d.weakness_studied())
+	check("studied: announced once", shifts == ["studied"])
+	check("studied: Omelette is neutral now", d.cuisine_reaction(GameDB.recipe("omelette")) == "")
+
+	# Bruno: below half Confidence the weakness switches.
+	var boss := cuisine_chef("AMERICAN", "ITALIAN")
+	boss.weakness_phase2 = "FRENCH"
+	d = Duel.new(GameDB.deck("starter"), boss, all_recipes, {seed = 10, player_flow = [99]})
+	var phase := {cuisine = ""}
+	d.weakness_shifted.connect(func(reason: String, c: String) -> void: if reason == "phase2": phase.cuisine = c)
+	check("phase 1: weak to Italian", d.rival_weakness() == "ITALIAN")
+	d._deal_pressure("enemy", d.enemy.max_confidence / 2)
+	check("phase 2: weakness switches to French", d.rival_weakness() == "FRENCH" and phase.cuisine == "FRENCH")
+
+	# RunState: Reputation needs 4 Serves and a clear lead; a duel's Serves are added when it ends.
+	var r := RunState.start()
+	check("a new run has no Reputation", r.reputation() == "")
+	r.cuisine_serves = {ASIAN = 3}
+	check("3 Serves is not a Reputation yet", r.reputation() == "")
+	r.cuisine_serves = {ASIAN = 4, FRENCH = 4}
+	check("a tie is no Reputation", r.reputation() == "")
+	r.cuisine_serves = {ASIAN = 5, FRENCH = 4}
+	check("5 vs 4: known for Asian", r.reputation() == "ASIAN")
+	check("the next duel gets the Reputation", r.new_duel(dummy, {seed = 1}).reputation == "ASIAN")
+	r.cuisine_serves = {}
+	var rd := r.new_duel(dummy, {seed = 2, player_flow = [99]})
+	rd.cuisine_serves = {ITALIAN = 2}
+	r.finish_duel(rd)
+	check("an unfinished duel adds no Serves", r.cuisine_serves.is_empty())
+	rd.phase = "won"
+	r.finish_duel(rd)
+	r.finish_duel(rd)
+	check("a finished duel adds its Serves once", r.cuisine_serves.get("ITALIAN", 0) == 2)
+
+	# Almanac: the weakness is revealed by hitting it, and survives a save.
+	var a := Almanac.new()
+	d = Duel.new(GameDB.deck("starter"), chef, all_recipes, {seed = 11, player_flow = [99]})
+	a.watch(d)
+	check("weakness starts unknown", not a.knows_weakness("dummy", "FRENCH"))
+	d.stations[0] = inst(["butter", "egg", "tomato"])
+	d.serve()
+	check("hitting it reveals it in the Almanac", a.knows_weakness("dummy", "FRENCH"))
+	var b := Almanac.from_dict(JSON.parse_string(JSON.stringify(a.to_dict())))
+	check("revealed weakness survives save/load", b.knows_weakness("dummy", "FRENCH"))
+
 
 func _run_state() -> void:
 	print("\n-- RunState")

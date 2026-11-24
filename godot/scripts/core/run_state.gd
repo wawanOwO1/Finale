@@ -10,6 +10,7 @@ extends RefCounted
 
 const START_DECK := "starter"
 const START_BOOKS: PackedStringArray = ["basics"]
+const REPUTATION_THRESHOLD := 4
 
 var deck: Array[CardDef] = []
 var confidence := Duel.PLAYER_CONFIDENCE
@@ -20,6 +21,10 @@ var books: PackedStringArray = []
 ## Kitchen Tool ids (ToolDef arrives with the Kitchen Tools task).
 var tools: PackedStringArray = []
 var duels_won := 0
+## Reputation (GDD §4.11): the player's Cooked/Perfect recipe Serves per cuisine over the run.
+var cuisine_serves := {}
+## Serves a cuisine needs (and must lead the rest by at least 1) to become your Reputation.
+var reputation_threshold := REPUTATION_THRESHOLD
 ## True once a duel was lost: the run is over and this state is not used for another duel.
 var over := false
 
@@ -55,7 +60,7 @@ func duel_deck() -> Array[CardDef]:
 ## Options for Duel.new: the run's Confidence goes in, `extra` (seed, hype, player_flow, …)
 ## is merged on top.
 func duel_opts(extra := {}) -> Dictionary:
-	var opts := {confidence = confidence, max_confidence = max_confidence}
+	var opts := {confidence = confidence, max_confidence = max_confidence, reputation = reputation()}
 	opts.merge(extra, true)
 	return opts
 
@@ -70,6 +75,9 @@ func new_duel(enemy: EnemyDef, extra := {}) -> Duel:
 func finish_duel(d: Duel) -> void:
 	if d == _settled:
 		return
+	if d.over():
+		for c: String in d.cuisine_serves:
+			cuisine_serves[c] = cuisine_serves.get(c, 0) + int(d.cuisine_serves[c])
 	match d.phase:
 		"won":
 			confidence = clampi(d.player.confidence, 1, max_confidence)
@@ -79,6 +87,25 @@ func finish_duel(d: Duel) -> void:
 		_:
 			return
 	_settled = d
+
+
+## Your Reputation (GDD §4.11): the cuisine you served most this run, once it has at least
+## `reputation_threshold` Serves and is strictly ahead of every other. "" = none yet.
+func reputation() -> String:
+	var best := ""
+	var best_n := 0
+	var second_n := 0
+	for c: String in cuisine_serves:
+		if c == RecipeDef.HOME:
+			continue
+		var n: int = cuisine_serves[c]
+		if n > best_n:
+			second_n = best_n
+			best_n = n
+			best = c
+		elif n > second_n:
+			second_n = n
+	return best if best_n >= reputation_threshold and best_n > second_n else ""
 
 
 # ================================================================ Confidence

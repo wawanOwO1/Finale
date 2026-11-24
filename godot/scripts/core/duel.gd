@@ -34,6 +34,11 @@ signal mise_en_place(side: String, drawn: CardInstance, given_back: CardInstance
 ## pick_modifier(); the rival picks on its own (then modifier_gained follows at once).
 signal flow_offer(side: String, choices: Array[ModifierDef])
 signal modifier_gained(side: String, modifier: ModifierDef, stacks: int)
+## Cuisine (GDD §4.11): a recipe Serve met the rival's traits. kind: "weak" | "home" | "known".
+## Emitted after dish_revealed, before the effects land.
+signal cuisine_reacted(side: String, recipe: RecipeDef, kind: String)
+## The rival's weakness changed mid-duel. reason: "studied" (Élodie, now none) | "phase2" (Bruno).
+signal weakness_shifted(reason: String, cuisine: String)
 signal changed
 
 ## Apis's starting Confidence (GDD §4.1). Tuned in phase G with tests/balance.gd.
@@ -60,6 +65,12 @@ const PLAYER_FLOW: PackedInt32Array = [1, 2, 3]
 const RARE_CHANCE := 0.25
 const RARE_PITY := 3
 const PICK_FIRST := "Pick a modifier first."
+## Cuisine defaults (GDD §4.11); Main's Inspector overrides them through the duel opts.
+## Flat, added after every multiplier, so Perfect × Signature never snowballs.
+const WEAKNESS_BONUS := 6
+const SPECIALTY_PENALTY := 6
+const WEAKNESS_HYPE := 10
+const STUMPED_HEAT := 1
 
 ## Signature Dish (GDD §4.5): appears in hand when Hype is full, once per duel.
 static var SIGNATURE_CARD: CardDef = _make_signature_card()
@@ -127,6 +138,21 @@ var signature_given: bool:
 var signature_armed: bool:
 	get: return kitchens.player.signature_armed
 
+## Cuisine tunables (GDD §4.11), from opts or the defaults above.
+var weakness_bonus := WEAKNESS_BONUS
+var specialty_penalty := SPECIALTY_PENALTY
+var weakness_hype := WEAKNESS_HYPE
+var stumped_heat := STUMPED_HEAT
+## The player's run Reputation (a cuisine, "" = none yet). Only rivals that know_reputation use it.
+var reputation := ""
+## Times the player hit the rival's weakness this duel (Élodie studies it).
+var weakness_hits := 0
+## The player's Cooked/Perfect recipe Serves this duel, cuisine -> count (HOME not counted).
+## RunState adds it to the run tally for Reputation.
+var cuisine_serves := {}
+var _studied := false
+var _phase2 := false
+
 var _intent_index := 0
 ## Rival turn: actions still to play this turn, and whether its start / end already ran.
 var _enemy_queue: Array[Dictionary] = []
@@ -139,7 +165,8 @@ var _next_uid := 0
 
 
 ## opts: { confidence, max_confidence, hype, seed, player_flow: PackedInt32Array,
-##         enemy_deck: Array[CardDef], enemy_recipes: Array[RecipeDef] } — all optional. A drafting rival (EnemyDef with a
+##         enemy_deck: Array[CardDef], enemy_recipes: Array[RecipeDef], reputation: String,
+##         weakness_bonus, specialty_penalty, weakness_hype, stumped_heat } — all optional. A drafting rival (EnemyDef with a
 ## deck and an AI profile) brings its own deck, books, Heat and hand size; enemy_deck /
 ## enemy_recipes override them (tests).
 func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef], opts := {}) -> void:
@@ -149,7 +176,12 @@ func _init(deck: Array[CardDef], enemy_def_: EnemyDef, recipes_: Array[RecipeDef
 	enemy_def = enemy_def_
 	enemy = Fighter.new(enemy_def.confidence, enemy_def.confidence)
 	duel_seed = rng_seed
-	kitchens.player = Kitchen.new("player", player, SeededRng.new(rng_seed))
+	weakness_bonus = opts.get("weakness_bonus", WEAKNESS_BONUS)
+	specialty_penalty = opts.get("specialty_penalty", SPECIALTY_PENALTY)
+	weakness_hype = opts.get("weakness_hype", WEAKNESS_HYPE)
+	stumped_heat = opts.get("stumped_heat", STUMPED_HEAT)
+	reputation = opts.get("reputation", "")
+	kitchens.player =Kitchen.new("player", player, SeededRng.new(rng_seed))
 	kitchens.enemy = Kitchen.new("enemy", enemy, SeededRng.new(rng_seed ^ ENEMY_RNG_SALT))
 	kitchens.player.ai_rng = SeededRng.stream(rng_seed, "ai_player")
 	kitchens.enemy.ai_rng = SeededRng.stream(rng_seed, "ai_enemy")
@@ -256,6 +288,55 @@ func pressure_from(attacker: String, base: int) -> int:
 
 func over() -> bool:
 	return phase == "won" or phase == "lost"
+
+
+# ---------------------------------------------------------------- cuisine (GDD §4.11)
+
+## The rival's current weakness: "" once studied, the phase-2 one after the switch, HOME = none.
+func rival_weakness() -> String:
+	if _studied:
+		return ""
+	var w := enemy_def.weakness_phase2 if _phase2 else enemy_def.weakness
+	return "" if w == RecipeDef.HOME else w
+
+
+func weakness_studied() -> bool:
+	return _studied
+
+
+## This rival treats your Reputation as an extra Specialty ("" = it does not apply).
+func known_cuisine() -> String:
+	if not enemy_def.knows_reputation or reputation == "" or reputation == RecipeDef.HOME:
+		return ""
+	return reputation
+
+
+## What a recipe Serve by `side` would meet: "weak", "home", "known" or "" (neutral).
+## Only the player's dishes react; the rival's own Serves are never changed.
+func cuisine_reaction(recipe: RecipeDef, side := "player") -> String:
+	if side != "player" or recipe == null or recipe.cuisine == RecipeDef.HOME:
+		return ""
+	var weak := recipe.cuisine == rival_weakness()
+	var known := recipe.cuisine == known_cuisine()
+	if weak and known:
+		return ""  # They prepared for it, but still can't really cook it: cancels out.
+	if weak:
+		return "weak"
+	if recipe.cuisine == enemy_def.specialty:
+		return "home"
+	if known:
+		return "known"
+	return ""
+
+
+## Flat Pressure change for a reaction (after every multiplier).
+func cuisine_pressure(kind: String) -> int:
+	match kind:
+		"weak":
+			return weakness_bonus
+		"home", "known":
+			return -specialty_penalty
+	return 0
 
 
 ## Kind of the rival's next step ("place", "serve", "attack", … or "end"), without playing it.
@@ -557,12 +638,26 @@ func _do_serve(recipe: RecipeDef, station: int, side: String) -> Dictionary:
 	if signature:
 		signature_served.emit(side, dish_name)
 	dish_revealed.emit(side, recipe, perfect, signature, burnt)
+	# Cuisine (GDD §4.11): decided before the effects, so the ticket's chip is what you get.
+	var reaction := cuisine_reaction(recipe, side)
+	if reaction != "":
+		cuisine_reacted.emit(side, recipe, reaction)
+		match reaction:
+			"weak": _say("%s has never tasted this! +%d Pressure." % [enemy_def.name, weakness_bonus])
+			"home": _say("%s: \"Seen it a thousand times.\" −%d Pressure." % [enemy_def.name, specialty_penalty])
+			"known": _say("%s came prepared for your %s. −%d Pressure." % [enemy_def.name,
+					RecipeDef.cuisine_name(recipe.cuisine), specialty_penalty])
 
 	if recipe:
 		_say("SERVE! %s (+%d Quality)%s%s" % [recipe.name, quality,
 				" Perfect Order!" if perfect else "", " ×2" if signature else ""])
 		# Recipe effect = base value + total Plate Quality (GDD §4.4), on the headline effect.
-		_apply_effects(recipe.effects, quality, mult, side)
+		var used := _apply_effects(recipe.effects, quality, mult, side, cuisine_pressure(reaction))
+		# A dish with no Pressure (Fresh Salad, Risotto) still lands the weakness bonus on its own.
+		if reaction == "weak" and not used and not over():
+			_deal_pressure(_other(side), weakness_bonus)
+		if recipe.cuisine != RecipeDef.HOME and side == "player":
+			cuisine_serves[recipe.cuisine] = cuisine_serves.get(recipe.cuisine, 0) + 1
 	else:
 		_say("Improvised Dish: %d ingredients.%s" % [served.size(), " ×2" if signature else ""])
 		_apply_effects([EffectDef.make(EffectDef.Kind.PRESSURE, 2 * served.size())], 0, mult, side)
@@ -571,6 +666,8 @@ func _do_serve(recipe: RecipeDef, station: int, side: String) -> Dictionary:
 		k.hype = 0
 	elif recipe:
 		_add_hype(recipe.hype, side)
+	if reaction == "weak" and not over():
+		_hit_weakness(side)
 	# Modifiers (GRAND_DESIGN §5.3): Hot Pan hits harder, Crowd Favorite builds Hype.
 	if serve_bonus(side) > 0 and not over():
 		_deal_pressure(_other(side), pressure_from(side, serve_bonus(side)))
@@ -589,6 +686,35 @@ func _do_serve(recipe: RecipeDef, station: int, side: String) -> Dictionary:
 	return _ok()
 
 
+## After a weakness Serve: the crowd loves it, the rival is Stumped (never stacks), and a rival
+## that studies weaknesses may now have learned it.
+func _hit_weakness(side: String) -> void:
+	var rival := _other(side)
+	_add_hype(weakness_hype, side)
+	if fighter(rival).stacks("stumped") == 0 and stumped_heat > 0:
+		_add_status(rival, "stumped", stumped_heat)
+	weakness_hits += 1
+	var n := enemy_def.studies_weakness_after
+	if n > 0 and weakness_hits >= n and not _studied:
+		var was := rival_weakness()
+		_studied = true
+		_say("%s has studied your %s. It won't work again." % [enemy_def.name, RecipeDef.cuisine_name(was)])
+		weakness_shifted.emit("studied", "")
+
+
+## Bruno (GDD §4.11): below phase2_at of their Confidence the weakness switches.
+func _check_phase2() -> void:
+	if _phase2 or enemy_def.weakness_phase2 == RecipeDef.HOME:
+		return
+	if enemy.confidence > enemy.max_confidence * enemy_def.phase2_at or enemy.confidence <= 0:
+		return
+	_phase2 = true
+	var w := rival_weakness()
+	if w != "":
+		_say("%s changes tactics! Now weak to %s." % [enemy_def.name, RecipeDef.cuisine_name(w)])
+	weakness_shifted.emit("phase2", w)
+
+
 # ---------------------------------------------------------------- turn flow (rules)
 
 ## Start of a side's turn (GDD §4.2 step 1): Composure → 0, Spicy ticks, Heat refills, draw.
@@ -604,6 +730,11 @@ func _start_turn(side: String) -> void:
 	if over():
 		return
 	k.fighter.heat = k.max_heat
+	var stumped := k.fighter.stacks("stumped")
+	if stumped > 0:
+		k.fighter.heat = maxi(0, k.fighter.heat - stumped)
+		_add_status(side, "stumped", -stumped)
+		_say("%s is still Stumped: −%d Heat." % [chef_name(side), stumped])
 	if k.burner_next:
 		k.burner_next = false
 		k.fighter.heat += int(GameDB.modifier("extra_burner").amount)
@@ -643,16 +774,22 @@ func _tick_spicy(side: String) -> void:
 # ---------------------------------------------------------------- effects
 
 ## Effects of a card or dish played by `side`. `bonus` is added to the first effect's amount
-## (recipe Quality); `mult` scales it all.
-func _apply_effects(effects: Array[EffectDef], bonus: int, mult: float, side: String) -> void:
+## (recipe Quality); `mult` scales it all. `pressure_delta` (cuisine, GDD §4.11) is added flat to
+## the first Pressure effect after statuses and multipliers. Returns true when it was used.
+func _apply_effects(effects: Array[EffectDef], bonus: int, mult: float, side: String, pressure_delta := 0) -> bool:
+	var used := false
 	for i in effects.size():
 		if over():
-			return
+			return used
 		var e := effects[i]
 		var scaled := floori((e.amount + (bonus if i == 0 else 0)) * mult)
 		match e.kind:
 			EffectDef.Kind.PRESSURE:
-				_deal_pressure(_other(side), pressure_from(side, scaled))
+				var hit := pressure_from(side, scaled)
+				if not used and pressure_delta != 0:
+					hit = maxi(0, hit + pressure_delta)
+					used = true
+				_deal_pressure(_other(side), hit)
 			EffectDef.Kind.COMPOSURE:
 				_gain_composure(side, scaled)
 			EffectDef.Kind.HEAL:
@@ -666,6 +803,7 @@ func _apply_effects(effects: Array[EffectDef], bonus: int, mult: float, side: St
 				_add_status(to, e.status, maxi(1, scaled))
 			EffectDef.Kind.CLEANSE:
 				_cleanse(e.amount, side)
+	return used
 
 
 ## Pressure hits Composure first, then Confidence. `amount` already includes statuses.
@@ -686,6 +824,8 @@ func _lose_confidence(target: String, amount: int, source: String) -> void:
 		phase = "won" if target == "enemy" else "lost"
 		_say("%s gives up!" % enemy_def.name if target == "enemy" else "Apis loses heart...")
 		duel_ended.emit(_other(target))
+	elif target == "enemy" and amount > 0:
+		_check_phase2()
 
 
 func _add_status(side: String, id: String, delta: int) -> void:

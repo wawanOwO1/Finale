@@ -99,6 +99,27 @@ func finish_rival(id: String) -> void:
 		unseen["rival:%s" % id] = true
 
 
+## You hit this rival's weakness (GDD §4.11): it is no longer "???". Bruno has two.
+func reveal_weakness(id: String, cuisine: String) -> bool:
+	meet_rival(id)
+	var known: Array = rivals[id].get("weak", [])
+	if cuisine == "" or known.has(cuisine):
+		return false
+	known.append(cuisine)
+	rivals[id].weak = known
+	_new("rival", id)
+	return true
+
+
+## Weakness cuisines discovered for this rival (empty = still "???").
+func known_weaknesses(id: String) -> PackedStringArray:
+	return PackedStringArray(rivals[id].get("weak", [])) if rivals.has(id) else PackedStringArray()
+
+
+func knows_weakness(id: String, cuisine: String) -> bool:
+	return known_weaknesses(id).has(cuisine)
+
+
 ## The rival served this recipe: it is "Seen from <rival>" if not mastered yet.
 func record_serve(rival_id: String, recipe_id: String) -> void:
 	var list: Array = served.get(rival_id, [])
@@ -128,6 +149,9 @@ func watch(d: Duel) -> void:
 		if side == "enemy" and recipe:
 			record_serve(rival, recipe.id))
 	d.duel_ended.connect(func(_winner: String) -> void: finish_rival(rival))
+	d.cuisine_reacted.connect(func(_side: String, recipe: RecipeDef, kind: String) -> void:
+		if kind == "weak":
+			reveal_weakness(rival, recipe.cuisine))
 
 
 func _new(kind: String, id: String) -> void:
@@ -207,7 +231,10 @@ static func from_dict(data: Dictionary) -> Almanac:
 		a.recipes[str(id)] = str(rec[id])
 	var riv: Dictionary = data.get("rivals", {})
 	for id in riv:
-		a.rivals[str(id)] = {finished = bool((riv[id] as Dictionary).get("finished", false))}
+		var entry: Dictionary = riv[id]
+		a.rivals[str(id)] = {finished = bool(entry.get("finished", false))}
+		if entry.has("weak"):
+			a.rivals[str(id)].weak = Array(entry.weak).map(func(x: Variant) -> String: return str(x))
 	var srv: Dictionary = data.get("served", {})
 	for id in srv:
 		a.served[str(id)] = Array(srv[id]).map(func(x: Variant) -> String: return str(x))

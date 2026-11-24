@@ -18,6 +18,10 @@ const ALL := {
 		name = "Burnt", debuff = true,
 		text = "The next X Serves have 50% less effect.",
 	},
+	"stumped": {
+		name = "Stumped", debuff = true,
+		text = "Never tasted that dish before. Starts the next turn with X less Heat.",
+	},
 	"focus": {
 		name = "Focus", debuff = false,
 		text = "Adds X Pressure to every attack. Lasts the whole duel.",

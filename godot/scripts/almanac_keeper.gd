@@ -45,4 +45,7 @@ func _reveal_all() -> void:
 		almanac.discover_recipe(r.id, Almanac.MASTERED)
 	for e: EnemyDef in GameDB.all("enemies"):
 		almanac.finish_rival(e.id)
+		for w in [e.weakness, e.weakness_phase2]:
+			if w != RecipeDef.HOME:
+				almanac.reveal_weakness(e.id, w)
 	almanac.unseen.clear()

@@ -133,8 +133,8 @@ Replaces the Intent system (the old §4.6). Always **1 vs 1**, and the rival pla
 ### 4.10 Almanac ✅
 A knowledge book in the HUD (book button or `Tab`, pauses the game). Tabs: Ingredients, Techniques, Recipes, Rivals, Keywords. Entries unlock when discovered (deck, reward/shop, or a rival serves it) and are saved across runs in `user://almanac.save`. This is **knowledge, not power**, so it does not break the no-meta-progression decision. The Recipes tab has a **combination finder**.
 
-### 4.11 Cuisines, rival weaknesses & Reputation ⏳
-*Decided 24 Nov 2026.* Gives builds something to counter and something that counters them. Every rival has a home cuisine they shrug off and one cuisine they have never learned. On top of that, the city remembers what *you* cook.
+### 4.11 Cuisines, rival weaknesses & Reputation ✅
+*Decided 24 Nov 2026, in the code 25 Nov* (Tony + Rosa data; Élodie/Bruno use the same EnemyDef fields when they are built). Tests: `tests/sim.gd` "Cuisine", `tests/ui_drive.gd`. Gives builds something to counter and something that counters them. Every rival has a home cuisine they shrug off and one cuisine they have never learned. On top of that, the city remembers what *you* cook.
 
 **Cuisines.** Every recipe has exactly one `cuisine`. Improvised dishes have none.
 
@@ -181,7 +181,7 @@ AMERICAN → beats Marco (ITALIAN) → beats Bruno (AMERICAN)
 
 **UI summary.** Cuisine icon on recipe cards, the Recipe Book and the Order Ticket. The ticket's predicted recipe shows `WEAK!` / `HOME` / `KNOWN` *before* you Serve, so the choice is always informed. Rival HUD badge: Specialty + Weakness icons. VS screen shows both.
 
-**Implementation sketch.** `RecipeDef.cuisine` (enum) · `EnemyDef.specialty`, `weakness`, `weakness_phase2`, `studies_weakness_after` · the flat ±Pressure applies in `Duel`'s Serve resolution, which emits `cuisine_reaction(side, kind)` for the UI · `RunState` keeps the per-cuisine tally and passes Reputation into the duel · `Almanac` stores weakness discovery per rival · tunables (`weakness_bonus`, `specialty_penalty`, `reputation_threshold`, `stumped_heat`) are `@export` on the duel system node in `main.tscn`.
+**Implementation.** `RecipeDef.cuisine` (enum) · `EnemyDef.specialty`, `weakness`, `weakness_phase2`, `studies_weakness_after` · the flat ±Pressure applies in `Duel`'s Serve resolution, which emits `cuisine_reaction(side, kind)` for the UI · `RunState` keeps the per-cuisine tally and passes Reputation into the duel · `Almanac` stores weakness discovery per rival · tunables (`weakness_bonus`, `specialty_penalty`, `reputation_threshold`, `stumped_heat`) are `@export` on the duel system node in `main.tscn`.
 
 ## 5. Run progression ⏳
 
@@ -230,7 +230,7 @@ Pick one: **Rest** (restore 30% Confidence), **Upgrade** one card, or **Master a
 | Quick Chop ×3 | Technique | 1 | 6 Pressure |
 | Deep Breath ×2 | Technique | 1 | 5 Composure |
 
-### 6.2 Reward pool (target ±33 cards total; **22 exist, 10 missing**)
+### 6.2 Reward pool (target ±33 cards total; **25 exist, 7 missing**)
 | Card | Type | Cost | Effect | Status |
 |---|---|---|---|---|
 | Chicken | `PROTEIN` | 1 | Q2 | ✅ |
@@ -256,34 +256,34 @@ Pick one: **Rest** (restore 30% Confidence), **Upgrade** one card, or **Master a
 | Second Helping | Technique | 2 | Return 1 ingredient from the last Serve to hand | ⏳ |
 | Clean Station | Technique | 0 | Discard 1 ingredient from the Station, draw 1 | ⏳ |
 | Crowd Pleaser | Technique | 1 | Hype +20 | ✅ |
-| Soy Sauce | `SAUCE` | 0 | Q1, Fried Rice key ingredient (§4.11) | ⏳ |
-| Noodles | `CARB` | 1 | Q2, Ramen key ingredient (§4.11) | ⏳ |
-| Tortilla | `CARB` | 0 | Q1, Tacos/Quesadilla key ingredient (§4.11) | ⏳ |
+| Soy Sauce | `SAUCE` | 0 | Q1, Fried Rice key ingredient (§4.11) | ✅ |
+| Noodles | `CARB` | 1 | Q2, Ramen key ingredient (§4.11) | ✅ |
+| Tortilla | `CARB` | 0 | Q1, Tacos/Quesadilla key ingredient (§4.11) | ✅ |
 
 (Egg, Bread, Tomato, Butter, Quick Chop and Deep Breath from the starter deck are also ✅.)
 
-### 6.3 Recipes ✅ (13 in `godot/data/recipes`, +4 ⏳ planned for cuisines)
+### 6.3 Recipes ✅ (17, all in `godot/data/recipes`)
 | Recipe | Book | Cuisine (§4.11) | Needs (tag/key ingredient) | Base effect |
 |---|---|---|---|---|
 | **Omelette** | Basics | `FRENCH` | `FAT` → *Egg* → `VEGGIE` | 10 Pressure, 5 Composure |
 | **Toast** | Basics | `HOME` | `CARB` → `FAT` | 6 Pressure, draw 1 |
 | **Fresh Salad** | Basics | `HOME` | `VEGGIE` → `VEGGIE` | 8 Composure, remove 1 debuff |
 | **Sandwich** *(new)* | Basics | `HOME` | *Bread* → `PROTEIN` → `VEGGIE` → *Bread* | 12 Pressure, 6 Composure |
-| **Fried Rice** ⏳ | Basics | `ASIAN` | *Rice* → *Egg* → *Soy Sauce* | 8 Pressure, draw 1 |
+| **Fried Rice** ✅ | Basics | `ASIAN` | *Rice* → *Egg* → *Soy Sauce* | 8 Pressure, draw 1 |
 | **Classic Steak** | Grill Master | `AMERICAN` | `FAT` → *Beef* → `SPICE` | 20 Pressure |
 | **Skewers** | Grill Master | `ASIAN` | `PROTEIN` → `SPICE` | 8 Pressure, Focus 1 |
 | **Mixed Grill** | Grill Master | `AMERICAN` | `FAT` → `PROTEIN` → `PROTEIN` | 16 Pressure, opponent Rattled 1 |
 | **Burger** *(new)* | Grill Master | `AMERICAN` | *Bread* → *Beef* → *Cheese* → `VEGGIE` → *Bread* | 22 Pressure, 6 Composure |
 | **Arrabbiata** | Spice Route | `ITALIAN` | `SPICE` → `SAUCE` → `CARB` | 8 Pressure, Spicy 4 |
 | **Hot Wings** | Spice Route | `AMERICAN` | *Chicken* → `SPICE` → `SPICE` | 6 Pressure, Spicy 6 |
-| **Tacos** ⏳ | Spice Route | `MEXICAN` | *Tortilla* → `PROTEIN` → `VEGGIE` → `SPICE` | 10 Pressure, Spicy 2 |
+| **Tacos** ✅ | Spice Route | `MEXICAN` | *Tortilla* → `PROTEIN` → `VEGGIE` → `SPICE` | 10 Pressure, Spicy 2 |
 | **Warm Soup** | Comfort Food | `FRENCH` | `VEGGIE` → `PROTEIN` → `SAUCE` | Restore 5 Confidence, 8 Composure |
 | **Mac & Cheese** | Comfort Food | `AMERICAN` | *Pasta* → `FAT` → `DAIRY` | 8 Pressure, 8 Composure |
 | **Mushroom Risotto** | Comfort Food | `ITALIAN` | *Rice* → *Mushroom* → `DAIRY` | 10 Composure, Inspired |
-| **Ramen** ⏳ | Comfort Food | `ASIAN` | *Noodles* → `SAUCE` → *Egg* | Restore 4 Confidence, 6 Pressure, 6 Composure |
-| **Quesadilla** ⏳ | Comfort Food | `MEXICAN` | *Tortilla* → *Cheese* → *Tortilla* | 6 Pressure, 8 Composure |
+| **Ramen** ✅ | Comfort Food | `ASIAN` | *Noodles* → `SAUCE` → *Egg* | Restore 4 Confidence, 6 Pressure, 6 Composure |
+| **Quesadilla** ✅ | Comfort Food | `MEXICAN` | *Tortilla* → *Cheese* → *Tortilla* | 6 Pressure, 8 Composure |
 
-**Cuisine coverage rule:** every book has at least 2 non-`HOME` cuisines, so no build is shut out against any rival. Basics: French, Asian · Grill Master: American, Asian · Spice Route: Italian, American, Mexican · Comfort Food: French, American, Italian, Asian, Mexican. Effects marked ⏳ are first guesses for `tests/balance.gd`.
+**Cuisine coverage rule:** every book has at least 2 non-`HOME` cuisines, so no build is shut out against any rival. Basics: French, Asian · Grill Master: American, Asian · Spice Route: Italian, American, Mexican · Comfort Food: French, American, Italian, Asian, Mexican. The 4 cuisine recipes' numbers are first guesses for `tests/balance.gd`.
 
 *All effects add the total Quality on the Station, then multiply by the Perfect multiplier (×1.5).*
 
@@ -303,7 +303,7 @@ Confidence scales to a player at 100 (phase G, 23 Nov). ✅ values were tuned wi
 
 | Opponent | Type | Confidence | AI profile | Specialty | Weakness | Gimmick | Status |
 |---|---|---|---|---|---|---|---|
-| **Tony**, street noodle cook | Duel | **45** | `greedy`, Heat 2, hand 4 | `ASIAN` | `FRENCH` | Serves as soon as a recipe is available. Tutorial opponent. | ✅ data + 3D model + animations |
+| **Tony**, street noodle cook | Duel | **51** (raised from 48 for his Omelette weakness) | `greedy`, Heat 2, hand 4 | `ASIAN` | `FRENCH` | Serves as soon as a recipe is available. Tutorial opponent. | ✅ data + 3D model + animations |
 | **Rosa**, taco truck queen | Duel | **50** | `trickster`, Heat 3, hand 4 | `MEXICAN` | `ASIAN` | Onion/Stare Down deck, often applies Flustered/Rattled. | ✅ data, ⏳ 3D model |
 | **Marco**, pizza showman | Duel | ±42 *(not tuned yet)* | `showman` | `ITALIAN` | `AMERICAN` | Holds a stack for 2 turns for a big dish; the Confident mood shows a turn earlier. Teaches the importance of Composure. | ⏳ |
 | **Élodie**, rival pâtissière | Elite | ±60 *(old scale)* | `patient` | `FRENCH` + your Reputation | `MEXICAN` (*studied* after 2 hits) | If a player Station holds ≥ 5 cards at the start of the rival's turn, the player is Rattled 1 (reads the card *count*, which is public). | ⏳ |
