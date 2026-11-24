@@ -118,6 +118,7 @@ sekali untuk migrasi; menjalankannya lagi akan **menimpa** editan di Godot.
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/sim.gd
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/fx_check.gd
 ```
 
 Balancing (GRAND_DESIGN §8.2): laporan angka sekarang, atau `-- sweep` untuk mencoba nilai lain
@@ -178,6 +179,54 @@ Test UI (butuh window, bukan headless):
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1366x768 --script res://tests/hit_probe.gd
 ```
+
+## FX (hitstop, shake, flash)
+
+Node **`FxDirector`** di `main.tscn` (`scripts/fx/`, lihat `../FX_MASTERPLAN.md`) mendengarkan signal `Duel`.
+Rasa tiap momen = satu `FxCue` di `data/fx/*.tres` (hitstop, trauma shake, flash, desaturasi, punch zoom, partikel,
+kata manga, crowd melompat, retak bar Confidence), diatur di Inspector.
+Anak node: **`HitStop`** (satu-satunya yang menulis `Engine.time_scale`; TurnDirector hanya mengisi `fast_forward`)
+dan **`Shake`** (offset kamera stage + offset CanvasLayer HUD, dibulatkan ke grid 3 px).
+Flash/desaturasi lewat `%FxScreen` di `duel_ui.tscn` (`assets/shaders/fx_screen.gdshader`), tersembunyi saat tidak dipakai.
+Partikel dan kata manga lewat `%FxHud` (`scripts/fx/fx_hud.gd`): 2 `CPUParticles2D` per jenis (`Crumbs`, `Steam`, `Sparks`,
+`Smoke`, `Shards`, dipakai bergiliran, tanpa tekstur) + label `Word1`/`Word2`. Atur bentuk partikel langsung di node-nya.
+Angka Pressure ≥ `DuelUI.slam_number_at` (15) di-*slam* besar, bukan melayang biasa.
+**Impact frame** (Signature, menang): 3 frame siluet dua warna tinta/krem di `%FxScreen`, frame ke-2 terbalik. Tiap frame
+minimal 1/60 s dan 1 frame tergambar. Dengan *Reduce Flashing* diganti desaturasi singkat. Speed lines / cincin kejut lewat
+`%FxLines` (`assets/shaders/fx_lines.gdshader`, prosedural, grid 3 px); chromatic split juga di `%FxScreen`.
+
+| Momen | Cue | Tier | Isi |
+|---|---|---|---|
+| Bahan ditaruh di station | `place` | T0 | remah warna tag |
+| Serve yang kena | `serve` | T1 | uap, "CLANG!", crowd kecil |
+| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 | uap + percikan, "BAM!!", speed lines singkat, flash krem, punch zoom, crowd |
+| Serve Burnt | `serve_burnt` | T1 | asap, "FSSHH...", desaturasi singkat |
+| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 | serpihan merah + "CRACK!" di bar yang retak, flash merah, chromatic |
+| Signature Dish | `signature` | T3 | **impact frame**, speed lines, chromatic, flash emas, percikan + uap, punch zoom, crowd penuh |
+| Menang / kalah | `win` / `lose` | T3 | **impact frame** + speed lines + serpihan + retak bar lawan / asap + desaturasi panjang |
+
+**Cutscene Signature Dish** (`SignatureCutscene` di `main.tscn`, `scripts/fx/signature_cutscene.gd`): beat-nya adalah
+method key di `AnimationPlayer` anaknya (`long` 2.3 s, `short` 1.0 s); geser key di editor animasi untuk mengatur
+tempo. Versi panjang sekali per sesi (`long_once`), lalu versi pendek. Urutan panjang: cut-in + letterbox, dunia
+dibekukan (`HitStop.cutscene_factor`) → kamera close-up `CutCamera` bergerak dari `CutMarkers/SigFrom` ke `SigTo`
+(atur posisinya di `stage.tscn`), HUD memudar, "SLASH!" ×2 → impact frame, kembali ke kamera duel, semua cue yang
+ditahan `FxDirector` (damage, KO) mendarat bersamaan → letterbox keluar. Klik / Space / Esc = lompat ke impact.
+Cut-in, letterbox, dan semua overlay FX ada di `%FxLayer` (CanvasLayer di atas HUD) supaya HUD bisa memudar sendiri.
+
+**Cutscene Finish** (`FinishCutscene` di `main.tscn`, animasi `win` 1.5 s / `lose` 1.8 s): main sebelum announcer
+FINISHED. Menang: impact frame KO, slow-mo ×0.3, kamera meluncur dari pandangan duel ke `CutMarkers/KoWin` (rival),
+penonton bersorak. Kalah: slow-mo ×0.5, layar pudar, kamera turun ke `KoLose` (Apis), penonton diam. Kalau
+Signature yang menamatkan duel, Finish mulai tepat di impact Signature. Klik untuk skip. Kedua cutscene memakai
+base class `FxCutscene` (`scripts/fx/fx_cutscene.gd`).
+
+**Layar VS** (`%VsIntro` di `duel_ui.tscn`, `scripts/fx/vs_intro.gd`): ±2 s sebelum 3·2·1, layar dibagi diagonal,
+potret 2D dari `assets/portraits/<id>.png`. Potret dirender sekali dari GLB dengan
+`tests/portrait_render.gd` (butuh window; jalankan lagi kalau model berubah). Rival tanpa potret hanya tampil namanya.
+Klik untuk skip.
+
+Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
+Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel
+(≤ 150 hidup), satu kata per frame, retak, punch zoom, crowd, dan angka slam.
 
 ## Audio
 

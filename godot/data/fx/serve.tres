@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="FxCue" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/fx_cue.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier = 1
+hitstop = 0.05
+trauma = 0.3
+burst = "steam"
+word = "CLANG!"
+crowd = 0.3
