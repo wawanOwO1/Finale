@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/fx/fx_director.gd" id="fx_director"]
 [ext_resource type="Script" path="res://scripts/fx/hit_stop.gd" id="hit_stop"]
 [ext_resource type="Script" path="res://scripts/fx/shake.gd" id="shake"]
+[ext_resource type="Resource" path="res://data/fx/place.tres" id="fx_place"]
 [ext_resource type="Resource" path="res://data/fx/serve.tres" id="fx_serve"]
 [ext_resource type="Resource" path="res://data/fx/serve_big.tres" id="fx_serve_big"]
 [ext_resource type="Resource" path="res://data/fx/serve_burnt.tres" id="fx_serve_burnt"]
@@ -47,6 +48,7 @@ script = ExtResource("5")
 
 [node name="FxDirector" type="Node" parent="."]
 script = ExtResource("fx_director")
+place = ExtResource("fx_place")
 serve = ExtResource("fx_serve")
 serve_big = ExtResource("fx_serve_big")
 serve_burnt = ExtResource("fx_serve_burnt")

@@ -41,7 +41,7 @@ func _ready() -> void:
 	_set_pixel(pixel_on_start)
 	director.ui = ui
 	director.hit_stop = fx.hit_stop
-	fx.setup(stage.camera, ui)
+	fx.setup(stage, ui)
 	ui.director = director
 	ui.almanac_keeper = almanac_keeper
 	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))

@@ -24,6 +24,13 @@ extends Control
 @export var border := 4.0
 @export var font_size := 24
 @export var text_color := Color("#fbf3e2")
+## Crack overlay after a big hit (FX_MASTERPLAN.md §3.2): 0 = none, 1 = fully drawn. FxDirector
+## sets it to 1 and fades it out. crack_seed picks where the cracks run.
+@export_range(0.0, 1.0) var crack := 0.0:
+	set(v):
+		crack = clampf(v, 0.0, 1.0)
+		queue_redraw()
+var crack_seed := 0
 
 
 func _draw() -> void:
@@ -48,7 +55,28 @@ func _draw() -> void:
 		draw_rect(Rect2(c.position, Vector2(c.size.x, c.size.y * 0.25)), shield_color.lightened(0.3))
 		draw_rect(Rect2(c.position, Vector2(b * 0.75, c.size.y)), frame_color)
 		_text(c, str(shield), roundi(font_size * 0.8))
+	if crack > 0.0:
+		_cracks(inner)
 	_text(Rect2(inner.position, Vector2(inner.size.x - cap_w, inner.size.y)), text, font_size)
+
+
+## Two jagged ink lines top to bottom, with a light edge, on a 2 px step so they read as pixel art.
+func _cracks(r: Rect2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = crack_seed
+	var ink := Color(frame_color, crack)
+	var light := Color(fill_color.lightened(0.5), crack * 0.8)
+	for n in 2:
+		var x := r.position.x + r.size.x * rng.randf_range(0.2 + n * 0.4, 0.4 + n * 0.4)
+		var pts := PackedVector2Array()
+		var steps := 4
+		for i in steps + 1:
+			var y := r.position.y + r.size.y * i / steps
+			pts.append(Vector2(snappedf(x + rng.randf_range(-9.0, 9.0), 2.0), snappedf(y, 2.0)))
+		draw_polyline(pts, light, 2.0)
+		for i in pts.size():
+			pts[i] += Vector2(2, 0)
+		draw_polyline(pts, ink, 3.0)
 
 
 func _text(r: Rect2, s: String, fs: int) -> void:

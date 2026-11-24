@@ -65,6 +65,9 @@ var anchors := {rival = Vector2(1400, 300), player = Vector2(600, 400), board = 
 @export var stations_size_px := Vector2(432, 560)
 ## Space kept above each Stations panel for its tab when the panel above it grows.
 @export var stations_tab_room_px := 52.0
+@export_group("FX")
+## Pressure loss that slams a big number instead of the usual float (FX_MASTERPLAN.md §5.6).
+@export var slam_number_at := 15
 @export_group("")
 
 var _views: Array[CardView] = []
@@ -156,7 +159,10 @@ func bind(d: Duel) -> void:
 	d.modifier_gained.connect(_on_modifier_gained)
 	%FlowPick.hide()
 	d.confidence_lost.connect(func(target: String, amount: int, source: String) -> void:
-		_float(_anchor(target), "-%d" % amount, Pal.ORANGE if source == "spicy" else Pal.RED, 2.3))
+		if source == "pressure" and amount >= slam_number_at:
+			_slam_number(_anchor(target), "-%d" % amount, amount)
+		else:
+			_float(_anchor(target), "-%d" % amount, Pal.ORANGE if source == "spicy" else Pal.RED, 2.3))
 	d.pressure_dealt.connect(func(target: String, _amount: int, blocked: int) -> void:
 		if blocked > 0:
 			_float(_anchor(target), str(blocked), Pal.BLUE, 1.4, "composure"))
@@ -204,6 +210,44 @@ func speed_hint() -> Label:
 ## Full-screen flash / desaturate overlay, driven by FxDirector.
 func fx_screen() -> ColorRect:
 	return %FxScreen
+
+
+## Particles + manga words, driven by FxDirector.
+func fx_hud() -> FxHud:
+	return %FxHud
+
+
+## Confidence bar of a side ("player" | "enemy").
+func hp_bar(target: String) -> HpBar:
+	return %RivalHp if target == "enemy" else %PlayerHp
+
+
+## Where a side's last Serve happened: Apis's served station, or the rival's face-down stations.
+func serve_rect(side: String) -> Rect2:
+	if side == "enemy":
+		return %RivalKitchen.get_global_rect()
+	var si := duel.last_served_station if duel else -1
+	if si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
+		return _cols[si].get_global_rect()
+	return %Board.get_global_rect()
+
+
+## Where a just-played card landed: the top edge of the top card of its station (crumbs spill
+## over the ticket and the dark panel, not over the card's own color), or the rival's stations.
+func card_point(side: String, card: CardInstance) -> Vector2:
+	if side == "enemy" or duel == null:
+		return %RivalKitchen.get_global_rect().get_center()
+	for i in duel.stations.size():
+		if card in duel.stations[i]:
+			var r := _top_card_rect(i)
+			if r.has_area():
+				return Vector2(r.get_center().x, r.position.y)
+	return %Board.get_global_rect().get_center()
+
+
+## A side's floating-number spot (above the chef).
+func hit_point(target: String) -> Vector2:
+	return _anchor(target)
 
 
 ## Locks card/station input (rival turn, banners). The result sequence also sets it.
@@ -1273,6 +1317,29 @@ func show_mise(side: String) -> void:
 	_float(at + Vector2(0, -Pal.em(1.0)), "Mise en place!", Pal.GOLD, 1.3, "inspired", 0.1)
 
 
+## Big hit number (FX_MASTERPLAN.md §5.6): slams in huge, holds, then drops. Grows with the hit.
+func _slam_number(at: Vector2, text: String, amount: int) -> void:
+	var size_em := lerpf(3.4, 5.2, clampf((amount - slam_number_at) / 25.0, 0.0, 1.0))
+	var l := Ui.outlined(text, size_em, Pal.GOLD if amount >= slam_number_at * 2 else Pal.RED, 0.16)
+	l.add_theme_color_override("font_shadow_color", Pal.HUD_INK)
+	l.add_theme_constant_override("shadow_offset_x", roundi(Pal.em(0.3)))
+	l.add_theme_constant_override("shadow_offset_y", roundi(Pal.em(0.3)))
+	%Floaters.add_child(l)
+	l.reset_size()
+	l.pivot_offset = l.size / 2.0
+	var p := at - l.size / 2.0 - Vector2(0, Pal.em(1.0))
+	l.position = p
+	l.rotation = deg_to_rad(randf_range(-6.0, 6.0))
+	l.scale = Vector2.ONE * 2.4
+	var tw := create_tween()
+	tw.tween_property(l, "scale", Vector2.ONE * 0.9, 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.08)
+	tw.tween_interval(0.55)
+	tw.tween_property(l, "position", p + Vector2(0, Pal.em(2.5)), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.35).set_ease(Tween.EASE_IN)
+	tw.tween_callback(l.queue_free)
+
+
 func _float(at: Vector2, text: String, color: Color, size_em: float, icon_name := "", delay := 0.0) -> void:
 	var row := Ui.hbox(0.15)
 	if icon_name != "":
@@ -1319,12 +1386,7 @@ func _show_dish(side: String, recipe: RecipeDef, perfect: bool, signature: bool,
 	var b: Control = %DishBanner
 	b.show()
 	b.reset_size()
-	var board: Rect2 = %Board.get_global_rect()
-	var si := duel.last_served_station if duel else -1
-	if rival:
-		board = %RivalKitchen.get_global_rect()
-	elif si >= 0 and si < _cols.size() and is_instance_valid(_cols[si]):
-		board = _cols[si].get_global_rect()
+	var board := serve_rect(side)
 	var p := Vector2(board.get_center().x - b.size.x / 2.0, board.position.y - 12.0 - b.size.y)
 	b.position = p
 	b.pivot_offset = b.size / 2.0

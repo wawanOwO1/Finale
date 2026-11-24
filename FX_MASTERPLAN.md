@@ -223,6 +223,11 @@ Urutan T3 (60 fps):
 
 Semua partikel: `one_shot`, `explosiveness` tinggi, `lifetime` ≤ 0.8 s, `fixed_fps = 30` (cukup untuk gaya pixel, separuh biaya).
 
+> **Keputusan F1:** partikel HUD memakai **`CPUParticles2D`**, bukan GPU. Dengan 12–20 partikel per burst biaya CPU-nya
+> kecil sekali, dan tidak ada shader partikel yang harus dikompilasi WebGL saat Serve pertama. Tanpa tekstur:
+> tiap partikel kotak pixel yang di-scale (cocok dengan gaya pixel, tidak ada atlas untuk diunduh). Atlas tetap
+> opsional kalau nanti butuh bentuk (bintang, api).
+
 ### 5.5 "Bloom" dan aura tanpa glow
 
 - Aura Signature: 2 sprite additive (lingkaran lembut + api flipbook 4 frame) di belakang Apis, bukan `Environment.glow`.
@@ -319,7 +324,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 | Fase | Isi | Perkiraan | Hasil yang terlihat |
 |---|---|---|---|
 | **F0 Fondasi** ✅ | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
-| **F1 Juice T0–T2** | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
+| **F1 Juice T0–T2** ✅ | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
 | **F2 Impact frame** | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
 | **F3 Cutscene Signature** | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
 | **F4 Finish + Intro VS** | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |

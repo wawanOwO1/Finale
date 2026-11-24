@@ -27,3 +27,20 @@ extends Resource
 ## Seconds it stays drained before fading back over desat_fade.
 @export_range(0.0, 5.0, 0.05) var desat_hold := 0.0
 @export_range(0.05, 3.0, 0.05) var desat_fade := 0.4
+@export_group("Camera")
+## FOV punch-in of the stage camera (0.03 = 3% closer), springs back in punch_time.
+@export_range(0.0, 0.15, 0.005) var zoom_punch := 0.0
+@export_group("Particles")
+## Burst kind from %FxHud: "crumbs", "steam", "sparks", "smoke", "shards", or "none".
+@export_enum("none", "crumbs", "steam", "sparks", "smoke", "shards") var burst := "none"
+## Second burst at the same spot (e.g. steam + sparks on a Perfect).
+@export_enum("none", "crumbs", "steam", "sparks", "smoke", "shards") var burst_2 := "none"
+@export_group("Text")
+## Manga sound word slammed near the hit ("BAM!"). Empty = none.
+@export var word := ""
+@export var word_color := Color("#fbf3e2")
+@export_group("Stage")
+## Crowd jumps together (0 = no reaction, 1 = big cheer).
+@export_range(0.0, 1.0, 0.05) var crowd := 0.0
+## Crack the hit side's Confidence bar.
+@export var crack := false

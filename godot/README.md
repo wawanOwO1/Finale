@@ -183,22 +183,28 @@ Test UI (butuh window, bukan headless):
 ## FX (hitstop, shake, flash)
 
 Node **`FxDirector`** di `main.tscn` (`scripts/fx/`, lihat `../FX_MASTERPLAN.md`) mendengarkan signal `Duel`.
-Rasa tiap momen = satu `FxCue` di `data/fx/*.tres` (hitstop, trauma shake, flash, desaturasi), diatur di Inspector.
+Rasa tiap momen = satu `FxCue` di `data/fx/*.tres` (hitstop, trauma shake, flash, desaturasi, punch zoom, partikel,
+kata manga, crowd melompat, retak bar Confidence), diatur di Inspector.
 Anak node: **`HitStop`** (satu-satunya yang menulis `Engine.time_scale`; TurnDirector hanya mengisi `fast_forward`)
 dan **`Shake`** (offset kamera stage + offset CanvasLayer HUD, dibulatkan ke grid 3 px).
 Flash/desaturasi lewat `%FxScreen` di `duel_ui.tscn` (`assets/shaders/fx_screen.gdshader`), tersembunyi saat tidak dipakai.
+Partikel dan kata manga lewat `%FxHud` (`scripts/fx/fx_hud.gd`): 2 `CPUParticles2D` per jenis (`Crumbs`, `Steam`, `Sparks`,
+`Smoke`, `Shards`, dipakai bergiliran, tanpa tekstur) + label `Word1`/`Word2`. Atur bentuk partikel langsung di node-nya.
+Angka Pressure ≥ `DuelUI.slam_number_at` (15) di-*slam* besar, bukan melayang biasa.
 
-| Momen | Cue | Tier |
-|---|---|---|
-| Serve yang kena | `serve` | T1 |
-| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 |
-| Serve Burnt | `serve_burnt` | T1 |
-| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 |
-| Signature Dish | `signature` | T3 |
-| Menang / kalah | `win` / `lose` | T3 |
+| Momen | Cue | Tier | Isi |
+|---|---|---|---|
+| Bahan ditaruh di station | `place` | T0 | remah warna tag |
+| Serve yang kena | `serve` | T1 | uap, "CLANG!", crowd kecil |
+| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 | uap + percikan, "BAM!!", flash krem, punch zoom, crowd |
+| Serve Burnt | `serve_burnt` | T1 | asap, "FSSHH...", desaturasi singkat |
+| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 | serpihan merah + "CRACK!" di bar yang retak, flash merah |
+| Signature Dish | `signature` | T3 | flash emas, percikan + uap, punch zoom, crowd penuh |
+| Menang / kalah | `win` / `lose` | T3 | serpihan + retak bar lawan / asap + desaturasi panjang |
 
 Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
-Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, dan overlay.
+Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel
+(≤ 150 hidup), satu kata per frame, retak, punch zoom, crowd, dan angka slam.
 
 ## Audio
 

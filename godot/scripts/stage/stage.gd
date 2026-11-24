@@ -19,6 +19,9 @@ const TAG_COLORS := {
 @export var crowd_per_row := 16
 @export var crowd_color := Color("#b5703a")
 @export var crowd_origin := Vector3(-11, 0.6, 6.2)
+## Height of a full-strength cheer jump (FxCue.crowd = 1).
+@export var cheer_height := 0.55
+@export var cheer_time := 0.6
 
 @onready var camera: Camera3D = $Camera3D
 ## Pixel filter post-process quad (assets/shaders/pixel_post.gdshader); main.gd toggles it.
@@ -38,6 +41,8 @@ var _hit_at := {player = -10.0, rival = -10.0}
 var _act_at := {player = -10.0, rival = -10.0}
 var _base := {}
 var _crowd: Array[Node3D] = []
+var _cheer_at := -10.0
+var _cheer := 0.0
 
 
 func _ready() -> void:
@@ -145,6 +150,14 @@ func act(who: String) -> void:
 	_act_at[who] = _time
 
 
+## The whole crowd jumps together (FxDirector, on big moments). power 0..1.
+func cheer(power: float) -> void:
+	if power <= 0.0:
+		return
+	_cheer = maxf(power, _cheer if _time - _cheer_at < cheer_time else 0.0)
+	_cheer_at = _time
+
+
 ## The chef for a duel side: "player" → Apis, anything else ("enemy") → the rival.
 func chef(side: String) -> Chef:
 	return player if side == "player" else rival
@@ -164,7 +177,9 @@ func _process(delta: float) -> void:
 	for m in _crowd:
 		var phase: float = m.get_meta("phase")
 		var base_y: float = m.get_meta("base_y")
-		m.position.y = base_y + maxf(0.0, sin(_time * 3.0 + phase)) * 0.12
+		var dt := _time - _cheer_at - fmod(phase, 0.5) * 0.12
+		var jump := sin(dt / cheer_time * PI) * cheer_height * _cheer if dt > 0.0 and dt < cheer_time else 0.0
+		m.position.y = base_y + maxf(0.0, sin(_time * 3.0 + phase)) * 0.12 + jump
 
 
 func _shake(who: String) -> float:
