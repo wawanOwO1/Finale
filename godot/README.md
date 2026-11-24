@@ -118,6 +118,7 @@ once for the migration; running it again will **overwrite** edits made in Godot.
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/sim.gd
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/fx_check.gd
 ```
 
 Balancing (GRAND_DESIGN §8.2): prints the current numbers, or `-- sweep` to try other values
@@ -178,6 +179,26 @@ UI tests (need a window, not headless):
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1366x768 --script res://tests/hit_probe.gd
 ```
+
+## FX (hitstop, shake, flash)
+
+Node **`FxDirector`** di `main.tscn` (`scripts/fx/`, lihat `../FX_MASTERPLAN.md`) mendengarkan signal `Duel`.
+Rasa tiap momen = satu `FxCue` di `data/fx/*.tres` (hitstop, trauma shake, flash, desaturasi), diatur di Inspector.
+Anak node: **`HitStop`** (satu-satunya yang menulis `Engine.time_scale`; TurnDirector hanya mengisi `fast_forward`)
+dan **`Shake`** (offset kamera stage + offset CanvasLayer HUD, dibulatkan ke grid 3 px).
+Flash/desaturasi lewat `%FxScreen` di `duel_ui.tscn` (`assets/shaders/fx_screen.gdshader`), tersembunyi saat tidak dipakai.
+
+| Momen | Cue | Tier |
+|---|---|---|
+| Serve yang kena | `serve` | T1 |
+| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 |
+| Serve Burnt | `serve_burnt` | T1 |
+| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 |
+| Signature Dish | `signature` | T3 |
+| Menang / kalah | `win` / `lose` | T3 |
+
+Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
+Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, dan overlay.
 
 ## Audio
 

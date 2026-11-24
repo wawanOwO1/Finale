@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/ui/hud/diamond_badge.gd" id="diamond"]
 [ext_resource type="Texture2D" path="res://assets/icons/book.svg" id="8"]
 [ext_resource type="Script" path="res://scripts/ui/almanac_view.gd" id="9"]
+[ext_resource type="Shader" path="res://assets/shaders/fx_screen.gdshader" id="fx_screen_shader"]
 
 [sub_resource type="StyleBoxFlat" id="hud_panel"]
 content_margin_left = 18.0
@@ -230,6 +231,12 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(0.231, 0.141, 0.078, 1)
 anti_aliasing = false
+
+[sub_resource type="ShaderMaterial" id="fx_screen_mat"]
+shader = ExtResource("fx_screen_shader")
+shader_parameter/flash = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/desat = 0.0
 
 [node name="DuelUI" type="CanvasLayer"]
 script = ExtResource("1")
@@ -1525,4 +1532,19 @@ mouse_filter = 2
 z_index = 200
 unique_name_in_owner = true
 layout_mode = 0
+mouse_filter = 2
+
+[node name="FxScreen" type="ColorRect" parent="Root"]
+visible = false
+z_index = 190
+material = SubResource("fx_screen_mat")
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_left = -0.05
+anchor_top = -0.05
+anchor_right = 1.05
+anchor_bottom = 1.05
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2

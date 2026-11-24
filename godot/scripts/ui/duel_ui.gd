@@ -201,6 +201,11 @@ func speed_hint() -> Label:
 	return %SpeedHint
 
 
+## Full-screen flash / desaturate overlay, driven by FxDirector.
+func fx_screen() -> ColorRect:
+	return %FxScreen
+
+
 ## Locks card/station input (rival turn, banners). The result sequence also sets it.
 func set_busy(on: bool) -> void:
 	_busy = on
