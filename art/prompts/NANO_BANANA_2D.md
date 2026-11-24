@@ -1,46 +1,46 @@
-# FINALE — Prompt Nano Banana untuk aset 2D
+# FINALE — Nano Banana prompts for 2D assets
 
-Prompt untuk membuat **frame kartu, ilustrasi kartu, modifier, dan icon pack** dengan Nano Banana
-(Gemini image). Gaya mengikuti gambar referensi kartu pixel ("Archons Exile") dan `ART_DIRECTION.md`:
-pixel art tebal, outline gelap, bingkai krem, badan gelap, blok biaya teal, palet "Market Street".
+Prompts for making **card frames, card illustrations, modifiers and an icon pack** with Nano Banana
+(Gemini image). The style follows the pixel-card reference image ("Archons Exile") and `ART_DIRECTION.md`:
+chunky pixel art, dark outlines, a cream frame, a dark body, a teal cost block, the "Market Street" palette.
 
-Penjelasan dalam bahasa Indonesia, **prompt dalam bahasa Inggris** (hasil Nano Banana lebih stabil).
-Data yang dipakai: `godot/data/cards`, `godot/data/modifiers`, `godot/data/recipes`, `godot/assets/icons`,
+The explanations are written for humans; the **prompts are in English** (Nano Banana results are more stable that way).
+Data used: `godot/data/cards`, `godot/data/modifiers`, `godot/data/recipes`, `godot/assets/icons`,
 `scripts/ui/pal.gd`.
 
 ---
 
-## 0. Cara pakai (baca dulu)
+## 0. How to use (read first)
 
-1. **Satu kunci gaya dulu.** Buat frame kartu Ingredient (§2.1) sampai pas. Gambar itu jadi **gambar referensi**
-   yang di-upload bersama setiap prompt berikutnya, plus gambar "Archons Exile". Tambahkan kalimat:
+1. **One style key first.** Make the Ingredient card frame (§2.1) until it is right. That image becomes the **reference image**
+   uploaded with every following prompt, plus the "Archons Exile" image. Add the sentence:
    `Match the exact pixel style, outline weight and palette of the attached reference image.`
-2. **Tanpa teks di gambar.** Nama, biaya, angka, dan deskripsi digambar Godot (`card_view.tscn`). Nano Banana
-   sering salah eja, jadi semua prompt meminta area teks **kosong**.
-3. **Background datar.** Nano Banana tidak membuat PNG transparan. Semua prompt meminta latar **magenta
-   `#FF00FF` rata**, lalu dihapus (magic wand / `rembg` / script). Magenta tidak dipakai di palet, jadi aman.
-4. **Sheet, bukan satuan.** Ikon dan ilustrasi dibuat dalam grid (2×2, 3×3, 4×4). Satu sheet = gaya seragam.
-   Potong per sel setelahnya.
-5. **Downscale ke grid pixel asli.** Hasil Nano Banana ±1024 px dan "pixel"-nya tidak rata. Kecilkan dengan
-   **Nearest Neighbor** ke ukuran art (tabel di bawah), lalu rapikan sedikit di Aseprite/LibreSprite
-   (pixel nyasar, outline putus). Opsional: kuantisasi ke palet §1.2.
-6. Simpan ke `godot/assets/pixel/<kategori>/<nama>.png`, import `Filter: Nearest`, `Mipmaps: off`.
+2. **No text in the image.** Names, costs, numbers and descriptions are drawn by Godot (`card_view.tscn`). Nano Banana
+   often misspells, so every prompt asks for **empty** text areas.
+3. **A flat background.** Nano Banana does not make transparent PNGs. Every prompt asks for a **flat magenta
+   `#FF00FF`** background, which is then removed (magic wand / `rembg` / a script). Magenta is not in the palette, so it is safe.
+4. **Sheets, not singles.** Icons and illustrations are made in a grid (2×2, 3×3, 4×4). One sheet = a uniform style.
+   Cut it per cell afterward.
+5. **Downscale to the real pixel grid.** Nano Banana output is ±1024 px and its "pixels" are uneven. Shrink with
+   **Nearest Neighbor** to the art size (table below), then tidy up a little in Aseprite/LibreSprite
+   (stray pixels, broken outlines). Optional: quantize to the §1.2 palette.
+6. Save to `godot/assets/pixel/<category>/<name>.png`, import with `Filter: Nearest`, `Mipmaps: off`.
 
-| Aset | Aspect ratio prompt | Ukuran art akhir |
+| Asset | Prompt aspect ratio | Final art size |
 |---|---|---|
-| Frame kartu / punggung | 3:4 | 48×64 (atau 96×128 kalau kartu di-scale ×2) |
-| Ilustrasi kartu | 1:1 (sheet 2×2) | 32×32 per sel |
-| Chip modifier | 1:1 | 24×24 |
-| Emblem modifier | 1:1 (sheet 3×3 / 2×2) | 16×16 per sel |
-| Ikon HUD / status / tag | 1:1 (sheet 4×4) | 12×12 atau 16×16 per sel |
-| Ikon hidangan | 1:1 (sheet 4×4) | 24×24 per sel |
+| Card frame / back | 3:4 | 48×64 (or 96×128 if the card is scaled ×2) |
+| Card illustration | 1:1 (2×2 sheet) | 32×32 per cell |
+| Modifier chip | 1:1 | 24×24 |
+| Modifier emblem | 1:1 (3×3 / 2×2 sheet) | 16×16 per cell |
+| HUD / status / tag icon | 1:1 (4×4 sheet) | 12×12 or 16×16 per cell |
+| Dish icon | 1:1 (4×4 sheet) | 24×24 per cell |
 
-> Catatan jujur: ikon 12×12 hampir selalu butuh rapikan tangan setelah downscale. Kalau terlalu repot, pakai
-> 16×16 dan biarkan Godot men-scale.
+> An honest note: 12×12 icons almost always need hand cleanup after downscaling. If that is too much trouble, use
+> 16×16 and let Godot scale it.
 
 ---
 
-## 1. Blok gaya (tempel di awal setiap prompt)
+## 1. Style blocks (paste at the start of every prompt)
 
 ### 1.1 STYLE
 ```
@@ -52,18 +52,18 @@ cooking-show deckbuilder. Plain flat solid magenta background (#FF00FF), nothing
 No text, no letters, no numbers, no watermark, no signature.
 ```
 
-### 1.2 PALETTE (tambahkan kalau warna melenceng)
+### 1.2 PALETTE (add it if the colors drift)
 ```
 Use only this palette: wood #2a1a10 #3b2414 #5a3722 #7a4e30 #9c6a42; paper #fbf3e2 #f3e3c4 #d9c39a;
 card rim #d9cdb8; card body #241d19; teal #2f6f7a #3f7fae #8fb3d1; hot #d8342c #a8231d #e07b28 #f2b632;
 green #4d9a4a #5ea44f #2e5e2c; purple #8a3fb0 #7c63b5; ink #1e1410 #6b4a32; white #ffffff.
 ```
 
-### 1.3 Warna tag bahan (dari `pal.gd`)
+### 1.3 Ingredient tag colors (from `pal.gd`)
 
-| Tag | Warna | Dipakai untuk |
+| Tag | Color | Used for |
 |---|---|---|
-| PROTEIN | `#e9a23b` | latar art, pip, ikon |
+| PROTEIN | `#e9a23b` | art background, pip, icon |
 | CARB | `#c98c4a` | |
 | VEGGIE | `#5ea44f` | |
 | FAT | `#e6c84a` | |
@@ -71,17 +71,17 @@ green #4d9a4a #5ea44f #2e5e2c; purple #8a3fb0 #7c63b5; ink #1e1410 #6b4a32; whit
 | SPICE | `#d8342c` | |
 | SAUCE | `#9a4a2a` | |
 | Technique | `#7c63b5` (art window `#2f6f7a`) | |
-| Signature | rim emas `#f2d27a`, art `#4a2a3a` | |
+| Signature | gold rim `#f2d27a`, art `#4a2a3a` | |
 
 ---
 
-## 2. Frame kartu
+## 2. Card frames
 
-Layout mengikuti Card v2 di `card_view.gd` dan referensi: rim krem tebal, badan gelap, **blok biaya teal kiri
-atas**, **pita nama** di atas, **jendela art** di tengah, kolom pip di sisi, **bar Quality** di bawah.
-Semua slot kosong; Godot yang mengisi.
+The layout follows Card v2 in `card_view.gd` and the reference: a thick cream rim, a dark body, a **teal cost block at the top
+left**, a **name ribbon** on top, an **art window** in the middle, a pip column on the side, a **Quality bar** at the bottom.
+All slots are empty; Godot fills them.
 
-### 2.1 Frame Ingredient (kunci gaya, buat ini dulu)
+### 2.1 Ingredient frame (the style key, make this first)
 ```
 [STYLE]
 A single empty trading card frame, portrait 3:4, filling most of the image.
@@ -97,7 +97,7 @@ Small empty dark text box under the art window.
 Symmetrical, clean, readable at tiny size.
 ```
 
-### 2.2 Frame Technique
+### 2.2 Technique frame
 ```
 [STYLE]
 Same card frame layout as the attached reference card (cost block top-left, name banner, art window,
@@ -106,7 +106,7 @@ and banner trim use muted purple (#7c63b5) accents, and there is NO bottom bar s
 empty text box is taller. Cream rim (#d9cdb8), dark body (#241d19). All slots empty, no text.
 ```
 
-### 2.3 Frame Signature (rare)
+### 2.3 Signature frame (rare)
 ```
 [STYLE]
 Same card frame layout as the attached reference card, but a legendary SIGNATURE DISH card:
@@ -115,7 +115,7 @@ rim center, tiny sparkle pixels (#ffffff) on two corners, the name banner is gol
 the art window is filled with deep plum (#4a2a3a). Cost block stays teal. All slots empty, no text.
 ```
 
-### 2.4 Punggung kartu
+### 2.4 Card back
 ```
 [STYLE]
 The back side of a playing card, portrait 3:4, same cream rim (#d9cdb8) and dark body (#241d19)
@@ -125,22 +125,22 @@ Small repeating checker pattern of two dark browns (#241d19, #3b2414) behind the
 Symmetrical. No text.
 ```
 
-### 2.5 Varian tag (opsional, edit gambar)
-Upload frame §2.1 lalu:
+### 2.5 Tag variants (optional, image edit)
+Upload the §2.1 frame, then:
 ```
 Edit this card frame: recolor only the side pip tab and the thin trim around the art window to {TAG COLOR},
 and fill the art window with a darker shade of {TAG COLOR}. Keep everything else pixel-identical.
 ```
-Ganti `{TAG COLOR}` dengan warna di §1.3 (mis. `VEGGIE green #5ea44f`).
+Replace `{TAG COLOR}` with a color from §1.3 (e.g. `VEGGIE green #5ea44f`).
 
 ---
 
-## 3. Ilustrasi kartu (isi jendela art, 32×32)
+## 3. Card illustrations (fill the art window, 32×32)
 
-Gaya seperti pedang di referensi: satu objek besar di tengah, sedikit miring, outline gelap, latar jendela
-diberi pola titik/partikel samar. **Latar tetap magenta** supaya bisa dipotong; warna jendela sudah dari frame.
+A style like the sword in the reference: one big object in the center, slightly tilted, a dark outline, and the window background
+given a faint dot/particle pattern. **The background stays magenta** so it can be cut out; the window color already comes from the frame.
 
-Template sheet 2×2:
+2×2 sheet template:
 ```
 [STYLE]
 A 2x2 sprite sheet of 4 separate food illustrations for card art, each centered in its own equal square
@@ -156,9 +156,9 @@ Top-left: {A}. Top-right: {B}. Bottom-left: {C}. Bottom-right: {D}.
 | **Carb** | a loaf of crusty bread, golden brown | a bundle of dry spaghetti tied with a string | a small bowl of white rice | a pot of steaming water with pasta (spare) |
 | **Veggie / Fat** | ripe red tomato with green leaves | a cut purple onion showing rings | a brown button mushroom | a stick of yellow butter on a small dish |
 | **Dairy / Spice / Sauce** | a wedge of yellow cheese with holes | a red chili pepper with green stem | a garlic bulb with one clove apart | a glass jar of red tomato sauce |
-| **Sauce 2 + cadangan** | a small pot of golden broth stock with steam | an empty cutting board (spare) | a whisk (spare) | a salt shaker (spare) |
+| **Sauce 2 + spares** | a small pot of golden broth stock with steam | an empty cutting board (spare) | a whisk (spare) | a salt shaker (spare) |
 
-Teknik (latar jendela teal, jadi objek pakai warna terang):
+Techniques (a teal window background, so the objects use light colors):
 ```
 [STYLE]
 A 2x2 sprite sheet of 4 cooking-show TECHNIQUE illustrations for card art, each centered in its own equal
@@ -177,18 +177,18 @@ Bottom-left: SIGNATURE DISH — a golden serving cloche lifted with light rays a
 Bottom-right: spare — a chef's knife crossed with a wooden spoon.
 ```
 
-Nama file: `godot/assets/pixel/card_art/<card_id>.png` (`beef`, `chicken`, `fish`, `egg`, `bread`, `pasta`,
+File names: `godot/assets/pixel/card_art/<card_id>.png` (`beef`, `chicken`, `fish`, `egg`, `bread`, `pasta`,
 `rice`, `tomato`, `onion`, `mushroom`, `butter`, `cheese`, `chili`, `garlic`, `tomatoSauce`, `stock`,
 `quickChop`, `flambe`, `deepBreath`, `stareDown`, `miseEnPlace`, `crowdPleaser`, `signature`).
 
 ---
 
-## 4. Modifier (Chef's Flow)
+## 4. Modifiers (Chef's Flow)
 
-10 modifier dari `MODIFIERS.md`. Tiap modifier = **chip** (bingkai per rarity) + **emblem** (ikon unik).
-Saat ini HUD memakai ikon generik (`heat`, `check`, ...); emblem ini menggantikannya.
+The 10 modifiers from `MODIFIERS.md`. Each modifier = a **chip** (a frame per rarity) + an **emblem** (a unique icon).
+For now the HUD uses generic icons (`heat`, `check`, ...); these emblems replace them.
 
-### 4.1 Chip / bingkai (2 rarity)
+### 4.1 Chip / frame (2 rarities)
 ```
 [STYLE]
 Two small square badge frames side by side, each in its own cell, separated by magenta (#FF00FF),
@@ -199,7 +199,7 @@ Right badge RARE: gold rim (#f2b632) with a purple (#8a3fb0) inner line and two 
 No text, no icon inside.
 ```
 
-### 4.2 Pick card modifier (overlay FlowPick, opsional)
+### 4.2 Modifier pick card (the FlowPick overlay, optional)
 ```
 [STYLE]
 A tall reward card frame, portrait 3:4, for choosing a power-up. Cream paper body (#fbf3e2) like an
@@ -207,9 +207,9 @@ order ticket, torn zig-zag top edge, a round empty emblem socket in the upper th
 banner below it (EMPTY), and an empty text area at the bottom. A thin colored stripe on the left edge
 in teal (#2f6f7a). No text.
 ```
-Varian Rare: `...stripe in gold (#f2b632) and a small purple (#8a3fb0) gem at the top.`
+Rare variant: `...stripe in gold (#f2b632) and a small purple (#8a3fb0) gem at the top.`
 
-### 4.3 Emblem modifier (sheet 3×3, sel ke-9 cadangan)
+### 4.3 Modifier emblems (3×3 sheet, the 9th cell is a spare)
 ```
 [STYLE]
 A 3x3 sprite sheet of 9 bold power-up emblems for a cooking card game, each centered in its own equal
@@ -237,17 +237,17 @@ Bottom-left: spare — a gold chef hat.
 Bottom-right: spare — a purple gem.
 ```
 
-Nama file: `godot/assets/pixel/modifiers/<id>.png` (`hot_pan`, `steady_hands`, `encore`, `extra_burner`,
+File names: `godot/assets/pixel/modifiers/<id>.png` (`hot_pan`, `steady_hands`, `encore`, `extra_burner`,
 `prep_cook`, `crowd_favorite`, `spice_whisperer`, `free_move`, `mise_master`, `plating_pro`).
 
 ---
 
 ## 5. Icon pack
 
-Menggantikan SVG di `godot/assets/icons` (nama file tetap sama supaya kode tidak berubah). Ikon kecil,
-dibaca di 12–16 px, jadi semua prompt meminta **siluet tebal** tanpa detail halus.
+Replaces the SVGs in `godot/assets/icons` (the file names stay the same so the code does not change). The icons are small,
+read at 12–16 px, so every prompt asks for a **thick silhouette** with no fine detail.
 
-Aturan umum, tempel setelah STYLE:
+General rules, pasted after STYLE:
 ```
 Tiny game UI icons. Each icon is one bold, instantly readable silhouette that must still read at
 12x12 pixels: no thin lines, no small details, max 3 colors plus outline, thick 1px dark outline.
@@ -255,7 +255,7 @@ Each icon centered in its own equal square cell, cells separated by plain magent
 All icons same visual weight and size.
 ```
 
-### 5.1 Tag bahan (sheet 3×3)
+### 5.1 Ingredient tags (3×3 sheet)
 ```
 [STYLE] [ICON RULES]
 A 3x3 icon sheet of ingredient category icons:
@@ -263,9 +263,9 @@ Row 1: PROTEIN — a meat drumstick (#e9a23b). CARB — a slice of bread (#c98c4
 Row 2: FAT — a butter stick / oil drop (#e6c84a). DAIRY — a milk bottle (#8fb3d1). SPICE — a red chili (#d8342c).
 Row 3: SAUCE — a sauce bottle / ladle drip (#9a4a2a). TECHNIQUE — a chef knife (#7c63b5). spare — a salt shaker.
 ```
-File: `PROTEIN`, `CARB`, `VEGGIE`, `FAT`, `DAIRY`, `SPICE`, `SAUCE`, `technique`.
+Files: `PROTEIN`, `CARB`, `VEGGIE`, `FAT`, `DAIRY`, `SPICE`, `SAUCE`, `technique`.
 
-### 5.2 Stat & resource (sheet 3×3)
+### 5.2 Stats & resources (3×3 sheet)
 ```
 [STYLE] [ICON RULES]
 A 3x3 icon sheet of battle stat icons:
@@ -273,10 +273,10 @@ Row 1: HEAT — an orange flame (#e07b28). HYPE — a lightning bolt in gold (#f
 Row 2: CONFIDENCE — a red heart with a chef hat notch (#d8342c). PRESSURE — a downward fist / impact burst (#a8231d). QUALITY — a gold star (#f2b632).
 Row 3: SERVE — a silver serving cloche. DRAW — a card with an up arrow. DISCARD — a card with a down arrow into a bin.
 ```
-File: `heat`, `hype`, `composure`, `confidence`, `pressure`, `quality`, `serve`, `draw`, `discard`.
+Files: `heat`, `hype`, `composure`, `confidence`, `pressure`, `quality`, `serve`, `draw`, `discard`.
 
-### 5.3 Status (sheet 3×3)
-Dari `status_defs.gd`: spicy, flustered, rattled, burnt (debuff); focus, inspired (buff).
+### 5.3 Statuses (3×3 sheet)
+From `status_defs.gd`: spicy, flustered, rattled, burnt (debuffs); focus, inspired (buffs).
 ```
 [STYLE] [ICON RULES]
 A 3x3 icon sheet of status effect icons. Debuffs have a thin red (#d8342c) corner mark, buffs a thin green (#4d9a4a) corner mark.
@@ -284,9 +284,9 @@ Row 1: SPICY — a red chili with heat waves. FLUSTERED — a spiral dizzy face 
 Row 2: BURNT — a black burnt smoking pan with grey smoke. FOCUS — an eye inside a target ring (teal #2f6f7a). INSPIRED — a light bulb with sparkles (gold).
 Row 3: BUFF — an up arrow (green). TAUNT — an angry speech bubble with an exclamation mark. spare — a sweat drop.
 ```
-File: `spicy`, `flustered`, `rattled`, `burnt`, `focus`, `inspired`, `buff`, `taunt`.
+Files: `spicy`, `flustered`, `rattled`, `burnt`, `focus`, `inspired`, `buff`, `taunt`.
 
-### 5.4 UI umum (sheet 3×3)
+### 5.4 General UI (3×3 sheet)
 ```
 [STYLE] [ICON RULES]
 A 3x3 icon sheet of general UI icons:
@@ -294,18 +294,18 @@ Row 1: CHECK — a bold green check mark. CROWN — a small gold crown. ARROW �
 Row 2: BOOK — a closed recipe book with a bookmark. TIPS — a question mark in a round bubble. SETTINGS — a gear.
 Row 3: LOCK — a padlock. CLOSE — a bold X. PLAY — a right-pointing triangle.
 ```
-File: `check`, `crown`, `arrow`, `book`, `tips`, `settings`, `lock`, `close`, `play`.
+Files: `check`, `crown`, `arrow`, `book`, `tips`, `settings`, `lock`, `close`, `play`.
 
-### 5.5 Metode masak (tiket, sheet 2×2)
+### 5.5 Cooking methods (ticket, 2×2 sheet)
 ```
 [STYLE] [ICON RULES]
 A 2x2 icon sheet of cooking method icons for an order ticket:
 Top-left: FRY — a frying pan with oil drops. Top-right: GRILL — a grill grate with flame under it.
 Bottom-left: BOIL — a pot with bubbles and steam. Bottom-right: RAW — a cutting board with a knife.
 ```
-File: `method_fry`, `method_grill`, `method_boil`, `method_raw`.
+Files: `method_fry`, `method_grill`, `method_boil`, `method_raw`.
 
-### 5.6 Ikon hidangan (13 resep, sheet 4×4, 24×24)
+### 5.6 Dish icons (13 recipes, 4×4 sheet, 24×24)
 ```
 [STYLE]
 A 4x4 sprite sheet of 16 finished dish icons for a cooking game, each plated on a small round
@@ -316,32 +316,32 @@ Row 2: two meat skewers; mixed grill platter; arrabbiata penne in red sauce; hot
 Row 3: warm soup bowl with steam; mac and cheese; mushroom risotto; tall burger with cheese and lettuce.
 Row 4: sandwich cut diagonally; spare: empty plate; spare: covered cloche; spare: burnt black dish with smoke.
 ```
-File: `godot/assets/pixel/dishes/<recipe_id>.png` (`toast`, `omelette`, `freshSalad`, `classicSteak`, `skewers`,
+Files: `godot/assets/pixel/dishes/<recipe_id>.png` (`toast`, `omelette`, `freshSalad`, `classicSteak`, `skewers`,
 `mixedGrill`, `arrabbiata`, `hotWings`, `warmSoup`, `macAndCheese`, `mushroomRisotto`, `burger`, `sandwich`).
-Sel "burnt dish" bisa dipakai untuk hasil Improvised.
+The "burnt dish" cell can be used for the Improvised result.
 
 ---
 
-## 6. Prompt perbaikan (kalau hasil meleset)
+## 6. Fix prompts (when the result misses)
 
-| Masalah | Tambahkan / kirim ulang |
+| Problem | Add / resend |
 |---|---|
-| Terlalu halus, mirip lukisan | `Strictly pixel art. Every pixel is a visible hard square. No soft shading, no gradients, no painterly texture.` |
-| Pixel tidak seragam ukurannya | `All pixels must be the same size on one uniform grid, as if drawn at 32x32 and scaled up 32x.` |
-| Muncul teks / huruf | `Remove all text and letters. Leave the banner and boxes completely empty.` |
-| Latar tidak rata / ada bayangan | `Background must be one flat solid #FF00FF with no shadow, no gradient, no floor.` |
-| Gaya beda antar sheet | Upload sheet yang sudah bagus + `Match the exact style, outline and scale of the attached sheet.` |
-| Warna di luar palet | Tempel blok PALETTE §1.2 |
-| Ikon terlalu detail | `Simplify to a chunky silhouette readable at 12x12. Remove small details.` |
+| Too smooth, looks like a painting | `Strictly pixel art. Every pixel is a visible hard square. No soft shading, no gradients, no painterly texture.` |
+| Pixels are not a uniform size | `All pixels must be the same size on one uniform grid, as if drawn at 32x32 and scaled up 32x.` |
+| Text / letters appear | `Remove all text and letters. Leave the banner and boxes completely empty.` |
+| The background is uneven / has a shadow | `Background must be one flat solid #FF00FF with no shadow, no gradient, no floor.` |
+| The style differs between sheets | Upload a sheet that is already good + `Match the exact style, outline and scale of the attached sheet.` |
+| Colors outside the palette | Paste the PALETTE block §1.2 |
+| Icons too detailed | `Simplify to a chunky silhouette readable at 12x12. Remove small details.` |
 
 ---
 
-## 7. Checklist produksi
+## 7. Production checklist
 
-- [ ] Frame Ingredient (kunci gaya) disetujui
-- [ ] Frame Technique, Signature, punggung kartu
-- [ ] 5 sheet ilustrasi bahan + 2 sheet teknik
-- [ ] Chip modifier Common/Rare + 2 sheet emblem modifier
-- [ ] Icon pack: tag, stat, status, UI, metode, hidangan
-- [ ] Semua di-downscale Nearest, latar magenta dihapus, disimpan di `godot/assets/pixel/...`
-- [ ] Hook ke Godot: `card_view.tscn` (frame + `%ArtIcon`), chip modifier di `duel_ui.tscn`, `Ui.icon_tex()`
+- [ ] The Ingredient frame (the style key) is approved
+- [ ] Technique frame, Signature, card back
+- [ ] 5 ingredient illustration sheets + 2 technique sheets
+- [ ] Common/Rare modifier chips + 2 modifier emblem sheets
+- [ ] Icon pack: tags, stats, statuses, UI, methods, dishes
+- [ ] Everything downscaled with Nearest, the magenta background removed, saved in `godot/assets/pixel/...`
+- [ ] Hooked up in Godot: `card_view.tscn` (frame + `%ArtIcon`), modifier chips in `duel_ui.tscn`, `Ui.icon_tex()`

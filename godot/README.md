@@ -1,178 +1,178 @@
-# FINALE — versi Godot 4.7
+# FINALE — Godot 4.7 version
 
-Port dari versi Vite + TypeScript + Three.js (`../src`). Logika duel sudah 1:1 (test `sim` lulus semua,
-statistik bot sama dengan versi TS). Versi web lama tetap ada sebagai referensi sampai versi Godot
-setara, lalu boleh dihapus.
+A port of the Vite + TypeScript + Three.js version (`../src`). The duel logic is already 1:1 (all `sim` tests pass,
+bot statistics match the TS version). The old web version stays as a reference until the Godot version is
+equivalent, then it may be deleted.
 
-## Buka project
+## Open the project
 
-1. Jalankan Godot 4.7.2 (`H:\Godot_v4.7.2-stable_win64.exe`).
-2. Project Manager → **Import** → pilih `godot/project.godot`.
-3. Tekan **F5**. Main scene: `scenes/main.tscn`.
+1. Launch Godot 4.7.2 (`H:\Godot_v4.7.2-stable_win64.exe`).
+2. Project Manager → **Import** → choose `godot/project.godot`.
+3. Press **F5**. Main scene: `scenes/main.tscn`.
 
-Setup duel (pengganti URL param lama) ada di Inspector node **Main**:
+The duel setup (replacing the old URL params) is in the **Main** node's Inspector:
 
-| Dulu (web) | Sekarang (Inspector `Main`) |
+| Before (web) | Now (`Main` Inspector) |
 |---|---|
 | `?enemy=rosa` | `Enemy Id` |
 | `?deck=dev` | `Dev Deck` |
 | `?hype=100` | `Start Hype` |
 
-**Cara main:** kartu di-**drag**. Bahan → seret ke salah satu dari **3 Station**. Teknik → seret ke atas
-keluar dari tangan lalu lepas. Klik biasa pada kartu hanya memunculkan hint "Drag a card to play it".
+**How to play:** cards are **dragged**. Ingredient → drag onto one of the **3 Stations**. Technique → drag up
+out of the hand and release. A plain click on a card only shows the hint "Drag a card to play it".
 
-**Station Stack** (lihat `../ART_DIRECTION.md` §6):
-- Bahan menumpuk ke bawah seperti solitaire. Kartu lama hanya terlihat pita nama + ikon tag, kartu terbaru terbuka penuh (bingkai emas).
-- Order Ticket di atas tiap station memberi hint resep dan langkah berikutnya. Urutan pas dari kartu pertama = **Perfect** ×1.5,
-  bahan lengkap tapi urutan beda = **Cooked** ×1, bahan setelah resep lengkap = **Garnish**, tidak cocok = Improvised.
-- Tiap station punya tombol **Serve** (1 Heat, sekali per giliran) dan **Clear**.
-- Kartu teratas bisa di-drag ke station lain, **sekali per giliran** (Clear juga memakai jatah ini).
+**Station Stack** (see `../ART_DIRECTION.md` §6):
+- Ingredients stack downward like solitaire. Older cards show only a name ribbon + tag icon, the newest card is fully visible (gold frame).
+- The Order Ticket above each station hints at the recipe and the next step. An exact order from the first card = **Perfect** ×1.5,
+  all ingredients but a different order = **Cooked** ×1, ingredients after the recipe is complete = **Garnish**, no match = Improvised.
+- Each station has a **Serve** button (1 Heat, once per turn) and a **Clear** button.
+- The top card can be dragged to another station, **once per turn** (Clear also uses this allowance).
 
-Alur match: 3 · 2 · 1 → ROUND N / FIGHT! di awal, FINISHED → YOU WINS! atau LOSER di akhir (`scripts/ui/announcer.gd`).
-Lawan memunculkan emote di samping kepala (`scripts/ui/emote_bubble.gd`): Smug saat Confidence-mu ≤30%,
-Shocked saat kena ≥15, Angry saat lawan ≤25%, Sad saat lawan kalah, Confident saat intent ≥10.
+Match flow: 3 · 2 · 1 → ROUND N / FIGHT! at the start, FINISHED → YOU WINS! or LOSER at the end (`scripts/ui/announcer.gd`).
+The opponent shows an emote beside their head (`scripts/ui/emote_bubble.gd`): Smug when your Confidence is ≤30%,
+Shocked when hit for ≥15, Angry when the opponent is ≤25%, Sad when the opponent loses, Confident when an intent is ≥10.
 
-Shortcut in-game: **E** = End Turn, **tahan klik / Space** saat giliran rival = percepat ×3, **S** = Serve station terbaik, **P** = filter pixel, **F11** = fullscreen.
+In-game shortcuts: **E** = End Turn, **hold click / Space** during the rival's turn = ×3 speed, **S** = Serve the best station, **P** = pixel filter, **F11** = fullscreen.
 
-Resolusi desain 1920x1080 (stretch `canvas_items` + `expand`), tapi window dibuka **1600x900**
-(`window_*_override`) supaya window + title bar muat di layar 1080p. UI mengikuti ukuran window
-apa pun; `tests/hit_probe.gd` memastikan tiap tombol bisa diklik penuh setelah resize.
+The design resolution is 1920x1080 (`canvas_items` stretch + `expand`), but the window opens at **1600x900**
+(`window_*_override`) so the window + title bar fit on a 1080p screen. The UI follows any window size;
+`tests/hit_probe.gd` makes sure every button is fully clickable after a resize.
 
-> Kalau menjalankan dari editor dan tidak bisa klik apa pun: di tab **Game** editor, pastikan mode
-> input aktif (bukan mode *Select* 2D/3D), atau matikan *Embed Game* supaya game jalan di window sendiri.
+> If you run from the editor and cannot click anything: in the editor's **Game** tab, make sure input mode
+> is active (not *Select* 2D/3D mode), or turn off *Embed Game* so the game runs in its own window.
 >
-> Kalau klik **meleset** (harus klik sedikit di bawah tombol): window Game floating lebih besar dari
-> layar, lalu Windows menggesernya sementara game yang di-embed tidak ikut. Kecilkan window Game itu
-> supaya muat di layar, atau pakai **F11** untuk fullscreen. Jangan menarik window melebihi layar.
+> If clicks **miss** (you have to click slightly below the button): the floating Game window is bigger than the
+> screen, and Windows shifts it while the embedded game does not follow. Shrink that Game window
+> to fit the screen, or use **F11** for fullscreen. Do not drag the window past the screen.
 
-## Struktur
+## Structure
 
 ```
 godot/
-  project.godot           Renderer: Compatibility (wajib untuk export Web)
-  export_presets.cfg      Preset "Web" → build/web/index.html
-  data/                   SEMUA konten, 1 file .tres per item (edit di Inspector)
+  project.godot           Renderer: Compatibility (required for Web export)
+  export_presets.cfg      "Web" preset → build/web/index.html
+  data/                   ALL content, 1 .tres file per item (edit in the Inspector)
     cards/ recipes/ enemies/ books/ decks/
-  assets/icons/           Ikon SVG putih (dari src/ui/icons.ts), diwarnai lewat self_modulate
-  assets/ui_theme.tres    Theme project: font + warna teks default
+  assets/icons/           White SVG icons (from src/ui/icons.ts), colored via self_modulate
+  assets/ui_theme.tres    Project theme: font + default text color
   scripts/
-    data/                 Class Resource: CardDef, RecipeDef, EffectDef, EnemyDef, IntentDef, BookDef, DeckDef, StatusDefs
-    core/                 Logika murni, tanpa node: Duel, RecipeMatch, SeededRng, CardInstance
-    game_db.gd            GameDB: load semua .tres di data/ lalu cari by id
+    data/                 Resource classes: CardDef, RecipeDef, EffectDef, EnemyDef, IntentDef, BookDef, DeckDef, StatusDefs
+    core/                 Pure logic, no nodes: Duel, RecipeMatch, SeededRng, CardInstance
+    game_db.gd            GameDB: loads every .tres in data/ then looks up by id
     stage/                Stage (3D diorama), Chef
-    ui/                   DuelUI (HUD + drag), CardView, Ui (builder panel/ikon), Pal (palet warna), Keywords
-    ui/hud/               HudPanel (panel + tab), HpBar, SegBar, DiamondBadge: widget HUD v2 yang dipasang di .tscn
+    ui/                   DuelUI (HUD + drag), CardView, Ui (panel/icon builder), Pal (color palette), Keywords
+    ui/hud/               HudPanel (panel + tab), HpBar, SegBar, DiamondBadge: HUD v2 widgets placed in the .tscn
     main.gd               Entry point: cookbook → duel
   scenes/
     main.tscn             Stage + DuelUI
-    stage/                stage.tscn, chef.tscn, counter.tscn  ← atur posisi/kamera/lampu di editor 3D
-    ui/                   duel_ui.tscn, card_view.tscn        ← atur layout HUD di editor 2D
-  tests/sim.gd            Test headless logika (port dari scripts/sim.ts)
-  tests/ui_drive.gd       Test UI dengan input mouse simulasi + screenshot
-  tests/hit_probe.gd      Cek area klik semua tombol di beberapa ukuran window
-  tests/balance.gd        Balancing: ratusan duel bot vs rival, win rate + panjang duel (-- sweep)
-  tests/glb_check.gd      Headless: model karakter (apis/tony.glb) berisi 5 clip + flag loop
-  tests/chef_drive.gd     Window: clip chef mengikuti event duel di game sungguhan + screenshot
+    stage/                stage.tscn, chef.tscn, counter.tscn  ← set position/camera/lights in the 3D editor
+    ui/                   duel_ui.tscn, card_view.tscn        ← set the HUD layout in the 2D editor
+  tests/sim.gd            Headless logic test (port of scripts/sim.ts)
+  tests/ui_drive.gd       UI test with simulated mouse input + screenshots
+  tests/hit_probe.gd      Checks every button's click area at several window sizes
+  tests/balance.gd        Balancing: hundreds of bot vs rival duels, win rate + duel length (-- sweep)
+  tests/glb_check.gd      Headless: character models (apis/tony.glb) contain 5 clips + loop flags
+  tests/chef_drive.gd     Window: chef clips follow duel events in the real game + screenshots
 ```
 
-### Karakter 3D
+### 3D characters
 
-Model ada di `assets/characters/` (dibuat lewat `../art/blender/chef_anims.py`, lihat `../ANIMATION_DESIGN.md`).
-Di `stage.tscn`, tiap chef (`Player`, `Rival`) punya child model bernama id karakter (`apis`, `tony`);
-`Chef.character` memilih yang tampil, dan tanpa model yang cocok (mis. Rosa) placeholder kapsul yang muncul.
-Skala dan tinggi model diatur di transform child itu. Clip mengikuti event duel (`main.gd` → `_bind_chefs`):
-kartu dimainkan → `chop`, dish disajikan → `busy`, duel selesai → `victory` / `lose` (ditahan sampai duel berikutnya).
+Models are in `assets/characters/` (made with `../art/blender/chef_anims.py`, see `../ANIMATION_DESIGN.md`).
+In `stage.tscn`, each chef (`Player`, `Rival`) has child models named after the character id (`apis`, `tony`);
+`Chef.character` chooses which one shows, and without a matching model (e.g. Rosa) a capsule placeholder appears.
+The model's scale and height are set in that child's transform. Clips follow duel events (`main.gd` → `_bind_chefs`):
+card played → `chop`, dish served → `busy`, duel finished → `victory` / `lose` (held until the next duel).
 
-### Peta TS → Godot
+### TS → Godot map
 
 | TypeScript | Godot |
 |---|---|
-| `core/types.ts` | `scripts/data/*_def.gd` (Resource, bisa diedit di Inspector) |
+| `core/types.ts` | `scripts/data/*_def.gd` (Resource, editable in the Inspector) |
 | `data/cards.ts`, `recipes.ts`, `enemies.ts` | `data/**/*.tres` |
 | `data/statuses.ts` | `scripts/data/status_defs.gd` |
 | `core/duel.ts` | `scripts/core/duel.gd` (class `Duel`) |
-| `core/events.ts` (EventBus) | **signal** bawaan Godot di `Duel` (`duel.changed.connect(...)`) |
+| `core/events.ts` (EventBus) | Godot's built-in **signals** on `Duel` (`duel.changed.connect(...)`) |
 | `core/recipes.ts` | `scripts/core/recipe_match.gd` |
-| `core/rng.ts` | `scripts/core/seeded_rng.gd` (mulberry32, bit-exact dengan TS) |
+| `core/rng.ts` | `scripts/core/seeded_rng.gd` (mulberry32, bit-exact with TS) |
 | `render3d/stage.ts` | `scenes/stage/stage.tscn` + `scripts/stage/stage.gd` |
 | `ui/hud.ts` | `scenes/ui/duel_ui.tscn` + `scripts/ui/duel_ui.gd` |
 | `scripts/sim.ts` | `tests/sim.gd` |
 
-Prinsip GDD §9 tetap: **data-driven**, **effect composable**, **logika terpisah dari visual**
-(`Duel` adalah `RefCounted` tanpa node; visual hanya mendengarkan signal).
+The GDD §9 principles still hold: **data-driven**, **composable effects**, **logic separated from visuals**
+(`Duel` is a `RefCounted` with no nodes; visuals only listen to signals).
 
-## Menambah / mengubah konten
+## Adding / changing content
 
-- **Kartu baru:** FileSystem → klik kanan `data/cards/` → *New Resource…* → `CardDef`. Isi `id`
-  (unik), `name`, `cost`, `tags`, `quality`, `effects`. Tidak perlu kode.
-- **Resep:** `RecipeDef`. `requires` berurutan sesuai Recipe Book (urutan ini = Perfect Order ×1.5).
-  Isinya tag (`FAT`) atau kartu kunci (`card:beef`).
-- **Rival:** `EnemyDef` dengan `pattern` berisi `IntentDef` (attack `-1` = tidak menyerang,
-  status `none` = tanpa status).
-- **Deck / buku resep:** `DeckDef` / `BookDef`, seret file `.tres` ke array di Inspector.
+- **New card:** FileSystem → right-click `data/cards/` → *New Resource…* → `CardDef`. Fill in `id`
+  (unique), `name`, `cost`, `tags`, `quality`, `effects`. No code needed.
+- **Recipe:** `RecipeDef`. `requires` is ordered to match the Recipe Book (this order = Perfect Order ×1.5).
+  It holds tags (`FAT`) or key cards (`card:beef`).
+- **Rival:** `EnemyDef` with a `pattern` of `IntentDef` (attack `-1` = does not attack,
+  status `none` = no status).
+- **Deck / recipe book:** `DeckDef` / `BookDef`, drag `.tres` files into the arrays in the Inspector.
 
-`.tres` di `data/` sekarang **sumber kebenaran**. `../scripts/export-godot-data.ts` hanya dipakai
-sekali untuk migrasi; menjalankannya lagi akan **menimpa** editan di Godot.
+The `.tres` files in `data/` are now the **source of truth**. `../scripts/export-godot-data.ts` was only used
+once for the migration; running it again will **overwrite** edits made in Godot.
 
-## Test
+## Tests
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/sim.gd
 ```
 
-Balancing (GRAND_DESIGN §8.2): laporan angka sekarang, atau `-- sweep` untuk mencoba nilai lain
-(`hp=`, `tony=`, `rosa=`, `flow=`, `n=`). Angkanya diubah di `.tres` rival dan Inspector `Main` → Balance.
+Balancing (GRAND_DESIGN §8.2): prints the current numbers, or `-- sweep` to try other values
+(`hp=`, `tony=`, `rosa=`, `flow=`, `n=`). The numbers are changed in the rival `.tres` files and in `Main` Inspector → Balance.
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --script res://tests/balance.gd
 ```
 
-Animasi chef di game (butuh window):
+Chef animations in the game (needs a window):
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1600x900 --script res://tests/chef_drive.gd -- "$env:TEMP"
 ```
 
-Kalau baru clone (folder `.godot/` belum ada), jalankan sekali dulu:
+If you just cloned (the `.godot/` folder does not exist yet), run this once first:
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --headless --path godot --import
 ```
 
-## Export Web untuk jam
+## Web export for the jam
 
-1. Editor → *Editor → Manage Export Templates* → **Download and Install** (4.7.2). Saat ini belum terpasang.
-2. *Project → Export* → preset **Web** sudah ada → **Export Project** → `godot/build/web/index.html`.
-3. Upload isi `build/web/` (ada `index.html` di root).
+1. Editor → *Editor → Manage Export Templates* → **Download and Install** (4.7.2). Not installed yet.
+2. *Project → Export* → the **Web** preset already exists → **Export Project** → `godot/build/web/index.html`.
+3. Upload the contents of `build/web/` (with `index.html` at the root).
 
-Catatan syarat jam (GDD §9):
-- Renderer **Compatibility** (WebGL 2) — sudah diset. Jangan ganti ke Forward+.
-- **Thread Support mati** di preset, jadi tidak butuh header COOP/COEP (SharedArrayBuffer) dari host.
-- Ukuran: engine web Godot ±35–40 MB (wasm, belum gzip). Masih di bawah 50 MB, tapi jaga ukuran aset.
-- Cek "Frame pertama < 10 detik" setelah export, di host jam.
-- Sinyal `og:ready`: panggil lewat `JavaScriptBridge.eval(...)` setelah duel pertama tampil
-  (API SDK OpenGame belum diintegrasikan, sama seperti versi web).
+Jam requirement notes (GDD §9):
+- **Compatibility** renderer (WebGL 2) — already set. Do not switch to Forward+.
+- **Thread Support is off** in the preset, so no COOP/COEP headers (SharedArrayBuffer) are needed from the host.
+- Size: the Godot web engine is ±35–40 MB (wasm, not gzipped). Still under 50 MB, but watch the asset size.
+- Check "First frame < 10 seconds" after exporting, on the jam host.
+- The `og:ready` signal: call it through `JavaScriptBridge.eval(...)` after the first duel is shown
+  (the OpenGame SDK API is not integrated yet, same as the web version).
 
-## Status port UI
+## UI port status
 
-HUD v2 (board "HUD v2" di canvas, lihat ART_DIRECTION §4): panel gelap bertab yang tetap di layar.
-Top bar ROUND + Hype bersegmen, panel rival kanan atas (diamond intent, nama, bar Confidence dengan
-cap Composure biru, status), panel STATIONS kiri atas (tiket bergerigi, stack solitaire, SERVE/Clear),
-panel PLAYER kiri bawah (diamond potret, bar Confidence, pip Heat), pile draw/discard, kartu gelap
-bergaya "Kartu v2" (blok biaya teal, banner nama, jendela art per tipe, bar Quality, tooltip keyword),
-drag & drop dengan ghost miring, zona "Release to play", angka melayang, banner dish, cut-in Signature
-Dish, Recipe Book v2 (satu resep per halaman, urutan masak, pita bab), layar Victory/Defeat, tooltip di semua elemen, filter pixel (tombol kanan atas / P).
+HUD v2 (the "HUD v2" board on the canvas, see ART_DIRECTION §4): dark tabbed panels that stay on screen.
+Top bar ROUND + segmented Hype, rival panel at the top right (intent diamond, name, Confidence bar with a
+blue Composure cap, statuses), STATIONS panel at the top left (jagged ticket, solitaire stack, SERVE/Clear),
+PLAYER panel at the bottom left (portrait diamond, Confidence bar, Heat pips), draw/discard piles, dark cards
+in the "Card v2" style (teal cost block, name banner, per-type art window, Quality bar, keyword tooltips),
+drag & drop with a slanted ghost, a "Release to play" zone, floating numbers, a dish banner, the Signature
+Dish cut-in, Recipe Book v2 (one recipe per page, cooking order, chapter ribbons), Victory/Defeat screens, tooltips on every element, a pixel filter (top-right button / P).
 
-Perbedaan kecil yang tersisa:
-- Font: pakai SystemFont "Trebuchet MS" (Windows). Di build **Web**, SystemFont tidak tersedia dan jatuh
-  ke font bawaan Godot. Untuk jam, tambahkan file font OFL (mis. Nunito Black) ke `assets/` dan pasang di
+Small remaining differences:
+- Font: uses the SystemFont "Trebuchet MS" (Windows). In the **Web** build, SystemFont is unavailable and falls
+  back to Godot's built-in font. For the jam, add an OFL font file (e.g. Nunito Black) to `assets/` and set it in
   `assets/ui_theme.tres`.
-- Gradien halus CSS (kartu, zona play) diganti warna rata.
-- Intent pill tidak "bob" naik-turun.
-- Pencahayaan 3D dikalibrasi manual: di renderer Compatibility, matahari ber-bayangan dirender sebagai
-  pass terpisah yang dijumlahkan setelah konversi sRGB, jadi energinya sengaja kecil (sun 0.35, ambient 0.15).
+- CSS soft gradients (cards, play zone) were replaced with flat colors.
+- The intent pill does not "bob" up and down.
+- The 3D lighting is calibrated by hand: in the Compatibility renderer, the shadow-casting sun is rendered as a separate
+  pass that is added after the sRGB conversion, so its energy is deliberately small (sun 0.35, ambient 0.15).
 
-Test UI (butuh window, bukan headless):
+UI tests (need a window, not headless):
 
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
@@ -181,24 +181,24 @@ Test UI (butuh window, bukan headless):
 
 ## Audio
 
-Autoload **`Audio`** (`scripts/audio/audio.gd`) mendengarkan signal `Duel`; logika duel tidak tahu soal audio.
-Bus: `Music` (-6 dB) dan `SFX` di `default_bus_layout.tres`. Test: `tests/audio_check.gd` (headless).
+The **`Audio`** autoload (`scripts/audio/audio.gd`) listens to `Duel` signals; the duel logic knows nothing about audio.
+Buses: `Music` (-6 dB) and `SFX` in `default_bus_layout.tres`. Test: `tests/audio_check.gd` (headless).
 
-| Kondisi | File |
+| Condition | File |
 |---|---|
-| Layar Recipe Book sebelum duel | `music/Building_Deck_Theme.mp3` (loop) |
-| Duel biasa (rival tanpa `boss`) | `music/Battle_Theme.mp3` (loop) + `sfx/Round start` |
-| Duel boss / grand final (`EnemyDef.boss = true`) | `sfx/Boss appearance sting`, Battle_Theme **tidak** diputar |
-| Menang | `sfx/Round won` + `music/Clear_Victory.mp3` |
-| Kalah | `music/Game_Over_Smile.mp3` |
-| Giliran baru | `sfx/Turn change` |
-| Bahan ditaruh di Station | `sfx/Prep Board chopping` |
-| Kartu teknik dimainkan | `sfx/Pan sizzle` |
-| Kartu Signature Dish dimainkan | `sfx/Signature Dish activation` |
-| Serve | `sfx/Ingredient added to a pot` lalu `sfx/Cooking bell ding` |
-| Status Burnt / Spicy | `sfx/Burn status applied` / `sfx/Poison status applied` |
-| Status lain | `sfx/Debuff applied` / `sfx/Buff applied` |
+| Recipe Book screen before a duel | `music/Building_Deck_Theme.mp3` (loop) |
+| A normal duel (rival without `boss`) | `music/Battle_Theme.mp3` (loop) + `sfx/Round start` |
+| Boss / grand final duel (`EnemyDef.boss = true`) | `sfx/Boss appearance sting`, Battle_Theme is **not** played |
+| Win | `sfx/Round won` + `music/Clear_Victory.mp3` |
+| Lose | `music/Game_Over_Smile.mp3` |
+| New turn | `sfx/Turn change` |
+| Ingredient placed on a Station | `sfx/Prep Board chopping` |
+| Technique card played | `sfx/Pan sizzle` |
+| Signature Dish card played | `sfx/Signature Dish activation` |
+| Serve | `sfx/Ingredient added to a pot` then `sfx/Cooking bell ding` |
+| Burnt / Spicy status | `sfx/Burn status applied` / `sfx/Poison status applied` |
+| Other statuses | `sfx/Debuff applied` / `sfx/Buff applied` |
 
-Belum terpakai karena fiturnya belum ada: `Main_Menu` (belum ada main menu), `Stun or freeze`
-(belum ada status stun), `Timer running out warning` (belum ada timer). Key-nya sudah terdaftar,
-tinggal panggil `Audio.play_music("menu")` / `Audio.sfx("stun")` / `Audio.sfx("timer")`.
+Not used yet because the features do not exist: `Main_Menu` (no main menu yet), `Stun or freeze`
+(no stun status yet), `Timer running out warning` (no timer yet). The keys are already registered,
+just call `Audio.play_music("menu")` / `Audio.sfx("stun")` / `Audio.sfx("timer")`.
