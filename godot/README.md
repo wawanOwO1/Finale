@@ -178,6 +178,7 @@ Test UI (butuh window, bukan headless):
 ```powershell
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1920x1080 --script res://tests/ui_drive.gd -- "$env:TEMP"
 & "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1366x768 --script res://tests/hit_probe.gd
+& "H:\Godot_v4.7.2-stable_win64_console.exe" --path godot --resolution 1600x900 --script res://tests/fx_drive.gd
 ```
 
 ## FX (hitstop, shake, flash)
@@ -223,6 +224,15 @@ base class `FxCutscene` (`scripts/fx/fx_cutscene.gd`).
 potret 2D dari `assets/portraits/<id>.png`. Potret dirender sekali dari GLB dengan
 `tests/portrait_render.gd` (butuh window; jalankan lagi kalau model berubah). Rival tanpa potret hanya tampil namanya.
 Klik untuk skip.
+
+**Debug & kualitas:** **F3** = overlay (FPS, frame time, draw call, partikel, status FX). **Shift+F3** = FX Quality
+Low (partikel ×0.5, tanpa chromatic, Signature selalu versi pendek). Di build Web, `FxDirector` pindah ke Low sendiri
+kalau FPS rata-rata < 45 selama 3 s (`auto_quality`, hanya di Web). Penonton digambar sebagai satu MultiMesh.
+Test `tests/fx_drive.gd` (butuh window): semua cue + cutscene sekali, gagal kalau ada lonjakan frame > 4× median
+(shader yang baru dikompilasi saat dipakai pertama kali).
+
+**Export Web:** `project.godot` mematikan `editor/export/convert_text_resources_to_binary`. Konversi teks→biner
+di Godot 4.7.2 menghapus `RecipeDef.requires` (PackedStringArray), sehingga di build Web semua resep tidak butuh bahan.
 
 Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
 Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel

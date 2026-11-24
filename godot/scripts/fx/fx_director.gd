@@ -36,6 +36,20 @@ extends Node
 @export_group("Speed lines")
 ## Hand-drawn jitter: new random lines this many times a second.
 @export_range(4.0, 60.0, 1.0) var lines_fps := 24.0
+@export_group("Quality")
+## FX Quality Low (FX_MASTERPLAN.md §7.2): half the particles, no chromatic split, the Signature
+## cutscene always short. Shift+F3 toggles it by hand.
+@export var quality_low := false:
+	set(v):
+		quality_low = v
+		_apply_quality()
+## Switch to Low by itself when the game runs slowly (average FPS below auto_low_fps for
+## auto_low_seconds, outside cutscenes). It never switches back on its own.
+@export var auto_quality := true
+## Only watch the FPS in the web build (the editor and tests keep the full effects).
+@export var auto_quality_web_only := true
+@export_range(10.0, 60.0, 1.0) var auto_low_fps := 45.0
+@export_range(1.0, 10.0, 0.5) var auto_low_seconds := 3.0
 @export_group("Crack")
 ## Seconds a Confidence-bar crack takes to fade.
 @export_range(0.1, 3.0, 0.05) var crack_time := 0.9
@@ -89,6 +103,10 @@ var last_cue: FxCue
 
 
 var _crack_tw := {}
+## Time the FPS has stayed under auto_low_fps (auto quality).
+var _slow_for := 0.0
+## True when auto quality made the switch (the F3 overlay says so).
+var auto_switched := false
 
 
 func setup(stage_: Stage, ui_: DuelUI) -> void:
@@ -100,6 +118,7 @@ func setup(stage_: Stage, ui_: DuelUI) -> void:
 	shake.extra_layers = [ui.fx_layer()]
 	screen = ui.fx_screen()
 	_mat = screen.material as ShaderMaterial
+	_apply_quality()
 	_lines = ui.fx_lines()
 	_lines_mat = _lines.material as ShaderMaterial
 	prewarm()
@@ -117,6 +136,7 @@ func bind(d: Duel) -> void:
 	hold = false
 	_pending.clear()
 	_finish_queued = false
+	_apply_quality()
 	if cutscene:
 		cutscene.abort()
 	if finish:
@@ -201,7 +221,7 @@ func play_now(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") 
 		_desat_at = now
 		_desat_hold = int(cue.desat_hold * 1000.0)
 		_desat_fade = int(cue.desat_fade * 1000.0)
-	if cue.chroma > 0.0 and cue.chroma >= _chroma_value(now):
+	if cue.chroma > 0.0 and not quality_low and cue.chroma >= _chroma_value(now):
 		_chroma_peak = cue.chroma
 		_chroma_at = now
 		_chroma_len = int(cue.chroma_time * 1000.0)
@@ -217,6 +237,35 @@ func prewarm() -> void:
 	_update_screen()
 	if hud:
 		hud.prewarm()
+
+
+func _apply_quality() -> void:
+	if hud:
+		hud.amount_scale = 0.5 if quality_low else 1.0
+	if cutscene:
+		cutscene.force_short = quality_low
+
+
+## Auto quality: a few slow seconds (not counting cutscenes, which slow the world on purpose) → Low.
+func _watch_fps() -> void:
+	if quality_low or not auto_quality or (auto_quality_web_only and not OS.has_feature("web")):
+		return
+	if (cutscene and cutscene.playing) or (finish and finish.playing) or _warm > 0:
+		_slow_for = 0.0
+		return
+	var fps := Engine.get_frames_per_second()
+	_slow_for = _slow_for + get_process_delta_time() / maxf(0.01, Engine.time_scale) if fps > 0.0 and fps < auto_low_fps else 0.0
+	if _slow_for >= auto_low_seconds:
+		auto_switched = true
+		quality_low = true
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k and k.pressed and not k.echo and k.keycode == KEY_F3 and k.shift_pressed:
+		quality_low = not quality_low
+		auto_switched = false
+		get_viewport().set_input_as_handled()
 
 
 func _crack(bar: HpBar) -> void:
@@ -331,6 +380,7 @@ func desat_value() -> float:
 func _process(_delta: float) -> void:
 	if _warm > 0:
 		_warm -= 1
+	_watch_fps()
 	_step_impact()
 	_update_screen()
 

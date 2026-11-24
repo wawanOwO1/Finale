@@ -42,6 +42,7 @@ func _initialize() -> void:
 	await _cutscene(fx, main, duel)
 	await _finish(fx, main, duel)
 	await _vs(main)
+	await _quality(fx, main)
 	_end()
 
 
@@ -207,13 +208,15 @@ func _hud(fx: FxDirector, main: Node) -> void:
 	await _real_wait(fx.crack_time + 0.3)
 	_check("crack fades out", main.ui.hp_bar("enemy").crack == 0.0)
 	# Crowd jumps.
-	var crowd: Array = main.stage._crowd
-	var y0: float = crowd[0].get_meta("base_y")
-	main.stage.cheer(1.0)
+	var stage: Stage = main.stage
+	_check("crowd is one MultiMesh", stage.get_node("Crowd") is MultiMeshInstance3D and stage.crowd_count() == stage.crowd_rows * stage.crowd_per_row)
+	stage.cheer(1.0)
 	await _real_wait(0.25)
-	var up := crowd.filter(func(m: Node3D) -> bool: return m.position.y > m.get_meta("base_y") + main.stage.cheer_height * 0.3)
-	_check("crowd jumps together: %d / %d" % [up.size(), crowd.size()], up.size() > crowd.size() * 0.8)
-	_check("crowd base unchanged", crowd[0].get_meta("base_y") == y0)
+	var up := 0
+	for i in stage.crowd_count():
+		if stage.crowd_lift(i) > stage.cheer_height * 0.3:
+			up += 1
+	_check("crowd jumps together: %d / %d" % [up, stage.crowd_count()], up > stage.crowd_count() * 0.8)
 
 
 ## F2: impact frames (ink / cream, 2nd one inverted), speed lines, chromatic split.
@@ -400,6 +403,22 @@ func _vs(main: Node) -> void:
 	vs._gui_input(click)
 	await vs.done
 	_check("click skips the VS screen", not vs.visible and Time.get_ticks_msec() - t0 < 600)
+
+
+## F5: FX Quality Low (half particles, no chroma, short Signature), the F3 overlay, auto switch.
+func _quality(fx: FxDirector, main: Node) -> void:
+	fx.quality_low = true
+	_check("Low: half the particles", is_equal_approx(fx.hud.amount_scale, 0.5))
+	_check("Low: Signature always short", fx.cutscene.force_short)
+	await _real_wait(0.4)
+	fx.play(fx.big_hit, Vector2(500, 500), Color.WHITE, "enemy")
+	_check("Low: no chromatic split", float((fx.screen.material as ShaderMaterial).get_shader_parameter("chroma")) == 0.0)
+	fx.hit_stop.clear()
+	fx.quality_low = false
+	_check("High again: full particles, long Signature allowed", fx.hud.amount_scale == 1.0 and not fx.cutscene.force_short)
+	var dbg: FxDebug = main.ui.fx_debug()
+	_check("F3 overlay is wired and reports", dbg.fx == fx and dbg.report().contains("FPS") and dbg.report().contains("particles"))
+	_check("auto quality waits for the web build", fx.auto_quality_web_only and not OS.has_feature("web") and not fx.quality_low)
 
 
 func _real_wait(seconds: float) -> void:
