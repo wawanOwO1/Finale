@@ -51,6 +51,7 @@ func _ready() -> void:
 	finish_cutscene.setup(stage, ui, fx)
 	fx.finish = finish_cutscene
 	ui.fx = fx
+	ui.fx_debug().fx = fx
 	ui.director = director
 	ui.almanac_keeper = almanac_keeper
 	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))

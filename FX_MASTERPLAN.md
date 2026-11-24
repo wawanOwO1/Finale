@@ -319,6 +319,25 @@ Versi pendek: lompati 0.25–0.90 (close-up), langsung ke impact frame.
 
 ---
 
+### 7.3 Hasil F5 (24 Nov 2026)
+
+| Ukuran | Sebelum | Sesudah | Catatan |
+|---|---|---|---|
+| Draw call saat duel, desktop 1280×720 | 254 | 169 | Penonton 32 kapsul → 1 MultiMesh (−85). Sisa terbesar: HUD ±130 |
+| Draw call saat duel, build Web | 272 | 174–188 | Overlay F3 di Chromium |
+| Lonjakan frame pertama kali (fx_drive) | – | ×1.9–2.2 median | Batas ×4; prewarm bekerja |
+| Median frame dengan FX vs diam | – | +3–5 ms (renderer software) | Kecil |
+| Partikel skenario terburuk | – | 92 / 150 | fx_check |
+
+- Build Web diuji di Chromium (WebGL 2, SwiftShader = render di CPU): termuat, VS, duel, drag kartu, Serve + FX, tanpa
+  error di console. FPS di sana (±7) tidak mewakili GPU sungguhan, jadi auto-quality langsung memilih Low: **perlu tes
+  di laptop sungguhan** untuk angka FPS.
+- Ditemukan dan diperbaiki: export Web menghapus `RecipeDef.requires` (konversi teks→biner Godot 4.7.2); konversi
+  dimatikan di `project.godot`.
+- Catatan terbuka: Chromium melapor "GPU stall due to ReadPixels" saat start (dilaporkan 4× lalu disembunyikan). Belum
+  diketahui sumbernya (kemungkinan salinan layar `hint_screen_texture`/depth di `pixel_post`); cek di GPU sungguhan.
+- HUD (±130 draw call) adalah kandidat optimasi berikutnya, di luar lingkup FX.
+
 ## 8. Aset yang dibutuhkan
 
 | Aset | Jumlah | Format | Sumber |
@@ -346,7 +365,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 | **F2 Impact frame** ✅ | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
 | **F3 Cutscene Signature** ✅ | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
 | **F4 Finish + Intro VS** ✅ | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
-| **F5 Optimasi & QA** | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
+| **F5 Optimasi & QA** ✅ | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
 | **Stretch** | Bruno fase 2, crowd wave, ilustrasi impact frame pre-drawn | — | — |
 
 > F5 sebaiknya dikerjakan sebagian **sebelum F1** (viewport + overlay F3), supaya semua FX dinilai di kondisi akhir.

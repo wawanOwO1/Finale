@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/fx/fx_hud.gd" id="fx_hud_script"]
 [ext_resource type="Shader" path="res://assets/shaders/fx_lines.gdshader" id="fx_lines_shader"]
 [ext_resource type="Script" path="res://scripts/fx/vs_intro.gd" id="vs_intro_script"]
+[ext_resource type="Script" path="res://scripts/fx/fx_debug.gd" id="fx_debug_script"]
 [ext_resource type="Texture2D" path="res://assets/portraits/apis.png" id="portrait_apis"]
 [ext_resource type="Texture2D" path="res://assets/portraits/tony.png" id="portrait_tony"]
 
@@ -236,6 +237,13 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(0.231, 0.141, 0.078, 1)
 anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="fx_debug_bg"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.102, 0.071, 0.051, 0.85)
 
 [sub_resource type="ShaderMaterial" id="vs_lines_mat"]
 shader = ExtResource("fx_lines_shader")
@@ -2016,3 +2024,19 @@ theme_override_constants/shadow_offset_y = 12
 theme_override_font_sizes/font_size = 220
 text = "VS"
 horizontal_alignment = 1
+
+[node name="FxDebug" type="Label" parent="FxLayer"]
+unique_name_in_owner = true
+visible = false
+z_index = 250
+offset_left = 12.0
+offset_top = 330.0
+offset_right = 560.0
+offset_bottom = 260.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.984, 0.953, 0.886, 1)
+theme_override_colors/font_outline_color = Color(0.102, 0.071, 0.051, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("fx_debug_bg")
+script = ExtResource("fx_debug_script")

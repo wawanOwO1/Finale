@@ -25,6 +25,8 @@ extends FxCutscene
 @export var chop_words: PackedStringArray = ["SLASH!", "SLASH!!"]
 @export var chop_color := Color("#f2b632")
 
+## FX Quality Low: always the short version.
+var force_short := false
 var _long_done := false
 var _dish := ""
 var _impacted := false
@@ -40,7 +42,7 @@ func play(dish: String) -> void:
 	_dish = dish
 	_impacted = false
 	_chops = 0
-	var v := "short" if long_once and _long_done else "long"
+	var v := "short" if force_short or (long_once and _long_done) else "long"
 	_long_done = true
 	fx.hold = true
 	ui.set_busy(true)

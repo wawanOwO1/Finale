@@ -28,5 +28,5 @@ Do not push unless asked.
 - Godot binary: `H:\Godot_v4.7.2-stable_win64_console.exe`. After adding a `class_name` script, run
   `--headless --path godot --import` first so the class cache knows it.
 - Tests: `tests/sim.gd` (headless), `tests/audio_check.gd` (headless), `tests/fx_check.gd` (headless), `tests/glb_check.gd` (headless),
-  `tests/ui_drive.gd`, `tests/chef_drive.gd` and
+  `tests/ui_drive.gd`, `tests/chef_drive.gd`, `tests/fx_drive.gd` and
   `tests/hit_probe.gd` (need a window). See `godot/README.md`.

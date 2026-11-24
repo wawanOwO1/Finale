@@ -215,6 +215,11 @@ func fx_screen() -> ColorRect:
 	return %FxScreen
 
 
+## F3 overlay (FPS, draw calls, particles, FX state).
+func fx_debug() -> FxDebug:
+	return %FxDebug
+
+
 ## VS screen before the countdown.
 func vs_intro() -> VsIntro:
 	return %VsIntro
