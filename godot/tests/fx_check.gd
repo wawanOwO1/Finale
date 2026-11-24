@@ -35,6 +35,7 @@ func _initialize() -> void:
 	await _mapping(fx, duel)
 	await _shake(fx)
 	await _hud(fx, main)
+	await _impact(fx)
 	await _real_serve(fx, duel)
 	_end()
 
@@ -49,6 +50,9 @@ func _budgets() -> void:
 				c.hitstop <= b[0] + 0.0001 and c.trauma <= b[1] + 0.0001 and c.flash <= b[2] + 0.0001
 				and c.zoom_punch <= b[3] + 0.0001)
 		_check("%s: only T3 may drain color for long" % f, c.tier == 3 or c.desat_hold <= 0.5)
+		_check("%s: impact frames are T3 only" % f, c.impact_frames == 0 or c.tier == 3)
+		_check("%s: speed lines from T2 up, chroma <= %d px" % [f, [0, 0, 6, 10][c.tier]],
+				(c.lines == "none" or c.tier >= 2) and c.chroma <= [0, 0, 6, 10][c.tier])
 		_check("%s: T0 stays quiet (no word, crowd or crack)" % f, c.tier > 0 or (c.word == "" and c.crowd == 0.0 and not c.crack))
 
 
@@ -192,6 +196,43 @@ func _hud(fx: FxDirector, main: Node) -> void:
 	var up := crowd.filter(func(m: Node3D) -> bool: return m.position.y > m.get_meta("base_y") + main.stage.cheer_height * 0.3)
 	_check("crowd jumps together: %d / %d" % [up.size(), crowd.size()], up.size() > crowd.size() * 0.8)
 	_check("crowd base unchanged", crowd[0].get_meta("base_y") == y0)
+
+
+## F2: impact frames (ink / cream, 2nd one inverted), speed lines, chromatic split.
+func _impact(fx: FxDirector) -> void:
+	await _real_wait(1.5)
+	await process_frame
+	var mat: ShaderMaterial = fx.screen.material
+	fx.play(fx.signature, Vector2(600, 500))
+	_check("signature starts an impact frame", fx.impact_on() and mat.get_shader_parameter("impact") == true)
+	_check("its first frame is not inverted", not fx.impact_inverted())
+	var seen_invert := false
+	var frames := 0
+	while fx.impact_on() and frames < 60:
+		await process_frame
+		frames += 1
+		seen_invert = seen_invert or fx.impact_inverted()
+	_check("the 2nd frame is inverted", seen_invert)
+	_check("impact ends after %d frames (>= %d)" % [frames, fx.signature.impact_frames],
+			not fx.impact_on() and frames >= fx.signature.impact_frames)
+	await process_frame
+	_check("shader impact off again", mat.get_shader_parameter("impact") == false)
+	_check("speed lines up", fx.lines_value() > 0.0 and fx.ui.fx_lines().visible)
+	_check("lines focus on the hit", (fx.ui.fx_lines().material as ShaderMaterial).get_shader_parameter("center") != Vector2(0.5, 0.5))
+	_check("chromatic split on", float(mat.get_shader_parameter("chroma")) > 0.0)
+	fx.hit_stop.clear()
+	await _real_wait(fx.signature.lines_time + 0.1)
+	await process_frame
+	_check("speed lines gone and hidden", fx.lines_value() == 0.0 and not fx.ui.fx_lines().visible)
+	# Reduce Flashing: no strobe, a short desaturate instead.
+	await _real_wait(0.5)
+	fx.reduce_flashing = true
+	fx.play(fx.win, Vector2(600, 500))
+	_check("Reduce Flashing: no impact frame", not fx.impact_on())
+	_check("Reduce Flashing: desaturate instead", fx.desat_value() >= fx.impact_soft_desat - 0.01)
+	fx.reduce_flashing = false
+	fx.hit_stop.clear()
+	await _real_wait(1.0)
 
 
 ## A real Serve through the Duel API reaches FxDirector; a placed card throws crumbs.

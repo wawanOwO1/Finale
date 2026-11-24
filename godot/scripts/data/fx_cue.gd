@@ -44,3 +44,18 @@ extends Resource
 @export_range(0.0, 1.0, 0.05) var crowd := 0.0
 ## Crack the hit side's Confidence bar.
 @export var crack := false
+@export_group("Impact frame")
+## Frames of two-tone ink/cream silhouette at the start of the hit (FX_MASTERPLAN.md §5.2). The 2nd
+## frame is inverted. Each lasts at least 1/60 s and one drawn frame. T3 only. Reduce Flashing turns
+## it into a short desaturate instead.
+@export_range(0, 3) var impact_frames := 0
+@export_group("Speed lines")
+## FxLines mode: radial focus lines, horizontal dash lines, or a shockwave ring.
+@export_enum("none", "radial", "horizontal", "ring") var lines := "none"
+## Seconds on screen (held for 60%, then fading). The ring grows over this time.
+@export_range(0.05, 2.0, 0.05) var lines_time := 0.4
+@export_range(0.0, 1.0, 0.05) var lines_alpha := 0.7
+@export_group("Chromatic split")
+## R/B split at the screen edge, in px (0 = none). Fades over chroma_time.
+@export_range(0.0, 16.0, 0.5) var chroma := 0.0
+@export_range(0.05, 1.0, 0.05) var chroma_time := 0.25

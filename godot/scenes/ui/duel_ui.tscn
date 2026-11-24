@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/ui/almanac_view.gd" id="9"]
 [ext_resource type="Shader" path="res://assets/shaders/fx_screen.gdshader" id="fx_screen_shader"]
 [ext_resource type="Script" path="res://scripts/fx/fx_hud.gd" id="fx_hud_script"]
+[ext_resource type="Shader" path="res://assets/shaders/fx_lines.gdshader" id="fx_lines_shader"]
 
 [sub_resource type="StyleBoxFlat" id="hud_panel"]
 content_margin_left = 18.0
@@ -232,6 +233,10 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(0.231, 0.141, 0.078, 1)
 anti_aliasing = false
+
+[sub_resource type="ShaderMaterial" id="fx_lines_mat"]
+shader = ExtResource("fx_lines_shader")
+shader_parameter/alpha = 0.0
 
 [sub_resource type="ShaderMaterial" id="fx_screen_mat"]
 shader = ExtResource("fx_screen_shader")
@@ -1553,6 +1558,19 @@ mouse_filter = 2
 z_index = 200
 unique_name_in_owner = true
 layout_mode = 0
+mouse_filter = 2
+
+[node name="FxLines" type="ColorRect" parent="Root"]
+visible = false
+z_index = 188
+material = SubResource("fx_lines_mat")
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 
 [node name="FxScreen" type="ColorRect" parent="Root"]

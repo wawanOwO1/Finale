@@ -16,3 +16,6 @@ burst_2 = "sparks"
 word = "BAM!!"
 word_color = Color(0.949, 0.714, 0.196, 1)
 crowd = 0.8
+lines = "radial"
+lines_time = 0.3
+lines_alpha = 0.55

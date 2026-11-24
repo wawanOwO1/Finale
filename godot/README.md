@@ -191,16 +191,19 @@ Flash/desaturasi lewat `%FxScreen` di `duel_ui.tscn` (`assets/shaders/fx_screen.
 Partikel dan kata manga lewat `%FxHud` (`scripts/fx/fx_hud.gd`): 2 `CPUParticles2D` per jenis (`Crumbs`, `Steam`, `Sparks`,
 `Smoke`, `Shards`, dipakai bergiliran, tanpa tekstur) + label `Word1`/`Word2`. Atur bentuk partikel langsung di node-nya.
 Angka Pressure ≥ `DuelUI.slam_number_at` (15) di-*slam* besar, bukan melayang biasa.
+**Impact frame** (Signature, menang): 3 frame siluet dua warna tinta/krem di `%FxScreen`, frame ke-2 terbalik. Tiap frame
+minimal 1/60 s dan 1 frame tergambar. Dengan *Reduce Flashing* diganti desaturasi singkat. Speed lines / cincin kejut lewat
+`%FxLines` (`assets/shaders/fx_lines.gdshader`, prosedural, grid 3 px); chromatic split juga di `%FxScreen`.
 
 | Momen | Cue | Tier | Isi |
 |---|---|---|---|
 | Bahan ditaruh di station | `place` | T0 | remah warna tag |
 | Serve yang kena | `serve` | T1 | uap, "CLANG!", crowd kecil |
-| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 | uap + percikan, "BAM!!", flash krem, punch zoom, crowd |
+| Perfect, atau Serve ≥ `big_pressure` (15) | `serve_big` | T2 | uap + percikan, "BAM!!", speed lines singkat, flash krem, punch zoom, crowd |
 | Serve Burnt | `serve_burnt` | T1 | asap, "FSSHH...", desaturasi singkat |
-| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 | serpihan merah + "CRACK!" di bar yang retak, flash merah |
-| Signature Dish | `signature` | T3 | flash emas, percikan + uap, punch zoom, crowd penuh |
-| Menang / kalah | `win` / `lose` | T3 | serpihan + retak bar lawan / asap + desaturasi panjang |
+| Kehilangan ≥ 25% Confidence sekali kena | `big_hit` | T2 | serpihan merah + "CRACK!" di bar yang retak, flash merah, chromatic |
+| Signature Dish | `signature` | T3 | **impact frame**, speed lines, chromatic, flash emas, percikan + uap, punch zoom, crowd penuh |
+| Menang / kalah | `win` / `lose` | T3 | **impact frame** + speed lines + serpihan + retak bar lawan / asap + desaturasi panjang |
 
 Beberapa cue di frame yang sama tidak menumpuk: nilai terkuat per field yang dipakai.
 Test: `tests/fx_check.gd` (headless) memeriksa anggaran tiap tier, pemetaan signal, hitstop, shake, overlay, batas partikel

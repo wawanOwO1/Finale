@@ -28,6 +28,14 @@ extends Node
 ## Settings menu: flashes at reduce_flash_scale of their alpha.
 @export var reduce_flashing := false
 @export_range(0.0, 1.0, 0.05) var reduce_flash_scale := 0.4
+@export_group("Impact frame")
+## Shortest time one impact frame stays up (it also always gets at least one drawn frame).
+@export_range(0.008, 0.1, 0.001) var impact_frame_time := 1.0 / 60.0
+## Reduce Flashing: the impact frame becomes this much desaturation for the same time.
+@export_range(0.0, 1.0, 0.05) var impact_soft_desat := 0.8
+@export_group("Speed lines")
+## Hand-drawn jitter: new random lines this many times a second.
+@export_range(4.0, 60.0, 1.0) var lines_fps := 24.0
 @export_group("Crack")
 ## Seconds a Confidence-bar crack takes to fade.
 @export_range(0.1, 3.0, 0.05) var crack_time := 0.9
@@ -51,6 +59,20 @@ var _desat_peak := 0.0
 var _desat_at := -100000
 var _desat_hold := 0
 var _desat_fade := 400
+var _lines: ColorRect
+var _lines_mat: ShaderMaterial
+var _lines_mode := 0
+var _lines_peak := 0.0
+var _lines_at := -100000
+var _lines_len := 400
+var _chroma_peak := 0.0
+var _chroma_at := -100000
+var _chroma_len := 250
+## Impact frame state: phase index (-1 = off), how many phases, when the phase began, frames drawn.
+var _impact_phase := -1
+var _impact_count := 0
+var _impact_since := 0
+var _impact_drawn := 0
 ## Prewarm frames left (§7.1): the overlay draws invisibly so WebGL compiles it before the first hit.
 var _warm := 0
 ## Last cue played (tests).
@@ -68,6 +90,8 @@ func setup(stage_: Stage, ui_: DuelUI) -> void:
 	shake.hud = ui
 	screen = ui.fx_screen()
 	_mat = screen.material as ShaderMaterial
+	_lines = ui.fx_lines()
+	_lines_mat = _lines.material as ShaderMaterial
 	prewarm()
 
 
@@ -77,6 +101,9 @@ func bind(d: Duel) -> void:
 	shake.trauma = 0.0
 	_flash_peak = 0.0
 	_desat_peak = 0.0
+	_lines_peak = 0.0
+	_chroma_peak = 0.0
+	_impact_phase = -1
 	d.card_played.connect(_on_card_played)
 	d.dish_revealed.connect(_on_dish_revealed)
 	d.dish_served.connect(_on_dish_served)
@@ -97,6 +124,7 @@ func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> v
 	if cue == null:
 		return
 	last_cue = cue
+	var now := Time.get_ticks_msec()
 	hit_stop.request(cue.hitstop)
 	shake.add(cue.trauma)
 	shake.punch(cue.zoom_punch)
@@ -108,7 +136,6 @@ func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> v
 		hud.word(cue.word, at - Vector2(0, Pal.em(3.0)), cue.word_color, maxi(1, cue.tier))
 	if cue.crack and ui and target != "":
 		_crack(ui.hp_bar(target))
-	var now := Time.get_ticks_msec()
 	var peak := cue.flash * (reduce_flash_scale if reduce_flashing else 1.0)
 	if peak > 0.0 and peak >= _flash_value(now):
 		_flash_peak = peak
@@ -120,6 +147,12 @@ func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> v
 		_desat_at = now
 		_desat_hold = int(cue.desat_hold * 1000.0)
 		_desat_fade = int(cue.desat_fade * 1000.0)
+	if cue.chroma > 0.0 and cue.chroma >= _chroma_value(now):
+		_chroma_peak = cue.chroma
+		_chroma_at = now
+		_chroma_len = int(cue.chroma_time * 1000.0)
+	_start_impact(cue)
+	_start_lines(cue, at)
 	_update_screen()
 
 
@@ -152,6 +185,87 @@ func _hit_point(target: String) -> Vector2:
 	return ui.hit_point(target) if ui else Vector2.INF
 
 
+## True while an impact frame is on screen; impact_inverted() for its 2nd frame (tests, F3 overlay).
+func impact_on() -> bool:
+	return _impact_phase >= 0
+
+
+func impact_inverted() -> bool:
+	return _impact_phase == 1
+
+
+func lines_value() -> float:
+	return _lines_value(Time.get_ticks_msec())
+
+
+func _start_impact(cue: FxCue) -> void:
+	if cue.impact_frames <= 0:
+		return
+	if reduce_flashing:
+		# No black/cream strobe: drain color for the same time instead.
+		var t := cue.impact_frames * impact_frame_time
+		if impact_soft_desat >= _desat_value(Time.get_ticks_msec()):
+			_desat_peak = impact_soft_desat
+			_desat_at = Time.get_ticks_msec()
+			_desat_hold = int(t * 1000.0)
+			_desat_fade = 200
+		return
+	if _impact_phase >= 0 and _impact_count >= cue.impact_frames:
+		return  # one already running, at least as long
+	_impact_phase = 0
+	_impact_count = cue.impact_frames
+	_impact_since = Time.get_ticks_msec()
+	_impact_drawn = 0
+
+
+## Advance the impact frames: a phase ends once it has been drawn and impact_frame_time has passed,
+## so it reads the same at 30, 60 or 144 Hz.
+func _step_impact() -> void:
+	if _impact_phase < 0:
+		return
+	_impact_drawn += 1
+	if _impact_drawn >= 1 and Time.get_ticks_msec() - _impact_since >= int(impact_frame_time * 1000.0):
+		_impact_phase += 1
+		_impact_since = Time.get_ticks_msec()
+		_impact_drawn = 0
+		if _impact_phase >= _impact_count:
+			_impact_phase = -1
+
+
+func _start_lines(cue: FxCue, at: Vector2) -> void:
+	var mode := ["radial", "horizontal", "ring"].find(cue.lines)
+	if mode < 0 or _lines == null:
+		return
+	var now := Time.get_ticks_msec()
+	var peak := cue.lines_alpha
+	if peak < _lines_value(now):
+		return
+	_lines_mode = mode
+	_lines_peak = peak
+	_lines_at = now
+	_lines_len = int(cue.lines_time * 1000.0)
+	var size := _lines.size
+	var c := Vector2(0.5, 0.5) if at == Vector2.INF or size.x <= 0.0 else (at - _lines.global_position) / size
+	_lines_mat.set_shader_parameter("mode", mode)
+	_lines_mat.set_shader_parameter("center", c)
+	_lines_mat.set_shader_parameter("rect_px", size)
+
+
+func _lines_value(now: int) -> float:
+	var t := now - _lines_at
+	if t < 0 or t >= _lines_len:
+		return 0.0
+	var hold := _lines_len * 0.6
+	return _lines_peak if t < hold else _lines_peak * (1.0 - (t - hold) / (_lines_len - hold))
+
+
+func _chroma_value(now: int) -> float:
+	var t := now - _chroma_at
+	if t < 0 or t >= _chroma_len:
+		return 0.0
+	return _chroma_peak * (1.0 - float(t) / _chroma_len)
+
+
 func flash_value() -> float:
 	return _flash_value(Time.get_ticks_msec())
 
@@ -163,6 +277,7 @@ func desat_value() -> float:
 func _process(_delta: float) -> void:
 	if _warm > 0:
 		_warm -= 1
+	_step_impact()
 	_update_screen()
 
 
@@ -172,12 +287,26 @@ func _update_screen() -> void:
 	var now := Time.get_ticks_msec()
 	var f := _flash_value(now)
 	var d := _desat_value(now)
-	var on := f > 0.0 or d > 0.0 or _warm > 0
+	var ch := _chroma_value(now)
+	var on := f > 0.0 or d > 0.0 or ch > 0.0 or _impact_phase >= 0 or _warm > 0
 	screen.visible = on
 	if on and _mat:
-		_mat.set_shader_parameter("flash", maxf(f, 0.001 if _warm > 0 else 0.0))
+		# Prewarm: tiny values on every branch so WebGL compiles the whole shader now.
+		var w := 0.001 if _warm > 0 else 0.0
+		_mat.set_shader_parameter("flash", maxf(f, w))
 		_mat.set_shader_parameter("flash_color", _flash_color)
-		_mat.set_shader_parameter("desat", maxf(d, 0.001 if _warm > 0 else 0.0))
+		_mat.set_shader_parameter("desat", maxf(d, w))
+		_mat.set_shader_parameter("chroma", maxf(ch, w))
+		_mat.set_shader_parameter("impact", _impact_phase >= 0)
+		_mat.set_shader_parameter("impact_invert", _impact_phase == 1)
+	if _lines:
+		var la := _lines_value(now)
+		_lines.visible = la > 0.0 or _warm > 0
+		if _lines.visible:
+			_lines_mat.set_shader_parameter("alpha", maxf(la, 0.001 if _warm > 0 else 0.0))
+			_lines_mat.set_shader_parameter("seed", floorf(now / 1000.0 * lines_fps))
+			if _lines_len > 0:
+				_lines_mat.set_shader_parameter("progress", clampf(float(now - _lines_at) / _lines_len, 0.0, 1.0))
 
 
 func _flash_value(now: int) -> float:

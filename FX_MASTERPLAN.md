@@ -195,6 +195,10 @@ Catatan: post ini hanya mengenai dunia 3D. Untuk HUD, flash/impact dilakukan jug
 
 ### 5.2 Impact frame (gaya anime)
 
+> **Keputusan F2:** warna **tinta/krem** (`#3b2414` / `#fbf3e2`, palet ART_DIRECTION). Dikerjakan di `fx_screen.gdshader`
+> (ambang kecerahan seluruh layar, termasuk HUD), bukan berbasis depth di `pixel_post`: satu shader, jalan dengan atau
+> tanpa filter pixel. Siluet karakter putih dan ilustrasi pre-drawn (frame 2 di tabel bawah) belum dibuat.
+
 Urutan T3 (60 fps):
 
 | Frame | Isi |
@@ -325,7 +329,7 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 |---|---|---|---|
 | **F0 Fondasi** ✅ | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
 | **F1 Juice T0–T2** ✅ | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
-| **F2 Impact frame** | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
+| **F2 Impact frame** ✅ | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
 | **F3 Cutscene Signature** | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
 | **F4 Finish + Intro VS** | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
 | **F5 Optimasi & QA** | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |

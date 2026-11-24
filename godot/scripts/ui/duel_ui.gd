@@ -212,6 +212,11 @@ func fx_screen() -> ColorRect:
 	return %FxScreen
 
 
+## Procedural speed lines / shockwave ring, driven by FxDirector.
+func fx_lines() -> ColorRect:
+	return %FxLines
+
+
 ## Particles + manga words, driven by FxDirector.
 func fx_hud() -> FxHud:
 	return %FxHud

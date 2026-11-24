@@ -15,3 +15,5 @@ burst = "shards"
 word = "CRACK!"
 word_color = Color(0.847, 0.204, 0.173, 1)
 crack = true
+chroma = 6.0
+chroma_time = 0.2
