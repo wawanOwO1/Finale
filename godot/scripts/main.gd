@@ -30,6 +30,10 @@ extends Node
 @onready var almanac_keeper: AlmanacKeeper = $AlmanacKeeper
 ## Hitstop, shake, flash (FX_MASTERPLAN.md); cues are in its Inspector.
 @onready var fx: FxDirector = $FxDirector
+## Apis's Signature Dish cutscene (FX_MASTERPLAN.md §6.2); beats in its AnimationPlayer.
+@onready var signature_cutscene: SignatureCutscene = $SignatureCutscene
+## End-of-duel cutscene (§6.3) before FINISHED / YOU WINS!; beats in its AnimationPlayer.
+@onready var finish_cutscene: FinishCutscene = $FinishCutscene
 
 var duel: Duel
 ## Deck, Confidence, Tips, books and Tools carried from duel to duel.
@@ -46,7 +50,13 @@ func _ready() -> void:
 	_set_pixel(pixel_on_start)
 	director.ui = ui
 	director.hit_stop = fx.hit_stop
-	fx.setup(stage.camera, ui)
+	fx.setup(stage, ui)
+	signature_cutscene.setup(stage, ui, fx)
+	fx.cutscene = signature_cutscene
+	finish_cutscene.setup(stage, ui, fx)
+	fx.finish = finish_cutscene
+	ui.fx = fx
+	ui.fx_debug().fx = fx
 	ui.director = director
 	ui.almanac_keeper = almanac_keeper
 	director.rival_acted.connect(func(_a: Dictionary) -> void: stage.act("rival"))
@@ -91,6 +101,7 @@ func _start_duel() -> void:
 	var recipes := run.recipes()
 	almanac_keeper.prepare(run.deck, recipes)
 	stage.set_plate([])
+	stage.crowd_still = false
 	Audio.play_music("deck")
 	await ui.show_cookbook(recipes)
 	ui.round_number = round_number
@@ -147,4 +158,5 @@ func _set_pixel(on: bool) -> void:
 	var vp: SubViewport = view.get_node("StageViewport")
 	vp.msaa_3d = Viewport.MSAA_DISABLED if on else Viewport.MSAA_2X
 	stage.pixel_post.visible = on
+	stage.cut_pixel_post.visible = on
 	ui.set_pixel_on(on)

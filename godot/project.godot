@@ -25,6 +25,12 @@ window/size/window_height_override=900
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[editor]
+
+; Godot 4.7.2's text→binary conversion on export drops RecipeDef.requires (PackedStringArray),
+; so every recipe needed nothing in the web build. Ship the .tres files as text instead.
+export/convert_text_resources_to_binary=false
+
 [gui]
 
 theme/custom="res://assets/ui_theme.tres"

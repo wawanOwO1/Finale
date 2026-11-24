@@ -19,10 +19,17 @@ const TAG_COLORS := {
 @export var crowd_per_row := 16
 @export var crowd_color := Color("#b5703a")
 @export var crowd_origin := Vector3(-11, 0.6, 6.2)
+## Height of a full-strength cheer jump (FxCue.crowd = 1).
+@export var cheer_height := 0.55
+@export var cheer_time := 0.6
 
 @onready var camera: Camera3D = $Camera3D
 ## Pixel filter post-process quad (assets/shaders/pixel_post.gdshader); main.gd toggles it.
 @onready var pixel_post: MeshInstance3D = $Camera3D/PixelPost
+## Close-up camera for cutscenes (SignatureCutscene moves it between CutMarkers), with its own
+## copy of the pixel filter quad.
+@onready var cut_camera: Camera3D = $CutCamera
+@onready var cut_pixel_post: MeshInstance3D = $CutCamera/CutPixelPost
 @onready var player: Chef = $Player
 @onready var rival: Chef = $Rival
 @onready var plate_items: Node3D = $Plate/Items
@@ -37,7 +44,15 @@ var _time := 0.0
 var _hit_at := {player = -10.0, rival = -10.0}
 var _act_at := {player = -10.0, rival = -10.0}
 var _base := {}
-var _crowd: Array[Node3D] = []
+## Crowd: one MultiMesh (one draw call + its shadow pass, instead of one per member, FX_MASTERPLAN §2.1).
+var _crowd_mm: MultiMesh
+var _crowd_base := PackedVector3Array()
+var _crowd_phase := PackedFloat32Array()
+var _crowd_y := PackedFloat32Array()
+## Lost duel (FinishCutscene): the crowd stops bobbing until the next duel.
+var crowd_still := false
+var _cheer_at := -10.0
+var _cheer := 0.0
 
 
 func _ready() -> void:
@@ -145,6 +160,14 @@ func act(who: String) -> void:
 	_act_at[who] = _time
 
 
+## The whole crowd jumps together (FxDirector, on big moments). power 0..1.
+func cheer(power: float) -> void:
+	if power <= 0.0:
+		return
+	_cheer = maxf(power, _cheer if _time - _cheer_at < cheer_time else 0.0)
+	_cheer_at = _time
+
+
 ## The chef for a duel side: "player" → Apis, anything else ("enemy") → the rival.
 func chef(side: String) -> Chef:
 	return player if side == "player" else rival
@@ -161,10 +184,13 @@ func _process(delta: float) -> void:
 	# chefs with a model get that from their clips (Chef: idle, chop, busy).
 	player.position = _base[player] + Vector3(_shake("player"), _bob(player, 2.2, 0.0) + _hop("player"), 0)
 	rival.position = _base[rival] + Vector3(_shake("rival"), _bob(rival, 2.0, 1.0) + _hop("rival"), 0)
-	for m in _crowd:
-		var phase: float = m.get_meta("phase")
-		var base_y: float = m.get_meta("base_y")
-		m.position.y = base_y + maxf(0.0, sin(_time * 3.0 + phase)) * 0.12
+	for i in _crowd_base.size():
+		var phase := _crowd_phase[i]
+		var dt := _time - _cheer_at - fmod(phase, 0.5) * 0.12
+		var jump := sin(dt / cheer_time * PI) * cheer_height * _cheer if dt > 0.0 and dt < cheer_time else 0.0
+		var bob := 0.0 if crowd_still else maxf(0.0, sin(_time * 3.0 + phase)) * 0.12
+		_crowd_y[i] = bob + jump
+		_crowd_mm.set_instance_transform(i, Transform3D(Basis(), _crowd_base[i] + Vector3(0, _crowd_y[i], 0)))
 
 
 func _shake(who: String) -> float:
@@ -193,15 +219,27 @@ func _spawn_crowd() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = crowd_color
 	mesh.material = mat
-	var holder := Node3D.new()
+	_crowd_mm = MultiMesh.new()
+	_crowd_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_crowd_mm.mesh = flat_mesh(mesh)
+	_crowd_mm.instance_count = crowd_rows * crowd_per_row
+	var holder := MultiMeshInstance3D.new()
 	holder.name = "Crowd"
+	holder.multimesh = _crowd_mm
 	add_child(holder)
 	for row in crowd_rows:
 		for i in crowd_per_row:
-			var m := MeshInstance3D.new()
-			m.mesh = mesh
-			m.position = crowd_origin + Vector3(i * 1.45 + (row % 2) * 0.7, row * 0.35, row * 1.2)
-			m.set_meta("phase", randf() * TAU)
-			m.set_meta("base_y", m.position.y)
-			holder.add_child(m)
-			_crowd.append(m)
+			var at := crowd_origin + Vector3(i * 1.45 + (row % 2) * 0.7, row * 0.35, row * 1.2)
+			_crowd_base.append(at)
+			_crowd_phase.append(randf() * TAU)
+			_crowd_y.append(0.0)
+			_crowd_mm.set_instance_transform(_crowd_base.size() - 1, Transform3D(Basis(), at))
+
+
+## Crowd size, and how high member i is off its spot right now (bob + cheer jump). Tests read these.
+func crowd_count() -> int:
+	return _crowd_base.size()
+
+
+func crowd_lift(i: int) -> float:
+	return _crowd_y[i]

@@ -4,9 +4,11 @@ extends Node
 ## DuelUI: the duel never knows it exists. Each moment is an FxCue (.tres in data/fx/) set in this
 ## node's Inspector; HitStop and Shake are child nodes with their own settings.
 ##
-## Wired in main.gd: fx.setup(stage.camera, ui), then fx.bind(duel) for each new duel.
+## Wired in main.gd: fx.setup(stage, ui), then fx.bind(duel) for each new duel.
 
 @export_group("Cues")
+## An ingredient lands on a station (T0: crumbs in the ingredient's color).
+@export var place: FxCue
 ## Any recipe or Improvised Serve that lands.
 @export var serve: FxCue
 ## Perfect Order, or a Serve taking at least big_pressure.
@@ -26,11 +28,48 @@ extends Node
 ## Settings menu: flashes at reduce_flash_scale of their alpha.
 @export var reduce_flashing := false
 @export_range(0.0, 1.0, 0.05) var reduce_flash_scale := 0.4
+@export_group("Impact frame")
+## Shortest time one impact frame stays up (it also always gets at least one drawn frame).
+@export_range(0.008, 0.1, 0.001) var impact_frame_time := 1.0 / 60.0
+## Reduce Flashing: the impact frame becomes this much desaturation for the same time.
+@export_range(0.0, 1.0, 0.05) var impact_soft_desat := 0.8
+@export_group("Speed lines")
+## Hand-drawn jitter: new random lines this many times a second.
+@export_range(4.0, 60.0, 1.0) var lines_fps := 24.0
+@export_group("Quality")
+## FX Quality Low (FX_MASTERPLAN.md §7.2): half the particles, no chromatic split, the Signature
+## cutscene always short. Shift+F3 toggles it by hand.
+@export var quality_low := false:
+	set(v):
+		quality_low = v
+		_apply_quality()
+## Switch to Low by itself when the game runs slowly (average FPS below auto_low_fps for
+## auto_low_seconds, outside cutscenes). It never switches back on its own.
+@export var auto_quality := true
+## Only watch the FPS in the web build (the editor and tests keep the full effects).
+@export var auto_quality_web_only := true
+@export_range(10.0, 60.0, 1.0) var auto_low_fps := 45.0
+@export_range(1.0, 10.0, 0.5) var auto_low_seconds := 3.0
+@export_group("Crack")
+## Seconds a Confidence-bar crack takes to fade.
+@export_range(0.1, 3.0, 0.05) var crack_time := 0.9
 
 @onready var hit_stop: HitStop = $HitStop
 @onready var shake: Shake = $Shake
 
 var duel: Duel
+## Signature Dish cutscene (main.tscn); null = cut-in + cue only.
+var cutscene: SignatureCutscene
+## End-of-duel cutscene (main.tscn); null = only the win / lose cue.
+var finish: FinishCutscene
+## While true (a cutscene's close-up), play() queues cues; release() plays them at the impact.
+var hold := false
+var _pending: Array = []
+## A duel ended and its finish cutscene has not started yet (waiting for a Signature's impact).
+var _finish_queued := false
+var stage: Stage
+var ui: DuelUI
+var hud: FxHud
 ## The FxScreen overlay (ColorRect with fx_screen.gdshader) from duel_ui.tscn.
 var screen: CanvasItem
 var _mat: ShaderMaterial
@@ -43,17 +82,45 @@ var _desat_peak := 0.0
 var _desat_at := -100000
 var _desat_hold := 0
 var _desat_fade := 400
+var _lines: ColorRect
+var _lines_mat: ShaderMaterial
+var _lines_mode := 0
+var _lines_peak := 0.0
+var _lines_at := -100000
+var _lines_len := 400
+var _chroma_peak := 0.0
+var _chroma_at := -100000
+var _chroma_len := 250
+## Impact frame state: phase index (-1 = off), how many phases, when the phase began, frames drawn.
+var _impact_phase := -1
+var _impact_count := 0
+var _impact_since := 0
+var _impact_drawn := 0
 ## Prewarm frames left (§7.1): the overlay draws invisibly so WebGL compiles it before the first hit.
 var _warm := 0
 ## Last cue played (tests).
 var last_cue: FxCue
 
 
-func setup(camera: Camera3D, ui: DuelUI) -> void:
-	shake.camera = camera
+var _crack_tw := {}
+## Time the FPS has stayed under auto_low_fps (auto quality).
+var _slow_for := 0.0
+## True when auto quality made the switch (the F3 overlay says so).
+var auto_switched := false
+
+
+func setup(stage_: Stage, ui_: DuelUI) -> void:
+	stage = stage_
+	ui = ui_
+	hud = ui.fx_hud()
+	shake.camera = stage.camera
 	shake.hud = ui
+	shake.extra_layers = [ui.fx_layer()]
 	screen = ui.fx_screen()
 	_mat = screen.material as ShaderMaterial
+	_apply_quality()
+	_lines = ui.fx_lines()
+	_lines_mat = _lines.material as ShaderMaterial
 	prewarm()
 
 
@@ -63,22 +130,86 @@ func bind(d: Duel) -> void:
 	shake.trauma = 0.0
 	_flash_peak = 0.0
 	_desat_peak = 0.0
+	_lines_peak = 0.0
+	_chroma_peak = 0.0
+	_impact_phase = -1
+	hold = false
+	_pending.clear()
+	_finish_queued = false
+	_apply_quality()
+	if cutscene:
+		cutscene.abort()
+	if finish:
+		finish.abort()
+	d.card_played.connect(_on_card_played)
 	d.dish_revealed.connect(_on_dish_revealed)
 	d.dish_served.connect(_on_dish_served)
 	d.confidence_lost.connect(_on_confidence_lost)
-	d.signature_served.connect(func(_side: String, _dish: String) -> void: play(signature))
-	d.duel_ended.connect(func(winner: String) -> void: play(win if winner == "player" else lose))
+	d.signature_served.connect(_on_signature)
+	d.duel_ended.connect(_on_duel_ended)
 
 
 ## Fire a cue. Values merge with what is already running (strongest wins), so a Serve that fires
 ## three signals in one frame still feels like one hit.
-func play(cue: FxCue) -> void:
+##   at: HUD position for its particles and word (Vector2.INF = screen-wide parts only).
+##   tint: particle color (crumbs take the ingredient's tag color).
+##   target: side whose Confidence bar cracks ("player" | "enemy"), if the cue cracks.
+func play(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> void:
+	if cue == null:
+		return
+	if hold:
+		_pending.append([cue, at, tint, target])
+		return
+	play_now(cue, at, tint, target)
+
+
+## Run `f` now, or at the impact if a cutscene is holding cues.
+func after_hold(f: Callable) -> void:
+	if hold:
+		_pending.append(f)
+	else:
+		f.call()
+
+
+## True from the end of a duel until its finish cutscene is over (DuelUI waits for this).
+func finish_pending() -> bool:
+	return _finish_queued or (finish != null and finish.playing)
+
+
+## Play the cues held during a cutscene close-up, all in one frame (they merge as usual).
+func release() -> void:
+	hold = false
+	var cues := _pending.duplicate()
+	_pending.clear()
+	for c in cues:
+		if c is Array:
+			play_now(c[0], c[1], c[2], c[3])
+		else:
+			(c as Callable).call()
+
+
+## Cues queued by hold (tests).
+func pending() -> int:
+	return _pending.size()
+
+
+## Like play(), but ignores hold (the cutscene's own opening beat).
+func play_now(cue: FxCue, at := Vector2.INF, tint := Color.WHITE, target := "") -> void:
 	if cue == null:
 		return
 	last_cue = cue
+	var now := Time.get_ticks_msec()
 	hit_stop.request(cue.hitstop)
 	shake.add(cue.trauma)
-	var now := Time.get_ticks_msec()
+	shake.punch(cue.zoom_punch)
+	if stage:
+		stage.cheer(cue.crowd)
+	if hud and at != Vector2.INF:
+		hud.burst(cue.burst, at, tint)
+		hud.burst(cue.burst_2, at, Color.WHITE)
+		hud.word(cue.word, at - Vector2(0, Pal.em(3.0)), cue.word_color, cue.tier)
+	if cue.crack and ui and target != "":
+		_crack(ui.hp_bar(target))
 	var peak := cue.flash * (reduce_flash_scale if reduce_flashing else 1.0)
 	if peak > 0.0 and peak >= _flash_value(now):
 		_flash_peak = peak
@@ -90,6 +221,12 @@ func play(cue: FxCue) -> void:
 		_desat_at = now
 		_desat_hold = int(cue.desat_hold * 1000.0)
 		_desat_fade = int(cue.desat_fade * 1000.0)
+	if cue.chroma > 0.0 and not quality_low and cue.chroma >= _chroma_value(now):
+		_chroma_peak = cue.chroma
+		_chroma_at = now
+		_chroma_len = int(cue.chroma_time * 1000.0)
+	_start_impact(cue)
+	_start_lines(cue, at)
 	_update_screen()
 
 
@@ -98,6 +235,138 @@ func play(cue: FxCue) -> void:
 func prewarm() -> void:
 	_warm = 2
 	_update_screen()
+	if hud:
+		hud.prewarm()
+
+
+func _apply_quality() -> void:
+	if hud:
+		hud.amount_scale = 0.5 if quality_low else 1.0
+	if cutscene:
+		cutscene.force_short = quality_low
+
+
+## Auto quality: a few slow seconds (not counting cutscenes, which slow the world on purpose) → Low.
+func _watch_fps() -> void:
+	if quality_low or not auto_quality or (auto_quality_web_only and not OS.has_feature("web")):
+		return
+	if (cutscene and cutscene.playing) or (finish and finish.playing) or _warm > 0:
+		_slow_for = 0.0
+		return
+	var fps := Engine.get_frames_per_second()
+	_slow_for = _slow_for + get_process_delta_time() / maxf(0.01, Engine.time_scale) if fps > 0.0 and fps < auto_low_fps else 0.0
+	if _slow_for >= auto_low_seconds:
+		auto_switched = true
+		quality_low = true
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k and k.pressed and not k.echo and k.keycode == KEY_F3 and k.shift_pressed:
+		quality_low = not quality_low
+		auto_switched = false
+		get_viewport().set_input_as_handled()
+
+
+func _crack(bar: HpBar) -> void:
+	bar.crack_seed = randi()
+	bar.crack = 1.0
+	var old: Tween = _crack_tw.get(bar)
+	if old and old.is_valid():
+		old.kill()
+	var tw := create_tween()
+	tw.tween_interval(crack_time * 0.4)
+	tw.tween_property(bar, "crack", 0.0, crack_time * 0.6)
+	_crack_tw[bar] = tw
+
+
+func _serve_point(side: String) -> Vector2:
+	return ui.serve_rect(side).get_center() if ui else Vector2.INF
+
+
+func _hit_point(target: String) -> Vector2:
+	return ui.hit_point(target) if ui else Vector2.INF
+
+
+## True while an impact frame is on screen; impact_inverted() for its 2nd frame (tests, F3 overlay).
+func impact_on() -> bool:
+	return _impact_phase >= 0
+
+
+func impact_inverted() -> bool:
+	return _impact_phase == 1
+
+
+func lines_value() -> float:
+	return _lines_value(Time.get_ticks_msec())
+
+
+func _start_impact(cue: FxCue) -> void:
+	if cue.impact_frames <= 0:
+		return
+	if reduce_flashing:
+		# No black/cream strobe: drain color for the same time instead.
+		var t := cue.impact_frames * impact_frame_time
+		if impact_soft_desat >= _desat_value(Time.get_ticks_msec()):
+			_desat_peak = impact_soft_desat
+			_desat_at = Time.get_ticks_msec()
+			_desat_hold = int(t * 1000.0)
+			_desat_fade = 200
+		return
+	if _impact_phase >= 0 and _impact_count >= cue.impact_frames:
+		return  # one already running, at least as long
+	_impact_phase = 0
+	_impact_count = cue.impact_frames
+	_impact_since = Time.get_ticks_msec()
+	_impact_drawn = 0
+
+
+## Advance the impact frames: a phase ends once it has been drawn and impact_frame_time has passed,
+## so it reads the same at 30, 60 or 144 Hz.
+func _step_impact() -> void:
+	if _impact_phase < 0:
+		return
+	_impact_drawn += 1
+	if _impact_drawn >= 1 and Time.get_ticks_msec() - _impact_since >= int(impact_frame_time * 1000.0):
+		_impact_phase += 1
+		_impact_since = Time.get_ticks_msec()
+		_impact_drawn = 0
+		if _impact_phase >= _impact_count:
+			_impact_phase = -1
+
+
+func _start_lines(cue: FxCue, at: Vector2) -> void:
+	var mode := ["radial", "horizontal", "ring"].find(cue.lines)
+	if mode < 0 or _lines == null:
+		return
+	var now := Time.get_ticks_msec()
+	var peak := cue.lines_alpha
+	if peak < _lines_value(now):
+		return
+	_lines_mode = mode
+	_lines_peak = peak
+	_lines_at = now
+	_lines_len = int(cue.lines_time * 1000.0)
+	var size := _lines.size
+	var c := Vector2(0.5, 0.5) if at == Vector2.INF or size.x <= 0.0 else (at - _lines.global_position) / size
+	_lines_mat.set_shader_parameter("mode", mode)
+	_lines_mat.set_shader_parameter("center", c)
+	_lines_mat.set_shader_parameter("rect_px", size)
+
+
+func _lines_value(now: int) -> float:
+	var t := now - _lines_at
+	if t < 0 or t >= _lines_len:
+		return 0.0
+	var hold := _lines_len * 0.6
+	return _lines_peak if t < hold else _lines_peak * (1.0 - (t - hold) / (_lines_len - hold))
+
+
+func _chroma_value(now: int) -> float:
+	var t := now - _chroma_at
+	if t < 0 or t >= _chroma_len:
+		return 0.0
+	return _chroma_peak * (1.0 - float(t) / _chroma_len)
 
 
 func flash_value() -> float:
@@ -111,6 +380,8 @@ func desat_value() -> float:
 func _process(_delta: float) -> void:
 	if _warm > 0:
 		_warm -= 1
+	_watch_fps()
+	_step_impact()
 	_update_screen()
 
 
@@ -120,12 +391,26 @@ func _update_screen() -> void:
 	var now := Time.get_ticks_msec()
 	var f := _flash_value(now)
 	var d := _desat_value(now)
-	var on := f > 0.0 or d > 0.0 or _warm > 0
+	var ch := _chroma_value(now)
+	var on := f > 0.0 or d > 0.0 or ch > 0.0 or _impact_phase >= 0 or _warm > 0
 	screen.visible = on
 	if on and _mat:
-		_mat.set_shader_parameter("flash", maxf(f, 0.001 if _warm > 0 else 0.0))
+		# Prewarm: tiny values on every branch so WebGL compiles the whole shader now.
+		var w := 0.001 if _warm > 0 else 0.0
+		_mat.set_shader_parameter("flash", maxf(f, w))
 		_mat.set_shader_parameter("flash_color", _flash_color)
-		_mat.set_shader_parameter("desat", maxf(d, 0.001 if _warm > 0 else 0.0))
+		_mat.set_shader_parameter("desat", maxf(d, w))
+		_mat.set_shader_parameter("chroma", maxf(ch, w))
+		_mat.set_shader_parameter("impact", _impact_phase >= 0)
+		_mat.set_shader_parameter("impact_invert", _impact_phase == 1)
+	if _lines:
+		var la := _lines_value(now)
+		_lines.visible = la > 0.0 or _warm > 0
+		if _lines.visible:
+			_lines_mat.set_shader_parameter("alpha", maxf(la, 0.001 if _warm > 0 else 0.0))
+			_lines_mat.set_shader_parameter("seed", floorf(now / 1000.0 * lines_fps))
+			if _lines_len > 0:
+				_lines_mat.set_shader_parameter("progress", clampf(float(now - _lines_at) / _lines_len, 0.0, 1.0))
 
 
 func _flash_value(now: int) -> float:
@@ -144,20 +429,47 @@ func _desat_value(now: int) -> float:
 	return _desat_peak * (1.0 - float(t - _desat_hold) / _desat_fade)
 
 
-func _on_dish_revealed(_side: String, _recipe: RecipeDef, perfect: bool, sig: bool, burnt: bool) -> void:
+## Apis's Signature: the cutscene takes over (it holds every cue until its impact beat);
+## without one, the old cut-in banner and the signature cue right away.
+func _on_signature(side: String, dish: String) -> void:
+	if side == "player" and cutscene and cutscene.enabled:
+		cutscene.play(dish)
+		play(signature, _serve_point(side))
+		return
+	if side == "player" and ui:
+		ui.play_cutin(dish)
+	play(signature, _serve_point(side))
+
+
+func _on_duel_ended(winner: String) -> void:
+	var loser := "enemy" if winner == "player" else "player"
+	play(win if winner == "player" else lose, _hit_point(loser), Color.WHITE, loser)
+	if finish and finish.enabled:
+		_finish_queued = true
+		after_hold(func() -> void:
+			_finish_queued = false
+			finish.play(winner == "player"))
+
+
+func _on_card_played(side: String, card: CardInstance) -> void:
+	if ui and card.def.is_ingredient():
+		play(place, ui.card_point(side, card), Pal.tag_color(card.def.first_tag()).lightened(0.25))
+
+
+func _on_dish_revealed(side: String, _recipe: RecipeDef, perfect: bool, sig: bool, burnt: bool) -> void:
 	if sig:
 		return  # signature_served already played its cue
 	if burnt:
-		play(serve_burnt)
+		play(serve_burnt, _serve_point(side))
 	elif perfect:
-		play(serve_big)
+		play(serve_big, _serve_point(side))
 
 
-func _on_dish_served(_side: String, _recipe: RecipeDef, pressure: int, _quality: int, _count: int) -> void:
+func _on_dish_served(side: String, _recipe: RecipeDef, pressure: int, _quality: int, _count: int) -> void:
 	if pressure >= big_pressure:
-		play(serve_big)
+		play(serve_big, _serve_point(side))
 	elif pressure > 0:
-		play(serve)
+		play(serve, _serve_point(side))
 
 
 func _on_confidence_lost(target: String, amount: int, source: String) -> void:
@@ -165,4 +477,5 @@ func _on_confidence_lost(target: String, amount: int, source: String) -> void:
 		return
 	var f := duel.fighter(target)
 	if amount >= f.max_confidence * big_hit_ratio:
-		play(big_hit)
+		# Shards and "CRACK!" on the bar that cracks; the slammed number stays over the chef.
+		play(big_hit, ui.hp_bar(target).get_global_rect().get_center() + Vector2(0, Pal.em(3.0)), Color.WHITE, target)

@@ -195,6 +195,10 @@ Catatan: post ini hanya mengenai dunia 3D. Untuk HUD, flash/impact dilakukan jug
 
 ### 5.2 Impact frame (gaya anime)
 
+> **Keputusan F2:** warna **tinta/krem** (`#3b2414` / `#fbf3e2`, palet ART_DIRECTION). Dikerjakan di `fx_screen.gdshader`
+> (ambang kecerahan seluruh layar, termasuk HUD), bukan berbasis depth di `pixel_post`: satu shader, jalan dengan atau
+> tanpa filter pixel. Siluet karakter putih dan ilustrasi pre-drawn (frame 2 di tabel bawah) belum dibuat.
+
 Urutan T3 (60 fps):
 
 | Frame | Isi |
@@ -223,6 +227,11 @@ Urutan T3 (60 fps):
 
 Semua partikel: `one_shot`, `explosiveness` tinggi, `lifetime` ≤ 0.8 s, `fixed_fps = 30` (cukup untuk gaya pixel, separuh biaya).
 
+> **Keputusan F1:** partikel HUD memakai **`CPUParticles2D`**, bukan GPU. Dengan 12–20 partikel per burst biaya CPU-nya
+> kecil sekali, dan tidak ada shader partikel yang harus dikompilasi WebGL saat Serve pertama. Tanpa tekstur:
+> tiap partikel kotak pixel yang di-scale (cocok dengan gaya pixel, tidak ada atlas untuk diunduh). Atlas tetap
+> opsional kalau nanti butuh bentuk (bintang, api).
+
 ### 5.5 "Bloom" dan aura tanpa glow
 
 - Aura Signature: 2 sprite additive (lingkaran lembut + api flipbook 4 frame) di belakang Apis, bukan `Environment.glow`.
@@ -247,6 +256,12 @@ Semua partikel: `one_shot`, `explosiveness` tinggi, `lifetime` ≤ 0.8 s, `fixed
 
 ### 6.2 Signature Dish (T3, ±2.5 s penuh / ±1.2 s pendek)
 
+> **Keputusan F3:** versi panjang 2.3 s, pendek 1.0 s, panjang **sekali per sesi**. Dunia dibekukan selama close-up
+> (`HitStop.cutscene_factor = 0.02`), sementara `AnimationPlayer` cutscene (mode manual), Apis (`Chef.set_anim_speed`),
+> cut-in, dan kata SLASH berjalan di waktu nyata. `FxDirector.hold` menahan cue damage/KO sampai beat impact, jadi angka
+> dan reaksi rival mendarat tepat di impact frame. Kamera kembali ke duel **di** impact frame (siluet dua warna menutupi
+> potongannya). Voice line belum ada (menunggu aset).
+
 | t (s) | Kamera / dunia | Overlay 2D | Audio |
 |---|---|---|---|
 | 0.00 | Hitstop, dunia desaturasi, letterbox masuk | Speed lines radial, teks "SIGNATURE!" slam | whoosh |
@@ -260,10 +275,18 @@ Versi pendek: lompati 0.25–0.90 (close-up), langsung ke impact frame.
 
 ### 6.3 Finish / KO (T3, ±2 s, lalu announcer yang sudah ada)
 
+> **Keputusan F4:** `FinishCutscene` (win 1.5 s, lose 1.8 s) memakai base class `FxCutscene` yang sama dengan
+> Signature. Kamera mulai **dari transform kamera duel** lalu meluncur ke marker (tanpa potongan). HUD memudar
+> selama cutscene; announcer menunggu `FxDirector.finish_pending()`. KO lewat Signature: Finish ditahan sampai
+> impact Signature.
+
 - **Menang:** hitstop panjang 0.25 s pada Serve terakhir → impact frame → slow-mo (`cutscene_factor = 0.3`) 0.6 s sambil kamera dorong pelan ke rival → rival `perform("lose")` → time scale normal → `FINISHED` → `YOU WINS!` (Announcer).
 - **Kalah:** tanpa impact frame. Desaturasi bertahap, kamera turun pelan ke Apis berlutut, crowd diam (berhenti bob). Lalu `LOSER` yang sudah ada.
 
 ### 6.4 Intro VS (T2, ±2 s, sebelum 3·2·1)
+
+> **Keputusan F4:** potret dirender dari GLB dengan `tests/portrait_render.gd` (360×420, transparan), bukan digambar.
+> Baru Apis dan Tony; rival lain tampil nama + gelar saja sampai modelnya ada.
 
 - Split-screen diagonal di `%FxLayer`: kiri Apis, kanan rival. Pakai **potret 2D pre-render** dari model 3D
   (1 PNG per chef, dibuat sekali), bukan render live ke SubViewport tambahan: tidak ada pass 3D ekstra.
@@ -296,6 +319,25 @@ Versi pendek: lompati 0.25–0.90 (close-up), langsung ke impact frame.
 
 ---
 
+### 7.3 Hasil F5 (24 Nov 2026)
+
+| Ukuran | Sebelum | Sesudah | Catatan |
+|---|---|---|---|
+| Draw call saat duel, desktop 1280×720 | 254 | 169 | Penonton 32 kapsul → 1 MultiMesh (−85). Sisa terbesar: HUD ±130 |
+| Draw call saat duel, build Web | 272 | 174–188 | Overlay F3 di Chromium |
+| Lonjakan frame pertama kali (fx_drive) | – | ×1.9–2.2 median | Batas ×4; prewarm bekerja |
+| Median frame dengan FX vs diam | – | +3–5 ms (renderer software) | Kecil |
+| Partikel skenario terburuk | – | 92 / 150 | fx_check |
+
+- Build Web diuji di Chromium (WebGL 2, SwiftShader = render di CPU): termuat, VS, duel, drag kartu, Serve + FX, tanpa
+  error di console. FPS di sana (±7) tidak mewakili GPU sungguhan, jadi auto-quality langsung memilih Low: **perlu tes
+  di laptop sungguhan** untuk angka FPS.
+- Ditemukan dan diperbaiki: export Web menghapus `RecipeDef.requires` (konversi teks→biner Godot 4.7.2); konversi
+  dimatikan di `project.godot`.
+- Catatan terbuka: Chromium melapor "GPU stall due to ReadPixels" saat start (dilaporkan 4× lalu disembunyikan). Belum
+  diketahui sumbernya (kemungkinan salinan layar `hint_screen_texture`/depth di `pixel_post`); cek di GPU sungguhan.
+- HUD (±130 draw call) adalah kandidat optimasi berikutnya, di luar lingkup FX.
+
 ## 8. Aset yang dibutuhkan
 
 | Aset | Jumlah | Format | Sumber |
@@ -319,11 +361,11 @@ Diurutkan dari **dampak terbesar per jam kerja**. Setiap fase selesai = commit +
 | Fase | Isi | Perkiraan | Hasil yang terlihat |
 |---|---|---|---|
 | **F0 Fondasi** ✅ | `FxDirector` + `HitStop` (pemilik time scale, TurnDirector disesuaikan) + `Shake` trauma + `FxCue` resource + uniform flash/desat di `pixel_post` + prewarm | 1 hari | Serve terasa "berat" walau tanpa partikel |
-| **F1 Juice T0–T2** | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
-| **F2 Impact frame** | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
-| **F3 Cutscene Signature** | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
-| **F4 Finish + Intro VS** | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
-| **F5 Optimasi & QA** | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
+| **F1 Juice T0–T2** ✅ | Partikel pool (remah, uap, asap), angka slam per tier, punch zoom, teks manga SFX, crack bar, crowd lompat serentak | 1–1.5 hari | Setiap aksi punya umpan balik, Perfect terasa beda dari Cooked |
+| **F2 Impact frame** ✅ | `fx_impact`, `fx_chroma`, `fx_lines` serbaguna, versi Reduce Flashing | 0.5 hari | Momen "anime" pertama |
+| **F3 Cutscene Signature** ✅ | `CutCamera`, `CutscenePlayer`, letterbox, versi panjang + pendek, skip | 1–1.5 hari | GDD §4.5 terpenuhi |
+| **F4 Finish + Intro VS** ✅ | KO win/lose, VS screen 2D | 1 hari | Awal dan akhir duel terasa seperti acara TV |
+| **F5 Optimasi & QA** ✅ | Viewport 640×360, overlay F3, FX Quality Low, tes build Web 2 browser | 0.5–1 hari | ≥ 45 fps di iGPU |
 | **Stretch** | Bruno fase 2, crowd wave, ilustrasi impact frame pre-drawn | — | — |
 
 > F5 sebaiknya dikerjakan sebagian **sebelum F1** (viewport + overlay F3), supaya semua FX dinilai di kondisi akhir.
@@ -347,7 +389,7 @@ prewarm. Itu yang paling murah dan paling terasa.
 
 ## 11. Pertanyaan terbuka
 
-- [ ] Impact frame: **2 warna (tinta/krem)** sesuai palet, atau **hitam-putih murni** ala manga? Usulan: tinta/krem, lebih menyatu dengan ART_DIRECTION.
+- [x] ~~Impact frame: 2 warna atau hitam-putih?~~ → **tinta/krem**, F2.
 - [ ] Rival boleh punya mini cut-in (T2) saat Serve besar, atau Signature tetap eksklusif Apis secara visual juga?
 - [ ] Voice line: berapa yang realistis dari ElevenLabs sebelum 13 Des?
-- [ ] Cutscene panjang "sekali per run" atau "sekali per duel"?
+- [x] ~~Cutscene panjang "sekali per run" atau "sekali per duel"?~~ → sekali per sesi (`long_once`), F3.

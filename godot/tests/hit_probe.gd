@@ -18,6 +18,10 @@ func _initialize() -> void:
 	print("window %s  canvas %s" % [root.size, ui.get_node("%Root").size])
 	await _probe(ui.get_node("%StartButton"))
 	await _click(ui.get_node("%StartButton").get_global_rect().get_center())
+	# VS screen first (FX_MASTERPLAN.md §6.4), then the countdown.
+	await _wait(0.3)
+	while ui.get_node("%VsIntro").visible:
+		await _wait(0.05)
 	await _wait(5.0)  # 3·2·1 FIGHT! intro
 	# Give station 1 a card so its Serve / Clear buttons exist.
 	var c := CardInstance.new(90000, GameDB.card("bread"))

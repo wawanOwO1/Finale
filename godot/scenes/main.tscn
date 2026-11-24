@@ -8,6 +8,10 @@
 [ext_resource type="Script" path="res://scripts/fx/fx_director.gd" id="fx_director"]
 [ext_resource type="Script" path="res://scripts/fx/hit_stop.gd" id="hit_stop"]
 [ext_resource type="Script" path="res://scripts/fx/shake.gd" id="shake"]
+[ext_resource type="Resource" path="res://data/fx/place.tres" id="fx_place"]
+[ext_resource type="Script" path="res://scripts/fx/signature_cutscene.gd" id="sig_cutscene"]
+[ext_resource type="Resource" path="res://data/fx/signature_open.tres" id="fx_signature_open"]
+[ext_resource type="Script" path="res://scripts/fx/finish_cutscene.gd" id="fin_cutscene"]
 [ext_resource type="Resource" path="res://data/fx/serve.tres" id="fx_serve"]
 [ext_resource type="Resource" path="res://data/fx/serve_big.tres" id="fx_serve_big"]
 [ext_resource type="Resource" path="res://data/fx/serve_burnt.tres" id="fx_serve_burnt"]
@@ -15,6 +19,123 @@
 [ext_resource type="Resource" path="res://data/fx/signature.tres" id="fx_signature"]
 [ext_resource type="Resource" path="res://data/fx/win.tres" id="fx_win"]
 [ext_resource type="Resource" path="res://data/fx/lose.tres" id="fx_lose"]
+
+[sub_resource type="Animation" id="sig_long"]
+resource_name = "long"
+length = 2.3
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 0.25, 0.6, 0.95, 1.4, 2.3),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"values": [{
+"args": [],
+"method": &"_beat_open"
+}, {
+"args": [],
+"method": &"_beat_closeup"
+}, {
+"args": [],
+"method": &"_beat_chop"
+}, {
+"args": [],
+"method": &"_beat_chop"
+}, {
+"args": [],
+"method": &"_beat_impact"
+}, {
+"args": [],
+"method": &"_beat_close"
+}]
+}
+
+[sub_resource type="Animation" id="sig_short"]
+resource_name = "short"
+length = 1.0
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 0.3, 1.0),
+"transitions": PackedFloat32Array(1, 1, 1),
+"values": [{
+"args": [],
+"method": &"_beat_open"
+}, {
+"args": [],
+"method": &"_beat_impact"
+}, {
+"args": [],
+"method": &"_beat_close"
+}]
+}
+
+[sub_resource type="AnimationLibrary" id="sig_lib"]
+_data = {
+&"long": SubResource("sig_long"),
+&"short": SubResource("sig_short")
+}
+
+[sub_resource type="Animation" id="fin_win"]
+resource_name = "win"
+length = 1.5
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 0.55, 1.5),
+"transitions": PackedFloat32Array(1, 1, 1),
+"values": [{
+"args": [],
+"method": &"_beat_open"
+}, {
+"args": [],
+"method": &"_beat_react"
+}, {
+"args": [],
+"method": &"_beat_back"
+}]
+}
+
+[sub_resource type="Animation" id="fin_lose"]
+resource_name = "lose"
+length = 1.8
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 0.6, 1.8),
+"transitions": PackedFloat32Array(1, 1, 1),
+"values": [{
+"args": [],
+"method": &"_beat_open"
+}, {
+"args": [],
+"method": &"_beat_react"
+}, {
+"args": [],
+"method": &"_beat_back"
+}]
+}
+
+[sub_resource type="AnimationLibrary" id="fin_lib"]
+_data = {
+&"lose": SubResource("fin_lose"),
+&"win": SubResource("fin_win")
+}
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -47,6 +168,7 @@ script = ExtResource("5")
 
 [node name="FxDirector" type="Node" parent="."]
 script = ExtResource("fx_director")
+place = ExtResource("fx_place")
 serve = ExtResource("fx_serve")
 serve_big = ExtResource("fx_serve_big")
 serve_burnt = ExtResource("fx_serve_burnt")
@@ -60,3 +182,24 @@ script = ExtResource("hit_stop")
 
 [node name="Shake" type="Node" parent="FxDirector"]
 script = ExtResource("shake")
+
+[node name="SignatureCutscene" type="Node" parent="."]
+script = ExtResource("sig_cutscene")
+open_cue = ExtResource("fx_signature_open")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="SignatureCutscene"]
+callback_mode_process = 2
+callback_mode_method = 1
+libraries = {
+&"": SubResource("sig_lib")
+}
+
+[node name="FinishCutscene" type="Node" parent="."]
+script = ExtResource("fin_cutscene")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="FinishCutscene"]
+callback_mode_process = 2
+callback_mode_method = 1
+libraries = {
+&"": SubResource("fin_lib")
+}
